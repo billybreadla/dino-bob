@@ -127,12 +127,19 @@ function Stage({ width, height, duration, background = '#0a0a0a', persistKey = '
   }, [width, height, showBar]);
   useEffect(() => {
     if (!playing) { last.current = null; return; }
+    let elapsed = 0, autoAdvanced = false;
     const step = ts => {
       if (last.current == null) last.current = ts;
       const dt = (ts - last.current) / 1000; last.current = ts;
       // loop mode wraps; play-once mode lets time grow past duration so the
       // "TAP TO START" blink keeps animating while the scene holds on its end.
       setTime(t => { let n = t + dt; if (loop && n >= duration) n = n % duration; return n; });
+      // play-once: if the scene has held a few seconds past its end and nobody
+      // has tapped, auto-advance so a child is never stuck on the last frame.
+      if (!loop && onTap && !autoAdvanced) {
+        elapsed += dt;
+        if (elapsed >= duration + 3) { autoAdvanced = true; onTap(); }
+      }
       raf.current = requestAnimationFrame(step);
     };
     raf.current = requestAnimationFrame(step);

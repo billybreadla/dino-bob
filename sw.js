@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v3';
+var CACHE = 'dinobob-v4';
 var FILES = [
   '.',
   'index.html',
@@ -27,6 +27,8 @@ var FILES = [
   'manifest.webmanifest',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
+  // every sprite the game can draw (all confirmed present on disk) so a cache
+  // version bump never strands the game with blank art while offline
   'assets/sprites/char_dinobob.png',
   'assets/sprites/char_ninja.png',
   'assets/sprites/char_astronaut.png',
@@ -36,8 +38,37 @@ var FILES = [
   'assets/sprites/arrow_fire.png',
   'assets/sprites/arrow_ice.png',
   'assets/sprites/arrow_lightning.png',
+  'assets/sprites/arrow_obsidian.png',
   'assets/sprites/bow.png',
-  'assets/sprites/balloon.png'
+  'assets/sprites/balloon.png',
+  'assets/sprites/bg_meadow.png',
+  'assets/sprites/bg_mountain.png',
+  'assets/sprites/target.png',
+  'assets/sprites/coin.png',
+  'assets/sprites/blackhole_0.png',
+  'assets/sprites/blackhole_1.png',
+  'assets/sprites/blackhole_2.png',
+  'assets/sprites/chest_closed.png',
+  'assets/sprites/chest_semi.png',
+  'assets/sprites/chest_open.png',
+  'assets/sprites/fruit_apple.png',
+  'assets/sprites/fruit_banana.png',
+  'assets/sprites/fruit_pineapple.png',
+  'assets/sprites/fruit_strawberry.png',
+  'assets/sprites/fruit_orange.png',
+  'assets/sprites/fruit_grapes.png',
+  'assets/sprites/fruit_pear.png',
+  'assets/sprites/fruit_cherry.png',
+  'assets/sprites/fruit_watermelon.png',
+  'assets/sprites/hat_cap.png',
+  'assets/sprites/hat_viking.png',
+  'assets/sprites/hat_robin.png',
+  'assets/sprites/hat_bandana.png',
+  'assets/sprites/hat_wizard.png',
+  'assets/sprites/hat_crown.png',
+  'assets/sprites/hat_pirate.png',
+  'assets/sprites/hat_dino.png',
+  'assets/sprites/hat_astro.png'
 ];
 
 self.addEventListener('install', function (e) {

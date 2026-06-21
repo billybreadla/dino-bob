@@ -583,15 +583,18 @@ var GAME = (function () {
         } else if (best.type === 'balloon') {
           award(TUNING.SCORE_BALLOON, best.x, best.y, { half: true, bonusObj: true });
           best.dead = true; AUDIO.pop(); burst(best.x, best.y, best.color);
+          track('balloons', 'balloons_50', 50);
         } else if (best.type === 'fruit') {
           award(best.value, best.x, best.y, { half: true, bonusObj: true });
           best.dead = true; fruitSplat(best);
+          track('fruits', 'fruits_100', 100);
         } else if (best.type === 'chest') {
           best.hp--; best.wobble = 1;
           if (best.hp <= 0) {
             award(TUNING.SCORE_CHEST, best.x, best.y - 50, { half: true, bonusObj: true });
             best.dead = true; AUDIO.chest();
             spawnCoins(Math.ceil(TUNING.COINS_FROM_CHEST / 2), best.x, best.y - 20);
+            track('chests', 'chests_10', 10);
           }
         }
       }
