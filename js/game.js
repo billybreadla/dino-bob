@@ -14,24 +14,38 @@ var GAME = (function () {
 
   /* ============ round setup ============ */
 
-  function newRound() {
+  function newRound(options) {
+    options = options || {};
     var p = SAVE.current();
     var char = DATA.characterById(p.equipped.character);
     var arrow = DATA.arrowById(p.equipped.arrow);
     var perk = char.perk || {};
 
+    var rules = {
+      mode: options.mode || 'practice',
+      label: options.label || '',
+      roundSeconds: options.roundSeconds || TUNING.ROUND_SECONDS,
+      arrows: options.arrows || TUNING.ARROWS_PER_ROUND,
+      moversAt: options.moversAt === undefined ? TUNING.MOVERS_START_AT : options.moversAt,
+      chaosAt: options.chaosAt === undefined ? TUNING.CHAOS_START_AT : options.chaosAt,
+      targetSpeed: options.targetSpeed || 1,
+      specialRule: options.specialRule || 'normal',
+      bossAtStart: !!options.bossAtStart,
+      theme: options.theme || null
+    };
     return {
       profile: p,
       char: char,
       arrowType: arrow,
       perk: perk,
-      time: TUNING.ROUND_SECONDS,
+      rules: rules,
+      time: rules.roundSeconds,
       countdown: 3.2,         // 3..2..1..GO
       over: false,
       overTimer: 0,
       score: 0,
       coinsDirect: 0,
-      arrowsLeft: TUNING.ARROWS_PER_ROUND,
+      arrowsLeft: rules.arrows,
       arrows: [],             // in flight
       targets: [],
       particles: [],
@@ -43,6 +57,7 @@ var GAME = (function () {
       t: 0,                   // elapsed seconds (for animation)
       aiming: false,
       aim: { x: 0, y: 0, power: 0, angle: 0 },
+      releaseKick: 0,
       lookTimer: 0,
       lastTickSec: 6,
       spawnCooldown: 0,
@@ -50,17 +65,21 @@ var GAME = (function () {
       comboMult: 1,           // current score multiplier from the combo
       bestCombo: 0,
       slowUntil: 0,           // slow-motion power-up active until this time
+      cinematicUntil: 0,
       bossSpawned: false,
-      bgName: Math.random() < 0.5 ? 'bg_mountain' : 'bg_meadow'
+      stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, bossDefeated: false },
+      bgName: options.background && options.background !== 'random' ?
+        (options.background === 'cave' ? 'bg_mountain' : options.background) :
+        (Math.random() < 0.5 ? 'bg_mountain' : 'bg_meadow')
     };
   }
 
   /* ============ targets ============ */
 
   function phase() {
-    var elapsed = TUNING.ROUND_SECONDS - st.time;
-    if (elapsed < TUNING.MOVERS_START_AT) return 1;
-    if (elapsed < TUNING.CHAOS_START_AT) return 2;
+    var elapsed = st.rules.roundSeconds - st.time;
+    if (elapsed < st.rules.moversAt) return 1;
+    if (elapsed < st.rules.chaosAt) return 2;
     return 3;
   }
 
@@ -170,7 +189,7 @@ var GAME = (function () {
     var live = liveTargets();
 
     // The BOSS appears once, when chaos mode begins.
-    if (ph === 3 && !st.bossSpawned) {
+    if ((st.rules.bossAtStart || ph === 3) && !st.bossSpawned) {
       st.targets.push(makeBoss());
       st.bossSpawned = true;
       st.floaters.push({ x: W / 2, y: 210, vy: -40, life: 2, text: 'BOSS!', big: true, color: '#ff5fa2' });
@@ -178,6 +197,8 @@ var GAME = (function () {
       st.spawnCooldown = 0.6;
       return;
     }
+
+    if (st.rules.bossAtStart) { st.spawnCooldown = 5; return; }
 
     var bullseyes = live.filter(function (t) { return t.type === 'bullseye'; }).length;
     var want = ph === 1 ? 3 : ph === 2 ? 3 : 4;
@@ -188,6 +209,17 @@ var GAME = (function () {
       if (ph === 3) kind = pick(['slide', 'swing']);
       st.targets.push(makeBullseye(kind));
       st.spawnCooldown = 0.35;
+      return;
+    }
+
+    if (st.rules.specialRule === 'balloons') {
+      if (live.filter(function (t) { return t.type === 'balloon'; }).length < 5) st.targets.push(makeBalloon());
+      st.spawnCooldown = 0.65;
+      return;
+    }
+    if (st.rules.specialRule === 'fruit') {
+      if (live.filter(function (t) { return t.type === 'fruit'; }).length < 5) st.targets.push(makeFruit());
+      st.spawnCooldown = 0.55;
       return;
     }
 
@@ -223,7 +255,7 @@ var GAME = (function () {
   function updateTarget(t, dt) {
     var frozen = st.t < t.frozenUntil;
     var sm = st.t < st.slowUntil ? 0.4 : 1;   // slow-motion power-up
-    dt *= sm;
+    dt *= sm * st.rules.targetSpeed;
     if (!frozen) t.mt = (t.mt || 0) + dt;
     t.wobble = Math.max(0, (t.wobble || 0) - dt * 4);
 
@@ -265,6 +297,7 @@ var GAME = (function () {
   function fireArrow() {
     if (st.arrowsLeft <= 0 || st.aim.power < 0.12) { st.aiming = false; return; }
     st.arrowsLeft--;
+    st.stats.shots++;
     var a = st.arrowType;
     var speedFactor = a.speedFactor * (1 + (st.perk.speedBonus || 0));
     var speed = (650 + st.aim.power * 1450) * speedFactor;
@@ -277,6 +310,7 @@ var GAME = (function () {
     });
     AUDIO.shoot();
     st.aiming = false;
+    st.releaseKick = 1;
   }
 
   function arrowGravity() {
@@ -378,6 +412,7 @@ var GAME = (function () {
   }
 
   function comboMiss() {
+    st.stats.misses++;
     st.combo = 0;
     st.comboMult = 1;
   }
@@ -469,6 +504,7 @@ var GAME = (function () {
   }
 
   function onHit(t, hit, ar) {
+    st.stats.hits++;
     var moving = t.type === 'bullseye' && t.motion !== 'static' && st.t >= t.frozenUntil;
 
     if (t.type === 'bullseye') {
@@ -479,15 +515,19 @@ var GAME = (function () {
       t.dead = true;
       splinters(hit.x, hit.y);
       if (base === rings[0]) {
+        st.stats.bullseyes++;
+        st.cinematicUntil = st.t + 0.34;
         AUDIO.bullseye();
         if (TUNING.SCREEN_SHAKE) st.shake = 0.35;
         ring(t.x, t.y, '#ffd23a');
         st.floaters.push({ x: t.x, y: t.y - t.r - 56, vy: -70, life: 1.3, text: 'BULLSEYE!', big: true, color: '#ffd23a' });
         earn('first_bullseye');
+        characterMoment(t.x, t.y - t.r - 95);
       } else {
         AUDIO.thunk();
       }
     } else if (t.type === 'balloon') {
+      st.stats.balloons++;
       award(TUNING.SCORE_BALLOON, t.x, t.y, { bonusObj: true });
       t.dead = true;
       AUDIO.pop();
@@ -495,6 +535,7 @@ var GAME = (function () {
       spawnCoins(TUNING.COINS_FROM_BALLOON, t.x, t.y);
       track('balloons', 'balloons_50', 50);
     } else if (t.type === 'fruit') {
+      st.stats.fruits++;
       award(t.value, t.x, t.y, { bonusObj: true });
       t.dead = true;
       AUDIO.splat();
@@ -517,6 +558,7 @@ var GAME = (function () {
       t.wobble = 1;
       splinters(hit.x, hit.y);
       if (t.hp <= 0) {
+        st.stats.bossDefeated = true;
         award(TUNING.SCORE_BOSS, t.x, t.y - t.r - 20, {});
         t.dead = true;
         AUDIO.chest();
@@ -534,6 +576,7 @@ var GAME = (function () {
       t.hp--;
       t.wobble = 1;
       if (t.hp <= 0) {
+        st.stats.chests++;
         award(TUNING.SCORE_CHEST, t.x, t.y - 50, { bonusObj: true });
         t.opened = true;          // show the fully-open chest, then it fades
         t.openTimer = 0.7;
@@ -599,6 +642,26 @@ var GAME = (function () {
         }
       }
     }
+  }
+
+  function characterMoment(x, y) {
+    var moments = {
+      dinobob: ['ROAR-SOME!', '#9fd636'],
+      ninja: ['SHADOW SHOT!', '#ff5f5f'],
+      astronaut: ['TO THE MOON!', '#8fdcff'],
+      robot: ['CALCULATED!', '#62e6ff'],
+      bear: ['BEAR-Y NICE!', '#ffd23a']
+    };
+    var m = moments[st.char.id] || moments.dinobob;
+    st.floaters.push({ x: x, y: y, vy: -55, life: 1.15, text: m[0], big: true, color: m[1] });
+    if (st.char.id === 'dinobob') spawnCoins(1, x, y + 45);
+    if (st.char.id === 'astronaut') st.slowUntil = Math.max(st.slowUntil, st.t + 1.25);
+    if (st.char.id === 'robot') { st.time += 0.75; ring(x, y + 40, '#62e6ff'); }
+    if (st.char.id === 'bear') {
+      st.targets.forEach(function (o) { if (!o.dead) o.frozenUntil = Math.max(o.frozenUntil, st.t + 0.9); });
+      snow(x, y + 45);
+    }
+    if (st.char.id === 'ninja') { st.arrowsLeft++; flame(x, y + 45); }
   }
 
   /* ============ particles ============ */
@@ -678,6 +741,7 @@ var GAME = (function () {
   function update(dt) {
     st.t += dt;
     st.shake = Math.max(0, st.shake - dt);
+    st.releaseKick = Math.max(0, st.releaseKick - dt * 7.5);
     st.lookTimer += dt;
 
     if (st.countdown > 0) {
@@ -703,19 +767,21 @@ var GAME = (function () {
     }
 
     var noArrows = st.arrowsLeft <= 0 && st.arrows.every(function (a) { return a.dead; });
-    if (st.time <= 0 || noArrows) {
+    var bossWon = st.rules.bossAtStart && st.stats.bossDefeated && st.arrows.every(function (a) { return a.dead; });
+    if (st.time <= 0 || noArrows || bossWon) {
       st.time = Math.max(0, st.time);
       st.over = true;
       AUDIO.roundEnd();
       return;
     }
 
-    spawner(dt);
-    st.targets.forEach(function (t) { updateTarget(t, dt); });
-    updateBlackholes(dt);
+    var worldDt = st.t < st.cinematicUntil ? dt * 0.18 : dt;
+    spawner(worldDt);
+    st.targets.forEach(function (t) { updateTarget(t, worldDt); });
+    updateBlackholes(worldDt);
     st.targets = st.targets.filter(function (t) { return !t.dead; });
-    updateArrows(dt);
-    updateParticles(dt);
+    updateArrows(worldDt);
+    updateParticles(worldDt);
   }
 
   function finish() {
@@ -735,6 +801,9 @@ var GAME = (function () {
       coinBonus: coinBonus,
       isHighScore: isHigh,
       highScore: SAVE.current().highScore
+      , stats: st.stats
+      , mode: st.rules.mode
+      , label: st.rules.label
     });
   }
 
@@ -744,6 +813,7 @@ var GAME = (function () {
     var bg = SPRITES.get(st.bgName) || SPRITES.get('bg_meadow');
     if (bg) {
       ctx.drawImage(bg, 0, 0, W, H);
+      if (st.rules.theme === 'cave') drawCaveOverlay();
       return;
     }
     // sky
@@ -812,6 +882,19 @@ var GAME = (function () {
     }
   }
 
+  function drawCaveOverlay() {
+    var vignette = ctx.createRadialGradient(W * 0.58, H * 0.48, 160, W * 0.55, H * 0.48, 900);
+    vignette.addColorStop(0, 'rgba(42,45,83,0.08)');
+    vignette.addColorStop(0.65, 'rgba(28,19,48,0.48)');
+    vignette.addColorStop(1, 'rgba(8,7,18,0.86)');
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(119,91,211,0.35)';
+    for (var i = 0; i < 9; i++) {
+      var cx = 550 + i * 125, ch = 28 + (i % 3) * 16;
+      ctx.beginPath(); ctx.moveTo(cx - 14, H); ctx.lineTo(cx, H - ch); ctx.lineTo(cx + 14, H); ctx.fill();
+    }
+  }
+
   function pine(x, y, s) {
     ctx.fillStyle = '#6f4b27';
     ctx.fillRect(x - 8 * s, y + 90 * s, 16 * s, 40 * s);
@@ -852,6 +935,7 @@ var GAME = (function () {
     ctx.translate(t.x + wob, t.y);
 
     if (t.type === 'bullseye') {
+      var timg = SPRITES.get('target');
       if (t.motion === 'swing') {
         // rope
         ctx.strokeStyle = '#8a5a2b';
@@ -861,15 +945,8 @@ var GAME = (function () {
         ctx.lineTo(t.anchor.x - (t.x + wob), t.anchor.y - t.y);
         ctx.stroke();
       } else {
-        // wooden stand
-        ctx.strokeStyle = '#8a5a2b';
-        ctx.lineWidth = 9;
-        ctx.beginPath();
-        ctx.moveTo(-t.r * 0.5, t.r * 0.4); ctx.lineTo(-t.r * 0.75, GROUND - t.y);
-        ctx.moveTo(t.r * 0.5, t.r * 0.4); ctx.lineTo(t.r * 0.75, GROUND - t.y);
-        ctx.stroke();
+        ART.drawTargetStand(ctx, t.r, GROUND - t.y, timg);
       }
-      var timg = SPRITES.get('target');
       if (timg) {
         var tw = t.r * 2.15;
         var th = tw * timg.height / timg.width;
@@ -1042,16 +1119,26 @@ var GAME = (function () {
       outfitColor: outfit.swap,
       shiny: p.equipped.shiny,
       t: st.t,
-      look: 1
+      look: 1,
+      aimPower: st.aiming ? st.aim.power : 0,
+      aimAngle: st.aim.angle,
+      recoil: st.releaseKick,
+      archer: true
     });
     var angle = st.aiming ? st.aim.angle : -0.25;
     var draw = st.aiming ? st.aim.power : 0;
+    var nockX = BOW.x - Math.cos(angle) * draw * 46;
+    var nockY = BOW.y - Math.sin(angle) * draw * 46;
+    ART.drawArcherArms(ctx, p.equipped.character, 150, GROUND + 10, 1.15,
+      { x: BOW.x, y: BOW.y }, { x: nockX, y: nockY }, {
+        aimPower: draw,
+        aimAngle: angle,
+        recoil: st.releaseKick
+      });
     ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2);
     if (!st.aiming && st.arrowsLeft > 0 && !st.over) {
       ART.drawArrow(ctx, BOW.x, BOW.y, angle, st.arrowType, 1, st.t);
     } else if (st.aiming) {
-      var nockX = BOW.x - Math.cos(st.aim.angle) * st.aim.power * 46;
-      var nockY = BOW.y - Math.sin(st.aim.angle) * st.aim.power * 46;
       ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t);
     }
   }
@@ -1112,6 +1199,14 @@ var GAME = (function () {
     ctx.restore();
     ctx.font = '26px sans-serif';
     ctx.fillText('⏱', W / 2 - 72, 52);
+    if (st.rules.label) {
+      ctx.fillStyle = 'rgba(26,24,34,0.78)';
+      ART.rr(ctx, W / 2 - 180, 88, 360, 38, 19, 'rgba(26,24,34,0.78)');
+      ctx.fillStyle = '#ffd23a';
+      ctx.font = '800 19px Nunito, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(st.rules.label, W / 2, 108);
+    }
 
     // arrows — top right
     hudPanel(W - 218, 24, 190, 52);
@@ -1150,7 +1245,10 @@ var GAME = (function () {
     // arrows in flight
     st.arrows.forEach(function (a) {
       if (a.dead) return;
-      ART.drawArrow(ctx, a.x, a.y, Math.atan2(a.vy, a.vx), st.arrowType, 1, a.t);
+      ART.drawArrow(ctx, a.x, a.y, Math.atan2(a.vy, a.vx), st.arrowType, 1, a.t, {
+        flight: true,
+        speed: Math.hypot(a.vx, a.vy)
+      });
     });
 
     // lightning bolts
@@ -1280,13 +1378,13 @@ var GAME = (function () {
   /* ============ public ============ */
 
   return {
-    start: function (canvasEl, endCb) {
+    start: function (canvasEl, endCb, options) {
       canvas = canvasEl;
       ctx = canvas.getContext('2d');
       canvas.width = W;
       canvas.height = H;
       onEnd = endCb;
-      st = newRound();
+      st = newRound(options);
       running = true;
       frame.last = undefined;
 

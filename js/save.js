@@ -12,6 +12,9 @@ var SAVE = (function () {
       coins: 0,
       highScore: 0,
       roundsPlayed: 0,
+      adventureStage: 0,
+      adventureStars: [],
+      customChallenge: null,
       stats: {},        // running tallies for badges (bullseyes, balloons, ...)
       badges: [],       // earned badge ids
       unlocked: {
@@ -45,6 +48,9 @@ var SAVE = (function () {
     state.profiles.forEach(function (p) {
       if (!p.stats) p.stats = {};
       if (!Array.isArray(p.badges)) p.badges = [];
+      if (typeof p.adventureStage !== 'number') p.adventureStage = 0;
+      if (!Array.isArray(p.adventureStars)) p.adventureStars = [];
+      if (!p.customChallenge) p.customChallenge = null;
     });
     return state;
   }
@@ -118,6 +124,21 @@ var SAVE = (function () {
       var p = current();
       if (!p) return;
       p.equipped[slot] = value;
+      persist();
+    },
+
+    saveChallenge: function (challenge) {
+      var p = current();
+      if (!p) return;
+      p.customChallenge = challenge;
+      persist();
+    },
+
+    completeAdventureStage: function (stageIndex) {
+      var p = current();
+      if (!p) return;
+      if (p.adventureStars.indexOf(stageIndex) === -1) p.adventureStars.push(stageIndex);
+      p.adventureStage = Math.max(p.adventureStage || 0, Math.min(2, stageIndex + 1));
       persist();
     },
 

@@ -8,35 +8,35 @@ var DATA = {
       id: 'dinobob',
       get name() { return TUNING.NAME_DINOBOB; },
       price: 0,
-      perkText: '+10% coins earned',
+      perkText: '+10% coins · bullseyes drop a bonus coin',
       perk: { coinBonus: 0.10 }
     },
     {
       id: 'ninja',
       get name() { return TUNING.NAME_NINJA; },
       get price() { return TUNING.PRICE_CHARACTER; },
-      perkText: 'Arrows fly 15% faster',
+      perkText: '15% faster · bullseyes return an arrow',
       perk: { speedBonus: 0.15 }
     },
     {
       id: 'astronaut',
       get name() { return TUNING.NAME_ASTRONAUT; },
       get price() { return TUNING.PRICE_CHARACTER; },
-      perkText: '15% less gravity — floaty arrows!',
+      perkText: 'Floaty arrows · bullseyes trigger slow motion',
       perk: { gravityCut: 0.15 }
     },
     {
       id: 'robot',
       get name() { return TUNING.NAME_ROBOT; },
       get price() { return TUNING.PRICE_CHARACTER; },
-      perkText: 'Extra-long aiming line',
+      perkText: 'Long aiming line · bullseyes add time',
       perk: { previewBonus: 1.8 }
     },
     {
       id: 'bear',
       get name() { return TUNING.NAME_BEAR; },
       get price() { return TUNING.PRICE_CHARACTER; },
-      perkText: '+1s ice freeze, +10% bonus points',
+      perkText: '+1s ice · bullseyes freeze every target',
       perk: { freezeBonus: 1, bonusObjBonus: 0.10 }
     }
   ],

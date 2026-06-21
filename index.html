@@ -20,6 +20,24 @@
 </head>
 <body>
 
+<!-- Small, code-native icon set: crisp at every iPad size and visually
+     consistent with the game's rounded toy-box interface. -->
+<svg class="icon-library" aria-hidden="true">
+  <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.5"/><path d="m15 9 5-5m-2.5 0H20v2.5"/></symbol>
+  <symbol id="icon-arcade" viewBox="0 0 24 24"><path d="M6 8.5h12l2 10H4z"/><path d="M9 12v4m-2-2h4"/><circle cx="16" cy="13" r="1"/><circle cx="17.5" cy="15.5" r="1"/></symbol>
+  <symbol id="icon-closet" viewBox="0 0 24 24"><path d="M9 6.5c0-1.8 1.2-3 3-3s3 1.1 3 2.7c0 1.3-.8 2-2 2.6v1.1l7 4.4-1.2 2.2H5.2L4 14.3l7-4.4"/></symbol>
+  <symbol id="icon-music" viewBox="0 0 24 24"><path d="M9 17V6l10-2v11"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></symbol>
+  <symbol id="icon-player" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.4-4 2.7-6 6.5-6s6.1 2 6.5 6"/></symbol>
+  <symbol id="icon-replay" viewBox="0 0 24 24"><path d="M6.5 8H3V4.5"/><path d="M4 8a9 9 0 1 1-1 7"/></symbol>
+  <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3.5 11 8.5-7 8.5 7"/><path d="M6 10v10h12V10M10 20v-6h4v6"/></symbol>
+  <symbol id="icon-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M4 12h16"/></symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="icon-map" viewBox="0 0 24 24"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16m6-14v16"/></symbol>
+  <symbol id="icon-wand" viewBox="0 0 24 24"><path d="m5 19 11-11 3 3L8 22zM15 4h4M17 2v4M5 5h3M6.5 3.5v3"/></symbol>
+  <symbol id="icon-family" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.4-4.2 2.2-6.3 5.5-6.3s5.1 2.1 5.5 6.3M13.5 15c1-.8 2.1-1.2 3.5-1.2 2.7 0 4.2 1.8 4.5 5.2"/></symbol>
+</svg>
+
 <!-- ===================== INTRO (Dino Bob's Opening Adventure) ===================== -->
 <iframe id="intro-overlay" src="intro/intro.dc.html" title="Dino Bob opening"
   style="position:fixed; inset:0; width:100%; height:100%; border:0; z-index:9999; background:#0b0a09;" scrolling="no"></iframe>
@@ -51,7 +69,7 @@
     <canvas id="title-hero" width="360" height="340"></canvas>
     <h1 class="logo"><span class="logo-dino">DINO</span> <span class="logo-bob">BOB</span></h1>
     <p class="tagline">Arrow Blast!</p>
-    <button id="btn-title-play" class="btn btn-big btn-green">▶ PLAY</button>
+    <button id="btn-title-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY</span></button>
   </div>
   <p class="credit">designed by Penny · built with Claude</p>
 </section>
@@ -73,16 +91,19 @@
     <div class="chip coin-chip">🪙 <span id="home-coins">0</span></div>
     <div class="chip name-chip" id="home-name">—</div>
     <div class="home-top-right">
-      <button id="btn-music" class="chip btn-chip" title="Music on/off">🎵</button>
-      <button id="btn-switch-profile" class="chip btn-chip" title="Switch player">👤</button>
+      <button id="btn-music" class="chip btn-chip icon-chip" title="Music on/off" aria-label="Music on or off"><svg class="game-icon"><use href="#icon-music"/></svg></button>
+      <button id="btn-switch-profile" class="chip btn-chip icon-chip" title="Switch player" aria-label="Switch player"><svg class="game-icon"><use href="#icon-player"/></svg></button>
     </div>
   </div>
   <canvas id="home-hero" width="420" height="430"></canvas>
   <div class="chip perk-chip" id="home-perk">—</div>
   <div class="home-buttons">
-    <button id="btn-play" class="btn btn-big btn-green">🎯 TARGET PRACTICE</button>
-    <button id="btn-arcade" class="btn btn-big btn-purple">🕹️ ARCADE</button>
-    <button id="btn-closet" class="btn btn-big btn-blue">👕 CLOSET</button>
+    <button id="btn-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-target"/></svg><span>TARGET PRACTICE</span></button>
+    <button id="btn-adventure" class="btn btn-big btn-orange"><svg class="game-icon"><use href="#icon-map"/></svg><span>ADVENTURE</span></button>
+    <button id="btn-challenge" class="btn btn-big btn-pink"><svg class="game-icon"><use href="#icon-wand"/></svg><span>PENNY'S CHALLENGES</span></button>
+    <button id="btn-family" class="btn btn-big btn-teal"><svg class="game-icon"><use href="#icon-family"/></svg><span>FAMILY MODE</span></button>
+    <button id="btn-arcade" class="btn btn-big btn-purple"><svg class="game-icon"><use href="#icon-arcade"/></svg><span>ARCADE</span></button>
+    <button id="btn-closet" class="btn btn-big btn-blue"><svg class="game-icon"><use href="#icon-closet"/></svg><span>CLOSET</span></button>
   </div>
   <div class="chip best-chip">⭐ Best: <span id="home-best">0</span></div>
 </section>
@@ -90,31 +111,90 @@
 <!-- ===================== GAME ===================== -->
 <section id="screen-game" class="screen game-bg hidden">
   <canvas id="game-canvas"></canvas>
-  <button id="btn-quit-round" class="quit-btn" title="End round">✕</button>
+  <button id="btn-quit-round" class="quit-btn" title="End round" aria-label="End round"><svg class="game-icon"><use href="#icon-close"/></svg></button>
+</section>
+
+<!-- ===================== ADVENTURE MAP ===================== -->
+<section id="screen-adventure" class="screen adventure-bg hidden">
+  <div class="mode-top">
+    <button id="btn-adventure-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-map"/></svg><span>DINO BOB'S ADVENTURE</span></h2>
+    <span class="chip" id="adventure-stars">0 / 3 ★</span>
+  </div>
+  <div id="adventure-map" class="adventure-map"></div>
+  <div id="adventure-detail" class="mode-card adventure-detail"></div>
+</section>
+
+<!-- ===================== PENNY'S CHALLENGE MAKER ===================== -->
+<section id="screen-challenge" class="screen maker-bg hidden">
+  <div class="mode-top">
+    <button id="btn-challenge-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-wand"/></svg><span>PENNY'S CHALLENGE MAKER</span></h2>
+    <span class="chip">DESIGNER ZONE</span>
+  </div>
+  <div class="maker-grid mode-card">
+    <label><span>Round time <b id="challenge-time-value">45s</b></span><input id="challenge-time" type="range" min="20" max="120" step="5" value="45"></label>
+    <label><span>Arrows <b id="challenge-arrows-value">18</b></span><input id="challenge-arrows" type="range" min="5" max="40" value="18"></label>
+    <label><span>Target speed <b id="challenge-speed-value">Normal</b></span><input id="challenge-speed" type="range" min="60" max="180" step="10" value="100"></label>
+    <label><span>Action style</span><select id="challenge-chaos"><option value="calm">Calm</option><option value="mixed" selected>Mixed</option><option value="wild">Wild!</option></select></label>
+    <label><span>Scenery</span><select id="challenge-bg"><option value="random">Surprise me</option><option value="bg_meadow">Enchanted Forest</option><option value="bg_mountain">Mountain Kingdom</option><option value="cave">Moon Cave</option></select></label>
+    <label><span>Special rule</span><select id="challenge-rule"><option value="normal">Everything</option><option value="balloons">Balloon party</option><option value="fruit">Fruit frenzy</option><option value="boss">Boss battle</option></select></label>
+  </div>
+  <button id="btn-challenge-start" class="btn btn-big btn-pink"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY MY CHALLENGE</span></button>
+</section>
+
+<!-- ===================== TWO PLAYER FAMILY MODE ===================== -->
+<section id="screen-family" class="screen family-bg hidden">
+  <div class="mode-top">
+    <button id="btn-family-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-family"/></svg><span>FAMILY MODE</span></h2>
+    <span class="chip">TAKE TURNS</span>
+  </div>
+  <div id="family-setup" class="mode-card family-panel">
+    <p class="mode-lede">Choose two players. Each gets the same 45-second challenge.</p>
+    <label>Player 1<select id="family-player-1"></select></label>
+    <div class="versus-badge">VS</div>
+    <label>Player 2<select id="family-player-2"></select></label>
+    <button id="btn-family-start" class="btn btn-big btn-teal">START MATCH</button>
+  </div>
+  <div id="family-handoff" class="mode-card family-panel hidden">
+    <p id="family-handoff-text" class="handoff-title"></p>
+    <button id="btn-family-next" class="btn btn-big btn-teal">NEXT PLAYER</button>
+  </div>
+  <div id="family-finish" class="mode-card family-panel hidden">
+    <h3 id="family-winner"></h3>
+    <div id="family-awards" class="family-awards"></div>
+    <button id="btn-family-again" class="btn btn-teal">PLAY AGAIN</button>
+    <button id="btn-family-home" class="btn btn-ghost">HOME</button>
+  </div>
 </section>
 
 <!-- ===================== RESULTS ===================== -->
 <section id="screen-results" class="screen arcade-bg hidden">
   <h2 class="panel-header" id="results-header">ROUND OVER!</h2>
   <div class="results-card">
+    <canvas id="results-character" width="170" height="150"></canvas>
+    <p id="results-quip" class="results-quip"></p>
     <div id="results-highscore" class="highscore-banner hidden">🎆 NEW HIGH SCORE! 🎆</div>
     <div class="results-row results-score"><span>Score</span><b id="results-score">0</b></div>
+    <div class="results-row"><span>🎯 Accuracy</span><b id="results-accuracy">0%</b></div>
+    <div class="results-row"><span>🌟 Bullseyes</span><b id="results-bullseyes">0</b></div>
     <div class="results-row"><span>Coins from score</span><b id="results-coins-score">0</b></div>
     <div class="results-row"><span>Coins collected</span><b id="results-coins-direct">0</b></div>
     <div class="results-row" id="results-bonus-row"><span id="results-bonus-label">Character bonus</span><b id="results-bonus">—</b></div>
     <div class="results-row results-total"><span>🪙 Coins earned</span><b id="results-coins">0</b></div>
   </div>
   <div class="results-buttons">
-    <button id="btn-again" class="btn btn-big btn-green">🔁 PLAY AGAIN</button>
-    <button id="btn-results-arcade" class="btn btn-purple">🕹️ ARCADE</button>
-    <button id="btn-results-home" class="btn btn-ghost">🏠 Home</button>
+    <button id="btn-again" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-replay"/></svg><span>PLAY AGAIN</span></button>
+    <button id="btn-results-arcade" class="btn btn-purple"><svg class="game-icon"><use href="#icon-arcade"/></svg><span>ARCADE</span></button>
+    <button id="btn-results-home" class="btn btn-ghost"><svg class="game-icon"><use href="#icon-home"/></svg><span>Home</span></button>
   </div>
 </section>
 
 <!-- ===================== ARCADE ===================== -->
 <section id="screen-arcade" class="screen arcade-bg hidden">
   <div class="arcade-top">
-    <button id="btn-arcade-back" class="chip btn-chip">← Back</button>
+    <button id="btn-arcade-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
     <h2 class="panel-header neon">★ THE ARCADE ★</h2>
     <div class="chip coin-chip">🪙 <span id="arcade-coins">0</span></div>
   </div>
@@ -129,8 +209,8 @@
 <!-- ===================== CLOSET ===================== -->
 <section id="screen-closet" class="screen arcade-bg hidden">
   <div class="arcade-top">
-    <button id="btn-closet-back" class="chip btn-chip">← Back</button>
-    <h2 class="panel-header">👕 CLOSET</h2>
+    <button id="btn-closet-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-closet"/></svg><span>CLOSET</span></h2>
     <canvas id="closet-preview" width="170" height="180"></canvas>
   </div>
   <div id="closet-body" class="closet-body"></div>

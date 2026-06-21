@@ -4,6 +4,17 @@ A touch-based arrow shooting game designed by Penny, built with Claude Code.
 Drag back like a slingshot, release to fire, earn coins, and spend them at
 the Arcade on new characters, magic arrows, and skins.
 
+## Deluxe modes
+
+- **Adventure** — three connected stages: Whispering Woods, Sky-High Peaks,
+  and the Moon Cave boss battle. Progress and stars save per player.
+- **Penny's Challenge Maker** — choose the timer, arrows, target speed,
+  action level, scenery, and special rules without editing a file.
+- **Family Mode** — two players take identical turns, then receive a winner
+  and silly awards for bullseyes, balloons, and wild shots.
+- **Character powers** — each character now celebrates bullseyes with a
+  distinct ability, plus a victory dance and personality line after rounds.
+
 ## How to play it right now
 
 Double-click `index.html` — it opens in the browser and plays immediately.

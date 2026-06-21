@@ -31,6 +31,9 @@ var ART = (function () {
     bear:      { body: '#9c6b3a', belly: '#d8b27e', skin: '#f3c08c', dark: '#6f4b27' }
   };
 
+  var archerSpriteCache = {};
+  var targetBarkTile = null;
+
   function eyes(ctx, x, y, s, look) {
     var dx = (look || 0) * 2 * s;
     circle(ctx, x - 9 * s, y, 5.5 * s, '#fff');
@@ -126,9 +129,29 @@ var ART = (function () {
   function drawCharacter(ctx, id, x, y, scale, opts) {
     opts = opts || {};
 
+    // A single finished character render can still feel animated when its
+    // whole pose reacts to the bow. Keep the feet planted, lean back as the
+    // string is drawn, then spring forward for a short release recoil.
+    var aimPower = Math.max(0, Math.min(1, opts.aimPower || 0));
+    var recoil = Math.max(0, Math.min(1, opts.recoil || 0));
+    var posed = aimPower > 0.001 || recoil > 0.001;
+    if (posed) {
+      var aimLift = Math.sin(opts.aimAngle || 0) * aimPower;
+      ctx.save();
+      ctx.translate(x - aimPower * 13 + recoil * 18, y + aimPower * 3);
+      ctx.rotate(-aimPower * 0.085 + recoil * 0.11);
+      ctx.scale(1 + recoil * 0.045, 1 - recoil * 0.035 + Math.abs(aimLift) * 0.018);
+      x = 0;
+      y = 0;
+    }
+
     // Use the real rendered sprite when it's available.
     var sp = typeof SPRITES !== 'undefined' && SPRITES.get('char_' + id);
-    if (sp) { drawCharacterSprite(ctx, sp, x, y, scale, opts); return; }
+    if (sp) {
+      drawCharacterSprite(ctx, sp, id, x, y, scale, opts);
+      if (posed) ctx.restore();
+      return;
+    }
 
     var s = scale;
     var pal = PALETTES[id] || PALETTES.dinobob;
@@ -245,16 +268,53 @@ var ART = (function () {
     if (opts.shiny) sparkles(ctx, x, y, s, opts.t || 0);
 
     ctx.restore();
+    if (posed) ctx.restore();
   }
 
   /* Sprite-backed character: feet at (x, y), visual height ≈ 132*scale to
      roughly match the procedural proportions callers expect. */
-  function drawCharacterSprite(ctx, img, x, y, scale, opts) {
+  function archerSprite(img, id) {
+    if (archerSpriteCache[id]) return archerSpriteCache[id];
+    if (typeof document === 'undefined' || !document.createElement) return img;
+
+    var c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width;
+    c.height = img.naturalHeight || img.height;
+    var g = c.getContext('2d');
+    g.drawImage(img, 0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'destination-out';
+
+    // The renders share the same chibi proportions. These soft masks remove
+    // only the resting arms so the articulated game arms can replace them.
+    var masks = id === 'robot' ? [[0.16, 0.69, 0.17, 0.22], [0.84, 0.69, 0.17, 0.22]] :
+      id === 'astronaut' ? [[0.18, 0.70, 0.17, 0.22], [0.82, 0.70, 0.17, 0.22]] :
+      id === 'dinobob' ? [[0.24, 0.69, 0.17, 0.21], [0.78, 0.69, 0.17, 0.21]] :
+      id === 'ninja' ? [[0.24, 0.72, 0.17, 0.22], [0.77, 0.72, 0.17, 0.22]] :
+      [[0.22, 0.72, 0.17, 0.22], [0.78, 0.72, 0.17, 0.22]];
+    masks.forEach(function (m) {
+      g.beginPath();
+      g.ellipse(c.width * m[0], c.height * m[1], c.width * m[2], c.height * m[3], 0, 0, Math.PI * 2);
+      g.fill();
+    });
+    g.globalCompositeOperation = 'source-over';
+    archerSpriteCache[id] = c;
+    return c;
+  }
+
+  function archerArtReady(id) {
+    return typeof SPRITES !== 'undefined' &&
+      SPRITES.get('arm_' + id + '_upper') &&
+      SPRITES.get('arm_' + id + '_bowhand') &&
+      SPRITES.get('arm_' + id + '_stringhand');
+  }
+
+  function drawCharacterSprite(ctx, img, id, x, y, scale, opts) {
     var h = 138 * scale;
     var w = h * img.width / img.height;
+    var source = opts.archer && archerArtReady(id) ? archerSprite(img, id) : img;
     ctx.save();
     if (opts.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.9)'; ctx.shadowBlur = 18 * scale; }
-    ctx.drawImage(img, x - w / 2, y - h, w, h);
+    ctx.drawImage(source, x - w / 2, y - h, w, h);
     ctx.restore();
 
     if (opts.hat) {
@@ -263,6 +323,116 @@ var ART = (function () {
       drawHat(ctx, opts.hat, x, y - h * 0.84, hatS);
     }
     if (opts.shiny) sparkles(ctx, x, y - h * 0.1, scale * 1.05, opts.t || 0);
+  }
+
+  function drawArmSprite(ctx, img, from, to, scale, isHand) {
+    if (!img) return false;
+    var dx = to.x - from.x, dy = to.y - from.y;
+    var len = Math.max(4, Math.hypot(dx, dy));
+    var drawW = len + (isHand ? 13 : 8) * scale;
+    var drawH = Math.max(17 * scale, Math.min(31 * scale, len * (isHand ? 0.56 : 0.5)));
+    ctx.save();
+    ctx.translate(from.x, from.y);
+    ctx.rotate(Math.atan2(dy, dx));
+    ctx.drawImage(img, -4 * scale, -drawH / 2, drawW, drawH);
+    ctx.restore();
+    return true;
+  }
+
+  function drawIllustratedArm(ctx, id, shoulder, hand, scale, bend, kind) {
+    var dx = hand.x - shoulder.x, dy = hand.y - shoulder.y;
+    var len = Math.max(1, Math.hypot(dx, dy));
+    var nx = -dy / len, ny = dx / len;
+    var elbow = {
+      x: (shoulder.x + hand.x) / 2 + nx * bend,
+      y: (shoulder.y + hand.y) / 2 + ny * bend
+    };
+    var upper = typeof SPRITES !== 'undefined' && SPRITES.get('arm_' + id + '_upper');
+    var forearm = typeof SPRITES !== 'undefined' && SPRITES.get('arm_' + id + '_' + kind);
+    if (upper && forearm) {
+      drawArmSprite(ctx, upper, shoulder, elbow, scale, false);
+      drawArmSprite(ctx, forearm, elbow, hand, scale, true);
+      return true;
+    }
+    return false;
+  }
+
+  /* Two-bone archer rig. The bow hand stays on the grip while the string hand
+     follows the nock, so the contact points remain correct at every power. */
+  function drawArcherArms(ctx, id, x, y, scale, bowHand, stringHand, pose) {
+    pose = pose || {};
+    var power = Math.max(0, Math.min(1, pose.aimPower || 0));
+    var recoil = Math.max(0, Math.min(1, pose.recoil || 0));
+    if (!archerArtReady(id)) return;
+    var h = 138 * scale;
+    var aimLift = Math.sin(pose.aimAngle || 0) * power;
+    var rot = -power * 0.085 + recoil * 0.11;
+    var sx = 1 + recoil * 0.045;
+    var sy = 1 - recoil * 0.035 + Math.abs(aimLift) * 0.018;
+    var baseX = x - power * 13 + recoil * 18;
+    var baseY = y + power * 3;
+
+    function shoulder(localX, localY) {
+      localX *= sx; localY *= sy;
+      return {
+        x: baseX + localX * Math.cos(rot) - localY * Math.sin(rot),
+        y: baseY + localX * Math.sin(rot) + localY * Math.cos(rot)
+      };
+    }
+    var frontShoulder = shoulder(14 * scale, -h * 0.43 + 2 * scale);
+    var stringShoulder = shoulder(-8 * scale, -h * 0.43 - 2 * scale);
+
+    ctx.save();
+    // String arm first: it tucks behind the fixed bow arm as the elbow rises.
+    drawIllustratedArm(ctx, id, stringShoulder, stringHand, scale,
+      (10 + power * 12) * scale, 'stringhand');
+    drawIllustratedArm(ctx, id, frontShoulder, bowHand, scale,
+      13 * scale, 'bowhand');
+    ctx.restore();
+  }
+
+  function barkTile(img) {
+    if (targetBarkTile) return targetBarkTile;
+    if (!img || typeof document === 'undefined' || !document.createElement) return null;
+    var c = document.createElement('canvas');
+    c.width = 44; c.height = 96;
+    var g = c.getContext('2d');
+    g.fillStyle = '#6d4124'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, img.width * 0.745, img.height * 0.29, img.width * 0.09, img.height * 0.38,
+      0, 0, c.width, c.height);
+    targetBarkTile = c;
+    return c;
+  }
+
+  function drawBarkLog(ctx, x1, y1, x2, y2, width, texture) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2f2118';
+    ctx.lineWidth = width + 7;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    var tile = barkTile(texture);
+    ctx.strokeStyle = tile ? ctx.createPattern(tile, 'repeat') : '#6d4124';
+    ctx.lineWidth = width + 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = tile ? 'rgba(194,137,79,0.48)' : '#a56d3c';
+    ctx.lineWidth = width * 0.55;
+    ctx.beginPath(); ctx.moveTo(x1 - 1, y1 - 1); ctx.lineTo(x2 - 1, y2 - 1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,186,118,0.55)';
+    ctx.lineWidth = Math.max(1.5, width * 0.13);
+    ctx.beginPath(); ctx.moveTo(x1 - 3, y1 - 2); ctx.lineTo(x2 - 3, y2 - 2); ctx.stroke();
+  }
+
+  function drawTargetStand(ctx, r, groundY, texture) {
+    var topY = r * 0.34;
+    var footY = groundY - 4;
+    drawBarkLog(ctx, -r * 0.43, topY, -r * 0.72, footY, 13, texture);
+    drawBarkLog(ctx, r * 0.43, topY, r * 0.72, footY, 13, texture);
+    drawBarkLog(ctx, -r * 0.64, footY - 8, r * 0.64, footY - 8, 11, texture);
+
+    [-1, 1].forEach(function (side) {
+      circle(ctx, side * r * 0.43, topY, 8, '#302117');
+      circle(ctx, side * r * 0.43, topY, 5.5, '#a66d3c');
+      circle(ctx, side * r * 0.43 - 1.5, topY - 1.5, 1.7, '#dfb070');
+    });
   }
 
   function shade(hex, amt) {
@@ -287,6 +457,20 @@ var ART = (function () {
       // native sprite is vertical with the string toward the archer; the grip
       // sits at the sprite's center, which we pin to the bow anchor.
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
+
+      // The source bow includes a relaxed string. This brighter tension line
+      // makes the pull readable and follows the arrow nock under the finger.
+      if (draw > 0.02) {
+        var pullX = -w * 0.22 - draw * 38 * s;
+        ctx.strokeStyle = 'rgba(255,248,220,0.95)';
+        ctx.lineWidth = 2.2 * s;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.2, -h * 0.43);
+        ctx.lineTo(pullX, 0);
+        ctx.lineTo(-w * 0.2, h * 0.43);
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }
@@ -315,8 +499,52 @@ var ART = (function () {
   }
 
   /* An arrow, drawn pointing right from its tail. */
-  function drawArrow(ctx, x, y, angle, type, scale, t) {
+  function drawArrow(ctx, x, y, angle, type, scale, t, motion) {
     var s = scale || 1;
+    var flying = motion && motion.flight;
+    var phase = (t || 0) * 26;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + (flying ? Math.sin(phase * 1.7) * 0.008 : 0));
+
+    if (flying) {
+      var trailLength = Math.min(105, 42 + (motion.speed || 0) * 0.025) * s;
+      var grad = ctx.createLinearGradient(-trailLength, 0, -8 * s, 0);
+      var trailColor = type.id === 'fire' ? '255,122,26' :
+        type.id === 'ice' ? '146,225,255' :
+        type.id === 'lightning' ? '255,227,58' : '255,255,255';
+      grad.addColorStop(0, 'rgba(' + trailColor + ',0)');
+      grad.addColorStop(1, 'rgba(' + trailColor + ',0.48)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = (type.id === 'fire' ? 10 : 5) * s;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-trailLength, Math.sin(phase) * 2 * s);
+      ctx.lineTo(-18 * s, 0);
+      ctx.stroke();
+
+      // Small, deterministic flickers give each magic arrow a distinct feel
+      // without adding particle objects to the physics simulation.
+      if (type.id === 'fire' || type.id === 'ice') {
+        for (var m = 0; m < 3; m++) {
+          ctx.globalAlpha = 0.28 + m * 0.13;
+          circle(ctx, (-32 - m * 18) * s, Math.sin(phase + m * 2.1) * 6 * s,
+            (type.id === 'fire' ? 7 - m : 4 - m * 0.6) * s,
+            type.id === 'fire' ? (m ? '#ff7a1a' : '#ffd23a') : (m ? '#bfeaff' : '#ffffff'));
+        }
+        ctx.globalAlpha = 1;
+      } else if (type.id === 'lightning') {
+        ctx.strokeStyle = 'rgba(255,239,112,0.9)';
+        ctx.lineWidth = 2.5 * s;
+        ctx.beginPath();
+        ctx.moveTo(-24 * s, 0);
+        ctx.lineTo(-42 * s, -7 * s);
+        ctx.lineTo(-58 * s, 5 * s);
+        ctx.lineTo(-78 * s, Math.sin(phase) * 7 * s);
+        ctx.stroke();
+      }
+    }
 
     var img = typeof SPRITES !== 'undefined' && SPRITES.get('arrow_' + type.id);
     if (img) {
@@ -324,16 +552,12 @@ var ART = (function () {
       var w = 92 * s;
       var h = w * img.height / img.width;
       ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
+      if (flying) ctx.scale(1, 0.9 + Math.abs(Math.cos(phase)) * 0.1);
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
       ctx.restore();
       return;
     }
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
 
     // trail effects per type
     if (type.id === 'fire') {
@@ -416,6 +640,8 @@ var ART = (function () {
 
   return {
     drawCharacter: drawCharacter,
+    drawArcherArms: drawArcherArms,
+    drawTargetStand: drawTargetStand,
     drawBow: drawBow,
     drawArrow: drawArrow,
     drawCoin: drawCoin,

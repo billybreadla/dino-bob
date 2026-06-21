@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v4';
+var CACHE = 'dinobob-v6-illustrated-hands';
 var FILES = [
   '.',
   'index.html',
@@ -34,6 +34,21 @@ var FILES = [
   'assets/sprites/char_astronaut.png',
   'assets/sprites/char_robot.png',
   'assets/sprites/char_bear.png',
+  'assets/sprites/arm_dinobob_upper.png',
+  'assets/sprites/arm_dinobob_bowhand.png',
+  'assets/sprites/arm_dinobob_stringhand.png',
+  'assets/sprites/arm_ninja_upper.png',
+  'assets/sprites/arm_ninja_bowhand.png',
+  'assets/sprites/arm_ninja_stringhand.png',
+  'assets/sprites/arm_astronaut_upper.png',
+  'assets/sprites/arm_astronaut_bowhand.png',
+  'assets/sprites/arm_astronaut_stringhand.png',
+  'assets/sprites/arm_robot_upper.png',
+  'assets/sprites/arm_robot_bowhand.png',
+  'assets/sprites/arm_robot_stringhand.png',
+  'assets/sprites/arm_bear_upper.png',
+  'assets/sprites/arm_bear_bowhand.png',
+  'assets/sprites/arm_bear_stringhand.png',
   'assets/sprites/arrow_wooden.png',
   'assets/sprites/arrow_fire.png',
   'assets/sprites/arrow_ice.png',

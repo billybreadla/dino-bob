@@ -5,6 +5,11 @@
 var SPRITES = (function () {
   var NAMES = [
     'char_dinobob', 'char_ninja', 'char_astronaut', 'char_robot', 'char_bear',
+    'arm_dinobob_upper', 'arm_dinobob_bowhand', 'arm_dinobob_stringhand',
+    'arm_ninja_upper', 'arm_ninja_bowhand', 'arm_ninja_stringhand',
+    'arm_astronaut_upper', 'arm_astronaut_bowhand', 'arm_astronaut_stringhand',
+    'arm_robot_upper', 'arm_robot_bowhand', 'arm_robot_stringhand',
+    'arm_bear_upper', 'arm_bear_bowhand', 'arm_bear_stringhand',
     'arrow_wooden', 'arrow_fire', 'arrow_ice', 'arrow_lightning',
     'bow', 'balloon',
     'bg_meadow', 'bg_mountain', 'target', 'coin',

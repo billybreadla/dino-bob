@@ -4,7 +4,9 @@
 var UI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
-  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet'];
+  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family'];
+  var activeMode = { type: 'practice', options: null };
+  var familySession = null;
 
   function show(name) {
     screens.forEach(function (s) {
@@ -229,6 +231,10 @@ var UI = (function () {
   }
 
   function goHome() {
+    if (familySession) {           // bailed out of a family match: give the starting player their profile back
+      SAVE.selectProfile(familySession.original);
+      familySession = null;
+    }
     var p = SAVE.current();
     if (!p) { show('profiles'); renderProfiles(); return; }
     $('home-coins').textContent = p.coins;
@@ -243,18 +249,27 @@ var UI = (function () {
 
   /* ============ game ============ */
 
-  function startRound() {
+  function startRound(options, mode) {
+    if (mode) activeMode = { type: mode, options: options || null, stage: options && options.stageIndex };
+    else if (!activeMode.options) activeMode = { type: 'practice', options: null };
     show('game');
     AUDIO.stopMusic();
     GAME.start($('game-canvas'), function (results) {
-      showResults(results);
-    });
+      if (activeMode.type === 'family') handleFamilyResult(results);
+      else {
+        if (activeMode.type === 'adventure') finishAdventureRound(results);
+        showResults(results);
+      }
+    }, options || activeMode.options || {});
   }
 
   function showResults(r) {
     show('results');
     if (AUDIO.musicPlaying() || musicWanted) AUDIO.startMusic();
     $('results-score').textContent = r.score;
+    var s = r.stats || {};
+    $('results-accuracy').textContent = (s.shots ? Math.min(100, Math.round(100 * s.hits / s.shots)) : 0) + '%';
+    $('results-bullseyes').textContent = s.bullseyes || 0;
     $('results-coins-score').textContent = '+' + r.coinsFromScore;
     $('results-coins-direct').textContent = '+' + r.coinsDirect;
     var bonusRow = $('results-bonus-row');
@@ -266,12 +281,246 @@ var UI = (function () {
       bonusRow.classList.add('hidden');
     }
     $('results-coins').textContent = '+' + r.coins;
+    var returnLabel = $('btn-results-home').querySelector('span');
+    if (returnLabel) returnLabel.textContent = activeMode.type === 'adventure' ? 'MAP' : 'Home';
     var banner = $('results-highscore');
     banner.classList.toggle('hidden', !r.isHighScore);
-    $('results-header').textContent = r.isHighScore ? 'AMAZING!' : 'ROUND OVER!';
+    $('results-header').textContent = r.adventureWon ? 'STAGE COMPLETE!' : (r.isHighScore ? 'AMAZING!' : 'ROUND OVER!');
+    animateResultCharacter(r);
     if (r.isHighScore && r.score > 0) {
       fx.fireworks();
     }
+  }
+
+  var resultAnim = 0;
+  function animateResultCharacter(r) {
+    resultAnim++;
+    var token = resultAnim;
+    var p = SAVE.current();
+    var char = DATA.characterById(p.equipped.character);
+    var quips = {
+      dinobob: ['ROAR-SOME SHOOTING!', 'DINO-MITE!'],
+      ninja: ['SILENT. SWIFT. SHARP.', 'SHADOW SHOT!'],
+      astronaut: ['THAT SCORE IS ORBITAL!', 'TO THE MOON!'],
+      robot: ['RESULT: EXCELLENT.', 'AIM CALCULATED!'],
+      bear: ['BEAR-Y IMPRESSIVE!', 'PAWSOME!']
+    };
+    var lines = quips[char.id] || quips.dinobob;
+    $('results-quip').textContent = lines[r.score % lines.length];
+    var t = 0;
+    function dance() {
+      if (token !== resultAnim || $('screen-results').classList.contains('hidden')) return;
+      t += 0.045;
+      var cv = $('results-character'), c = cv.getContext('2d');
+      c.clearRect(0, 0, cv.width, cv.height);
+      c.save();
+      var bounce = Math.abs(Math.sin(t * (char.id === 'robot' ? 5 : 3))) * 8;
+      c.translate(0, -bounce);
+      c.rotate(Math.sin(t * 2.5) * (char.id === 'ninja' ? 0.08 : 0.04));
+      ART.drawCharacter(c, char.id, 85, 146, 0.92, equippedOpts(p, t));
+      c.restore();
+      requestAnimationFrame(dance);
+    }
+    dance();
+  }
+
+  /* ============ adventure map ============ */
+
+  var ADVENTURE = [
+    {
+      name: 'Whispering Woods', blurb: 'Warm up among balloons and gentle targets.', goal: 700,
+      options: { mode: 'adventure', stageIndex: 0, label: 'STAGE 1 · WHISPERING WOODS', roundSeconds: 40, arrows: 16,
+        moversAt: 20, chaosAt: 34, targetSpeed: 0.82, background: 'bg_meadow' }
+    },
+    {
+      name: 'Sky-High Peaks', blurb: 'Faster targets sweep across the mountain air.', goal: 1250,
+      options: { mode: 'adventure', stageIndex: 1, label: 'STAGE 2 · SKY-HIGH PEAKS', roundSeconds: 45, arrows: 18,
+        moversAt: 8, chaosAt: 27, targetSpeed: 1.18, background: 'bg_mountain' }
+    },
+    {
+      name: 'Moon Cave Boss', blurb: 'Defeat the crowned target before your arrows run out!', goal: 1,
+      options: { mode: 'adventure', stageIndex: 2, label: 'STAGE 3 · MOON CAVE BOSS', roundSeconds: 50, arrows: 22,
+        moversAt: 0, chaosAt: 0, targetSpeed: 1.08, background: 'cave', theme: 'cave', bossAtStart: true, specialRule: 'boss' }
+    }
+  ];
+  var selectedStage = 0;
+
+  function openAdventure() {
+    activeMode = { type: 'adventure', options: null, stage: 0 };
+    show('adventure');
+    renderAdventure();
+  }
+
+  function renderAdventure() {
+    var p = SAVE.current();
+    var unlocked = p.adventureStage || 0;
+    selectedStage = Math.min(selectedStage, unlocked);
+    $('adventure-stars').textContent = (p.adventureStars || []).length + ' / 3 ★';
+    var map = $('adventure-map');
+    map.innerHTML = '';
+    ADVENTURE.forEach(function (stage, i) {
+      var btn = document.createElement('button');
+      var done = (p.adventureStars || []).indexOf(i) !== -1;
+      var locked = i > unlocked;
+      btn.className = 'stage-node' + (done ? ' complete' : '') + (locked ? ' locked' : '');
+      btn.innerHTML = (locked ? '🔒<br>' : '') + (i + 1) + '<br>' + stage.name;
+      btn.onclick = function () {
+        if (locked) { AUDIO.nope(); return; }
+        AUDIO.click(); selectedStage = i; renderAdventureDetail();
+      };
+      map.appendChild(btn);
+    });
+    renderAdventureDetail();
+  }
+
+  function renderAdventureDetail() {
+    var stage = ADVENTURE[selectedStage];
+    var detail = $('adventure-detail');
+    detail.innerHTML = '<h3>' + stage.name + '</h3><p>' + stage.blurb +
+      (selectedStage < 2 ? ' Goal: ' + stage.goal + ' points.' : '') + '</p>';
+    var play = document.createElement('button');
+    play.className = 'btn btn-orange'; play.textContent = 'PLAY STAGE ' + (selectedStage + 1);
+    play.onclick = function () {
+      AUDIO.click();
+      activeMode = { type: 'adventure', options: stage.options, stage: selectedStage };
+      startRound(stage.options, 'adventure');
+      activeMode.stage = selectedStage;
+    };
+    detail.appendChild(play);
+  }
+
+  function finishAdventureRound(r) {
+    var stageIndex = activeMode.stage || 0;
+    var won = stageIndex === 2 ? r.stats.bossDefeated : r.score >= ADVENTURE[stageIndex].goal;
+    if (won) {
+      SAVE.completeAdventureStage(stageIndex);
+      r.adventureWon = true;
+      $('results-header').textContent = 'STAGE COMPLETE!';
+      fx.confetti();
+    }
+  }
+
+  /* ============ Penny's Challenge Maker ============ */
+
+  function challengeFromControls() {
+    var chaos = $('challenge-chaos').value;
+    var rule = $('challenge-rule').value;
+    var seconds = Number($('challenge-time').value);
+    return {
+      mode: 'challenge', label: "PENNY'S CUSTOM CHALLENGE",
+      roundSeconds: seconds,
+      arrows: Number($('challenge-arrows').value),
+      targetSpeed: Number($('challenge-speed').value) / 100,
+      moversAt: chaos === 'calm' ? seconds + 1 : (chaos === 'wild' ? 0 : Math.round(seconds * 0.28)),
+      chaosAt: chaos === 'calm' ? seconds + 2 : (chaos === 'wild' ? 1 : Math.round(seconds * 0.68)),
+      background: $('challenge-bg').value,
+      theme: $('challenge-bg').value === 'cave' ? 'cave' : null,
+      specialRule: rule,
+      bossAtStart: rule === 'boss',
+      maker: { chaos: chaos, bg: $('challenge-bg').value, rule: rule }
+    };
+  }
+
+  function openChallenge() {
+    var saved = SAVE.current().customChallenge;
+    if (saved) {
+      $('challenge-time').value = saved.roundSeconds || 45;
+      $('challenge-arrows').value = saved.arrows || 18;
+      $('challenge-speed').value = Math.round((saved.targetSpeed || 1) * 100);
+      $('challenge-chaos').value = saved.maker && saved.maker.chaos || 'mixed';
+      $('challenge-bg').value = saved.maker && saved.maker.bg || 'random';
+      $('challenge-rule').value = saved.maker && saved.maker.rule || 'normal';
+    }
+    updateChallengeLabels();
+    show('challenge');
+  }
+
+  function updateChallengeLabels() {
+    $('challenge-time-value').textContent = $('challenge-time').value + 's';
+    $('challenge-arrows-value').textContent = $('challenge-arrows').value;
+    var n = Number($('challenge-speed').value);
+    $('challenge-speed-value').textContent = n < 90 ? 'Gentle' : n > 120 ? 'Zoomy!' : 'Normal';
+  }
+
+  /* ============ two-player family mode ============ */
+
+  function openFamily() {
+    show('family');
+    $('family-setup').classList.remove('hidden');
+    $('family-handoff').classList.add('hidden');
+    $('family-finish').classList.add('hidden');
+    var profiles = SAVE.profiles();
+    ['family-player-1', 'family-player-2'].forEach(function (id, selectIndex) {
+      var select = $(id); select.innerHTML = '';
+      profiles.forEach(function (p, i) {
+        var opt = document.createElement('option'); opt.value = p.id; opt.textContent = p.name;
+        if (i === selectIndex) opt.selected = true;
+        select.appendChild(opt);
+      });
+    });
+    $('btn-family-start').disabled = profiles.length < 2;
+    var lede = $('family-setup').querySelector('.mode-lede');
+    if (lede) lede.textContent = profiles.length < 2 ?
+      'Family Mode needs two players. Tap the 👤 button on the home screen to add another player, then come back!' :
+      'Choose two players. Each gets the same 45-second challenge.';
+  }
+
+  function beginFamilyMatch() {
+    var p1 = $('family-player-1').value, p2 = $('family-player-2').value;
+    if (!p1 || !p2 || p1 === p2) { AUDIO.nope(); return; }
+    familySession = { players: [p1, p2], results: [], turn: 0, original: SAVE.current().id };
+    SAVE.selectProfile(p1);
+    var options = { mode: 'family', label: 'FAMILY MATCH · PLAYER 1', roundSeconds: 45, arrows: 18,
+      moversAt: 12, chaosAt: 31, targetSpeed: 1, background: 'random' };
+    activeMode = { type: 'family', options: options };
+    startRound(options, 'family');
+  }
+
+  function handleFamilyResult(r) {
+    familySession.results.push(r);
+    AUDIO.startMusic();
+    if (familySession.turn === 0) {
+      familySession.turn = 1;
+      show('family');
+      $('family-setup').classList.add('hidden');
+      $('family-finish').classList.add('hidden');
+      $('family-handoff').classList.remove('hidden');
+      var next = SAVE.profiles().find(function (p) { return p.id === familySession.players[1]; });
+      $('family-handoff-text').textContent = r.score + ' points! Pass the game to ' + next.name + '.';
+    } else {
+      renderFamilyFinish();
+    }
+  }
+
+  function familyNextTurn() {
+    SAVE.selectProfile(familySession.players[1]);
+    var options = { mode: 'family', label: 'FAMILY MATCH · PLAYER 2', roundSeconds: 45, arrows: 18,
+      moversAt: 12, chaosAt: 31, targetSpeed: 1, background: 'random' };
+    activeMode = { type: 'family', options: options };
+    startRound(options, 'family');
+  }
+
+  function renderFamilyFinish() {
+    show('family');
+    $('family-setup').classList.add('hidden');
+    $('family-handoff').classList.add('hidden');
+    $('family-finish').classList.remove('hidden');
+    var ps = familySession.players.map(function (id) { return SAVE.profiles().find(function (p) { return p.id === id; }); });
+    var rs = familySession.results;
+    var winner = rs[0].score === rs[1].score ? 'A PERFECT TIE!' :
+      (rs[0].score > rs[1].score ? ps[0].name : ps[1].name) + ' WINS!';
+    $('family-winner').textContent = winner;
+    var awards = [
+      ['🏆 Arrow Champion', rs[0].score >= rs[1].score ? ps[0].name : ps[1].name, Math.max(rs[0].score, rs[1].score) + ' points'],
+      ['🎯 Bullseye Royalty', rs[0].stats.bullseyes >= rs[1].stats.bullseyes ? ps[0].name : ps[1].name, Math.max(rs[0].stats.bullseyes, rs[1].stats.bullseyes) + ' bullseyes'],
+      ['🎈 Balloon Buster', rs[0].stats.balloons >= rs[1].stats.balloons ? ps[0].name : ps[1].name, Math.max(rs[0].stats.balloons, rs[1].stats.balloons) + ' balloons'],
+      ['🌪️ Wildest Shot', rs[0].stats.misses >= rs[1].stats.misses ? ps[0].name : ps[1].name, Math.max(rs[0].stats.misses, rs[1].stats.misses) + ' adventurous misses']
+    ];
+    $('family-awards').innerHTML = awards.map(function (a) {
+      return '<div class="family-award"><b>' + a[0] + '</b>' + a[1] + '<br><small>' + a[2] + '</small></div>';
+    }).join('');
+    SAVE.selectProfile(familySession.original);
+    fx.confetti();
   }
 
   /* ============ arcade ============ */
@@ -620,7 +869,10 @@ var UI = (function () {
       else renderProfiles();
     };
 
-    $('btn-play').onclick = function () { AUDIO.click(); startRound(); };
+    $('btn-play').onclick = function () { AUDIO.click(); startRound({}, 'practice'); };
+    $('btn-adventure').onclick = function () { AUDIO.click(); openAdventure(); };
+    $('btn-challenge').onclick = function () { AUDIO.click(); openChallenge(); };
+    $('btn-family').onclick = function () { AUDIO.click(); openFamily(); };
     $('btn-arcade').onclick = function () { AUDIO.click(); openArcade(); };
     $('btn-closet').onclick = function () { AUDIO.click(); openCloset(); };
     $('btn-switch-profile').onclick = function () {
@@ -641,12 +893,33 @@ var UI = (function () {
       });
     };
 
-    $('btn-again').onclick = function () { AUDIO.click(); startRound(); };
+    $('btn-again').onclick = function () { AUDIO.click(); startRound(activeMode.options || {}, activeMode.type); };
     $('btn-results-arcade').onclick = function () { AUDIO.click(); openArcade(); };
-    $('btn-results-home').onclick = function () { AUDIO.click(); goHome(); };
+    $('btn-results-home').onclick = function () {
+      AUDIO.click();
+      if (activeMode.type === 'adventure') openAdventure();
+      else goHome();
+    };
 
     $('btn-arcade-back').onclick = function () { AUDIO.click(); goHome(); };
     $('btn-closet-back').onclick = function () { AUDIO.click(); goHome(); };
+    $('btn-adventure-back').onclick = function () { AUDIO.click(); goHome(); };
+    $('btn-challenge-back').onclick = function () { AUDIO.click(); goHome(); };
+    $('btn-family-back').onclick = function () { AUDIO.click(); goHome(); };
+
+    ['challenge-time', 'challenge-arrows', 'challenge-speed'].forEach(function (id) {
+      $(id).addEventListener('input', updateChallengeLabels);
+    });
+    $('btn-challenge-start').onclick = function () {
+      AUDIO.click();
+      var challenge = challengeFromControls();
+      SAVE.saveChallenge(challenge);
+      startRound(challenge, 'challenge');
+    };
+    $('btn-family-start').onclick = function () { AUDIO.click(); beginFamilyMatch(); };
+    $('btn-family-next').onclick = function () { AUDIO.click(); familyNextTurn(); };
+    $('btn-family-again').onclick = function () { AUDIO.click(); openFamily(); };
+    $('btn-family-home').onclick = function () { AUDIO.click(); goHome(); };
 
     document.querySelectorAll('.tab').forEach(function (tab) {
       tab.onclick = function () {
