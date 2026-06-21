@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v6-illustrated-hands';
+var CACHE = 'dinobob-v7-webp-bg';
 var FILES = [
   '.',
   'index.html',
@@ -56,8 +56,8 @@ var FILES = [
   'assets/sprites/arrow_obsidian.png',
   'assets/sprites/bow.png',
   'assets/sprites/balloon.png',
-  'assets/sprites/bg_meadow.png',
-  'assets/sprites/bg_mountain.png',
+  'assets/sprites/bg_meadow.webp',
+  'assets/sprites/bg_mountain.webp',
   'assets/sprites/target.png',
   'assets/sprites/coin.png',
   'assets/sprites/blackhole_0.png',

@@ -20,13 +20,15 @@ var SPRITES = (function () {
     'hat_cap', 'hat_viking', 'hat_robin', 'hat_bandana', 'hat_wizard',
     'hat_crown', 'hat_pirate', 'hat_dino', 'hat_astro'
   ];
+  // The big background scenes ship as WebP (~85% smaller); the rest stay PNG.
+  var WEBP = { bg_meadow: 1, bg_mountain: 1 };
   var imgs = {};
   NAMES.forEach(function (n) {
     var im = new Image();
     im._ok = false;
     im.onload = function () { im._ok = im.naturalWidth > 0; };
     im.onerror = function () { im._ok = false; };
-    im.src = 'assets/sprites/' + n + '.png';
+    im.src = 'assets/sprites/' + n + (WEBP[n] ? '.webp' : '.png');
     imgs[n] = im;
   });
 
