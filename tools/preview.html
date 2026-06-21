@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#222}canvas{display:block}
+</style></head><body>
+<canvas id="c" width="1600" height="900"></canvas>
+<script>
+var ctx = document.getElementById('c').getContext('2d');
+var SP = '../assets/sprites/';
+var fruits = [
+  ['fruit_cherry',20],['fruit_strawberry',35],['fruit_apple',50],
+  ['fruit_orange',65],['fruit_pear',80],['fruit_grapes',95],
+  ['fruit_watermelon',110],['fruit_pineapple',130],['fruit_banana',150]
+];
+var names = ['bg_meadow','target','coin','chest_closed','chest_semi','chest_open']
+  .concat(fruits.map(function(f){return f[0];}));
+var img = {}, left = names.length;
+names.forEach(function(n){
+  var im = new Image();
+  im.onload = im.onerror = function(){ if(--left===0) draw(); };
+  im.src = SP + n + '.png';
+  img[n] = im;
+});
+
+function sprite(n, cx, cy, w){
+  var im = img[n]; var h = w*im.height/im.width;
+  ctx.drawImage(im, cx-w/2, cy-h/2, w, h);
+  return h;
+}
+function label(txt, x, y, size, color){
+  ctx.font = '800 '+(size||22)+'px Nunito, Arial, sans-serif';
+  ctx.textAlign='center'; ctx.lineWidth=4; ctx.strokeStyle='rgba(0,0,0,0.75)';
+  ctx.strokeText(txt,x,y); ctx.fillStyle=color||'#fff'; ctx.fillText(txt,x,y);
+}
+
+function draw(){
+  ctx.drawImage(img['bg_meadow'],0,0,1600,900);
+
+  // a target floating in the sky (game uses r~70 -> width ~150)
+  sprite('target', 380, 250, 175);
+  label('TARGET', 380, 360, 24, '#ffe9a8');
+
+  // coin in HUD
+  ctx.fillStyle='rgba(26,24,34,0.82)';
+  ctx.beginPath(); ctx.roundRect(28,24,190,52,26); ctx.fill();
+  sprite('coin', 60, 50, 40);
+  label('1,240', 130, 58, 30, '#ffd23a');
+
+  // chest states along the lower ground
+  var cy = 690;
+  sprite('chest_closed', 250, cy, 150); label('CLOSED', 250, cy+70, 22, '#fff');
+  sprite('chest_semi',   500, cy, 158); label('FIRST HIT', 500, cy+70, 22, '#ffe9a8');
+  sprite('chest_open',   760, cy, 168); label('OPENED!', 760, cy+70, 22, '#ffd23a');
+
+  // fruit lineup with point values, cheapest -> best
+  label('FRUIT  (cheap → best)', 1230, 150, 26, '#fff');
+  var gx0 = 1010, gy0 = 230, dx = 170, dy = 175;
+  fruits.forEach(function(f, i){
+    var col = i%3, row=(i/3|0);
+    var x = gx0 + col*dx, y = gy0 + row*dy;
+    sprite(f[0], x, y, 130);
+    label(f[1]+' pts', x, y+78, 22, '#ffd23a');
+  });
+
+  document.title = 'READY';
+}
+</script></body></html>

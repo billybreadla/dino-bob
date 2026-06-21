@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#111;font-family:sans-serif}
+#status{position:fixed;top:0;left:0;right:0;padding:6px 10px;font:14px monospace;color:#fff;background:#000;z-index:9;white-space:pre-wrap}
+canvas{display:block;margin-top:28px}
+</style></head><body>
+<div id="status">starting…</div>
+<canvas id="c"></canvas>
+<script src="../js/tuning.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/audio.js"></script>
+<script src="../js/save.js"></script>
+<script src="../js/sprites.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/game.js"></script>
+<script>
+function run() {
+  var log = [];
+  try {
+    log.push('sprites ready: target=' + !!SPRITES.get('target') + ' mtn=' + !!SPRITES.get('bg_mountain') +
+             ' obs=' + !!SPRITES.get('arrow_obsidian') + ' hat=' + !!SPRITES.get('hat_wizard') +
+             ' hole=' + !!SPRITES.get('blackhole_1'));
+    SAVE.load();
+    var p = SAVE.addProfile('Test', 'dinobob');
+    p.equipped.hat = 'wizard';
+    p.equipped.arrow = 'obsidian';
+    SAVE.persist();
+
+    GAME.start(document.getElementById('c'), function(){});
+    var st = GAME.debugState();
+    st.countdown = 0;                 // skip the 3..2..1
+    st.bgName = 'bg_mountain';
+    st.arrowType = DATA.arrowById('obsidian');
+
+    // one of every target type clustered so the black hole grabs them
+    st.targets = [
+      { type:'bullseye', x:700, y:300, r:70, hp:1, motion:'static', mt:0, frozenUntil:0, dead:false },
+      { type:'balloon',  x:780, y:330, r:34, hp:1, color:'#ff5fa2', hue:0, vy:-50, sway:1, mt:0, frozenUntil:0, dead:false },
+      { type:'fruit',    x:640, y:360, r:30, hp:1, kind:'banana', value:150, vx:-40, vy:-100, spin:2, mt:0, frozenUntil:0, dead:false },
+      { type:'golden',   x:860, y:300, r:36, hp:1, vx:-60, vy:-120, mt:0, frozenUntil:0, dead:false },
+      { type:'chest',    x:1100, y:GROUNDY(), r:44, hp:2, wobble:0, frozenUntil:0, dead:false },
+      { type:'powerup',  x:1250, y:420, r:30, kind:'arrows', vy:-50, sway:1, mt:0, hp:1, frozenUntil:0, dead:false },
+      { type:'boss',     x:760, y:300, baseX:760, r:130, hp:6, maxHp:6, motion:'slide', range:0, speed:1, mt:0, wobble:0, frozenUntil:0, dead:false }
+    ];
+    // a black hole right in the cluster
+    st.blackholes.push({ x:740, y:320, t:0, life:1.1 });
+
+    var steps = 0;
+    for (var i=0;i<24;i++){ GAME.debugStep(0.05); steps++; }
+
+    log.push('OK: ran '+steps+' steps');
+    log.push('score='+st.score+' combo='+st.combo+' mult='+st.comboMult+' arrowsLeft='+st.arrowsLeft);
+    log.push('targets left='+st.targets.length+' holes='+st.blackholes.length+' bossSpawned='+st.bossSpawned);
+    log.push('badges='+JSON.stringify((SAVE.current().badges)||[]));
+    // re-add a fresh scene so the screenshot shows the art (the cluster got eaten)
+    st.blackholes = [{ x:1150, y:300, t:0.3, life:1.1 }];
+    st.targets = [
+      { type:'bullseye', x:380, y:250, r:72, hp:1, motion:'static', mt:0, frozenUntil:0, dead:false },
+      { type:'golden',   x:760, y:250, r:40, hp:1, vx:0, vy:0, mt:0.6, frozenUntil:0, dead:false },
+      { type:'powerup',  x:560, y:420, r:32, kind:'slowmo', vy:0, sway:1, mt:0, hp:1, frozenUntil:0, dead:false },
+      { type:'powerup',  x:980, y:430, r:32, kind:'arrows', vy:0, sway:1, mt:0, hp:1, frozenUntil:0, dead:false },
+      { type:'chest',    x:300, y:GROUNDY(), r:48, hp:1, wobble:0, frozenUntil:0, dead:false },
+      { type:'boss',     x:1180, y:520, baseX:1180, r:120, hp:4, maxHp:6, motion:'static', range:0, speed:1, mt:0, wobble:0, frozenUntil:0, dead:false }
+    ];
+    st.comboMult = 3; st.combo = 6; st.slowUntil = st.t + 5; st.score = 4820;
+    GAME.debugStep(0.016);
+
+    document.getElementById('status').textContent = log.join('\n');
+    document.title = 'DONE';
+  } catch (e) {
+    document.getElementById('status').textContent = 'ERROR: ' + (e && e.stack || e);
+    document.title = 'ERROR';
+  }
+}
+// GROUND constant lives inside GAME's closure; mirror it here.
+function GROUNDY(){ return 790 - 34; }
+// One idle timer: leaving the thread idle lets the engine's sprites finish
+// loading (a busy poll would starve image decode under headless virtual time).
+setTimeout(run, 4000);
+</script></body></html>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- background -->
+  <rect width="512" height="512" rx="110" fill="#1a1822"/>
+  <circle cx="256" cy="280" r="190" fill="#9fd95f"/>
+  <circle cx="256" cy="280" r="190" fill="none" stroke="#4d9b31" stroke-width="10"/>
+  <!-- hood -->
+  <circle cx="256" cy="270" r="150" fill="#2f6fd6"/>
+  <!-- spikes -->
+  <polygon points="186,150 216,90 246,150" fill="#9fd636"/>
+  <polygon points="226,140 256,75 286,140" fill="#9fd636"/>
+  <polygon points="266,150 296,90 326,150" fill="#9fd636"/>
+  <!-- face -->
+  <ellipse cx="256" cy="290" rx="100" ry="86" fill="#f3c08c"/>
+  <!-- hair -->
+  <circle cx="222" cy="226" r="24" fill="#5a3a22"/>
+  <circle cx="258" cy="218" r="24" fill="#5a3a22"/>
+  <circle cx="292" cy="226" r="22" fill="#5a3a22"/>
+  <!-- eyes -->
+  <circle cx="216" cy="288" r="26" fill="#fff"/>
+  <circle cx="296" cy="288" r="26" fill="#fff"/>
+  <circle cx="220" cy="292" r="13" fill="#2a2622"/>
+  <circle cx="300" cy="292" r="13" fill="#2a2622"/>
+  <!-- cheeks -->
+  <circle cx="186" cy="322" r="14" fill="#ff8a8a" opacity="0.55"/>
+  <circle cx="326" cy="322" r="14" fill="#ff8a8a" opacity="0.55"/>
+  <!-- smile -->
+  <path d="M 226 332 Q 256 360 286 332" fill="none" stroke="#2a2622" stroke-width="10" stroke-linecap="round"/>
+</svg>

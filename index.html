@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dino Bob — Arrow Blast!</title>
+<meta name="description" content="Dino Bob loves adventure and arcades! Shoot arrows, win coins, unlock awesome characters.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dino Bob">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="icon" href="assets/icons/icon-192.png">
+<meta name="theme-color" content="#1a1822">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===================== INTRO (Dino Bob's Opening Adventure) ===================== -->
+<iframe id="intro-overlay" src="intro/intro.dc.html" title="Dino Bob opening"
+  style="position:fixed; inset:0; width:100%; height:100%; border:0; z-index:9999; background:#0b0a09;" scrolling="no"></iframe>
+<script>
+(function () {
+  var ov = document.getElementById('intro-overlay');
+  if (!ov) return;
+  var done = false, ready = false;
+  function dismiss() {
+    if (done) return; done = true;
+    ov.style.transition = 'opacity 360ms ease';
+    ov.style.opacity = '0';
+    setTimeout(function () { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }, 400);
+  }
+  window.addEventListener('message', function (e) {
+    var d = e && e.data; if (!d || typeof d.type !== 'string') return;
+    if (d.type === 'dinobob-intro-ready') ready = true;
+    else if (d.type === 'dinobob-intro-done') dismiss();
+  });
+  // Failsafe: if the intro never reports it mounted (no internet for React/Babel,
+  // a load error, etc.), drop it after 6s so the game is never stuck behind it.
+  setTimeout(function () { if (!ready) dismiss(); }, 6000);
+})();
+</script>
+
+<!-- ===================== TITLE ===================== -->
+<section id="screen-title" class="screen sky-bg">
+  <div class="title-stack">
+    <canvas id="title-hero" width="360" height="340"></canvas>
+    <h1 class="logo"><span class="logo-dino">DINO</span> <span class="logo-bob">BOB</span></h1>
+    <p class="tagline">Arrow Blast!</p>
+    <button id="btn-title-play" class="btn btn-big btn-green">▶ PLAY</button>
+  </div>
+  <p class="credit">designed by Penny · built with Claude</p>
+</section>
+
+<!-- ===================== PROFILES ===================== -->
+<section id="screen-profiles" class="screen arcade-bg hidden">
+  <h2 class="panel-header">WHO'S PLAYING?</h2>
+  <div id="profile-list" class="profile-list"></div>
+  <div id="profile-new" class="profile-new hidden">
+    <input id="profile-name-input" type="text" maxlength="12" placeholder="Type your name!" autocomplete="off">
+    <button id="btn-profile-create" class="btn btn-green">LET'S GO!</button>
+    <button id="btn-profile-cancel" class="btn btn-ghost">Back</button>
+  </div>
+</section>
+
+<!-- ===================== HOME ===================== -->
+<section id="screen-home" class="screen sky-bg hidden">
+  <div class="home-top">
+    <div class="chip coin-chip">🪙 <span id="home-coins">0</span></div>
+    <div class="chip name-chip" id="home-name">—</div>
+    <div class="home-top-right">
+      <button id="btn-music" class="chip btn-chip" title="Music on/off">🎵</button>
+      <button id="btn-switch-profile" class="chip btn-chip" title="Switch player">👤</button>
+    </div>
+  </div>
+  <canvas id="home-hero" width="420" height="430"></canvas>
+  <div class="chip perk-chip" id="home-perk">—</div>
+  <div class="home-buttons">
+    <button id="btn-play" class="btn btn-big btn-green">🎯 TARGET PRACTICE</button>
+    <button id="btn-arcade" class="btn btn-big btn-purple">🕹️ ARCADE</button>
+    <button id="btn-closet" class="btn btn-big btn-blue">👕 CLOSET</button>
+  </div>
+  <div class="chip best-chip">⭐ Best: <span id="home-best">0</span></div>
+</section>
+
+<!-- ===================== GAME ===================== -->
+<section id="screen-game" class="screen game-bg hidden">
+  <canvas id="game-canvas"></canvas>
+  <button id="btn-quit-round" class="quit-btn" title="End round">✕</button>
+</section>
+
+<!-- ===================== RESULTS ===================== -->
+<section id="screen-results" class="screen arcade-bg hidden">
+  <h2 class="panel-header" id="results-header">ROUND OVER!</h2>
+  <div class="results-card">
+    <div id="results-highscore" class="highscore-banner hidden">🎆 NEW HIGH SCORE! 🎆</div>
+    <div class="results-row results-score"><span>Score</span><b id="results-score">0</b></div>
+    <div class="results-row"><span>Coins from score</span><b id="results-coins-score">0</b></div>
+    <div class="results-row"><span>Coins collected</span><b id="results-coins-direct">0</b></div>
+    <div class="results-row" id="results-bonus-row"><span id="results-bonus-label">Character bonus</span><b id="results-bonus">—</b></div>
+    <div class="results-row results-total"><span>🪙 Coins earned</span><b id="results-coins">0</b></div>
+  </div>
+  <div class="results-buttons">
+    <button id="btn-again" class="btn btn-big btn-green">🔁 PLAY AGAIN</button>
+    <button id="btn-results-arcade" class="btn btn-purple">🕹️ ARCADE</button>
+    <button id="btn-results-home" class="btn btn-ghost">🏠 Home</button>
+  </div>
+</section>
+
+<!-- ===================== ARCADE ===================== -->
+<section id="screen-arcade" class="screen arcade-bg hidden">
+  <div class="arcade-top">
+    <button id="btn-arcade-back" class="chip btn-chip">← Back</button>
+    <h2 class="panel-header neon">★ THE ARCADE ★</h2>
+    <div class="chip coin-chip">🪙 <span id="arcade-coins">0</span></div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="characters">CHARACTERS</button>
+    <button class="tab" data-tab="arrows">ARROWS</button>
+    <button class="tab" data-tab="skins">SKINS</button>
+  </nav>
+  <div id="arcade-grid" class="shop-grid"></div>
+</section>
+
+<!-- ===================== CLOSET ===================== -->
+<section id="screen-closet" class="screen arcade-bg hidden">
+  <div class="arcade-top">
+    <button id="btn-closet-back" class="chip btn-chip">← Back</button>
+    <h2 class="panel-header">👕 CLOSET</h2>
+    <canvas id="closet-preview" width="170" height="180"></canvas>
+  </div>
+  <div id="closet-body" class="closet-body"></div>
+</section>
+
+<!-- confetti / fireworks overlay -->
+<canvas id="fx-canvas"></canvas>
+
+<!-- modal for kid-proof confirms -->
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <p id="modal-text">Are you sure?</p>
+    <div class="modal-buttons">
+      <button id="modal-yes" class="btn btn-red">Yes</button>
+      <button id="modal-no" class="btn btn-green">No!</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/tuning.js"></script>
+<script src="js/data.js"></script>
+<script src="js/save.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/art.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

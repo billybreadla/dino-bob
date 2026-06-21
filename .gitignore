@@ -1,0 +1,9 @@
+# Local Netlify folder
+.netlify
+
+.DS_Store
+
+# 54MB of source/working files for the opening animation. The deployed game
+# loads its intro from intro/, not from here, so this is excluded to keep the
+# repo lean. Remove this line if you want it tracked too.
+Dino Bob's Opening Adventure/
