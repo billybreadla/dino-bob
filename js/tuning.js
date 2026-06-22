@@ -78,6 +78,7 @@ var TUNING = {
   NAME_ASTRONAUT: 'Astronaut',
   NAME_ROBOT: 'Robot',
   NAME_BEAR: 'Bear',
+  NAME_TRIXIE: 'Trixie',
 
   // ---------- SECRET FUN SWITCHES ----------
   CONFETTI_AMOUNT: 120,      // confetti pieces when you buy something

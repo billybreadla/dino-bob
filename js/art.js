@@ -145,8 +145,15 @@ var ART = (function () {
       y = 0;
     }
 
-    // Use the real rendered sprite when it's available.
-    var sp = typeof SPRITES !== 'undefined' && SPRITES.get('char_' + id);
+    // Use the real rendered sprite when it's available. Dino Bob has painted
+    // recolor + shiny variants, so the outfit shop visibly changes his look
+    // (other characters fall back to the base sprite).
+    var spriteName = 'char_' + id;
+    if (id === 'dinobob' && typeof SPRITES !== 'undefined') {
+      if (opts.shiny && SPRITES.get('char_dinobob_shiny')) spriteName = 'char_dinobob_shiny';
+      else if (opts.outfitId && opts.outfitId !== 'classic' && SPRITES.get('char_dinobob_' + opts.outfitId)) spriteName = 'char_dinobob_' + opts.outfitId;
+    }
+    var sp = typeof SPRITES !== 'undefined' && SPRITES.get(spriteName);
     if (sp) {
       drawCharacterSprite(ctx, sp, id, x, y, scale, opts);
       if (posed) ctx.restore();

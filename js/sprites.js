@@ -18,10 +18,15 @@ var SPRITES = (function () {
     'fruit_apple', 'fruit_banana', 'fruit_pineapple', 'fruit_strawberry',
     'fruit_orange', 'fruit_grapes', 'fruit_pear', 'fruit_cherry', 'fruit_watermelon',
     'hat_cap', 'hat_viking', 'hat_robin', 'hat_bandana', 'hat_wizard',
-    'hat_crown', 'hat_pirate', 'hat_dino', 'hat_astro'
+    'hat_crown', 'hat_pirate', 'hat_dino', 'hat_astro',
+    // V5 art overhaul
+    'char_trixie', 'arm_trixie_upper', 'arm_trixie_bowhand', 'arm_trixie_stringhand',
+    'char_dinobob_ruby', 'char_dinobob_grape', 'char_dinobob_gold', 'char_dinobob_mint', 'char_dinobob_shiny',
+    'boss_moonstone',
+    'bg_moon_cave', 'bg_starlight', 'bg_sunset_beach', 'bg_underwater', 'adventure_map'
   ];
   // The big background scenes ship as WebP (~85% smaller); the rest stay PNG.
-  var WEBP = { bg_meadow: 1, bg_mountain: 1 };
+  var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1 };
   var imgs = {};
   NAMES.forEach(function (n) {
     var im = new Image();

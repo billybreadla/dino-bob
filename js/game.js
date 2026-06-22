@@ -69,8 +69,8 @@ var GAME = (function () {
       bossSpawned: false,
       stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, bossDefeated: false },
       bgName: options.background && options.background !== 'random' ?
-        (options.background === 'cave' ? 'bg_mountain' : options.background) :
-        (Math.random() < 0.5 ? 'bg_mountain' : 'bg_meadow')
+        (options.background === 'cave' ? 'bg_moon_cave' : options.background) :
+        ['bg_meadow', 'bg_mountain', 'bg_sunset_beach', 'bg_starlight', 'bg_underwater'][(Math.random() * 5) | 0]
     };
   }
 
@@ -1034,18 +1034,26 @@ var GAME = (function () {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(t.kind === 'arrows' ? '+3' : '⏱', 0, 2);
     } else if (t.type === 'boss') {
-      var bimgT = SPRITES.get('target');
+      var bossImg = SPRITES.get('boss_moonstone');
+      var bimgT = bossImg || SPRITES.get('target');
+      var byoff = 0;
       if (bimgT) {
-        var bw = t.r * 2.15, bh = bw * bimgT.height / bimgT.width;
-        ctx.drawImage(bimgT, -bw / 2, -bh / 2, bw, bh);
+        var bw = t.r * (bossImg ? 2.5 : 2.15), bh = bw * bimgT.height / bimgT.width;
+        // the Moonstone King's chest weak-spot sits a touch below its center,
+        // so lift the art to line that bullseye up with the round's hitbox.
+        byoff = bossImg ? bh * 0.06 : 0;
+        ctx.drawImage(bimgT, -bw / 2, -bh / 2 - byoff, bw, bh);
       } else {
         ART.circle(ctx, 0, 0, t.r, '#e23b3b');
       }
-      ctx.font = Math.round(t.r * 0.7) + 'px sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      ctx.fillText('👑', 0, -t.r * 0.85);
-      // health bar
-      var hbw = t.r * 1.6, hx = -hbw / 2, hy = -t.r - 30;
+      if (!bossImg) {   // the Moonstone art already wears its crown
+        ctx.font = Math.round(t.r * 0.7) + 'px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('👑', 0, -t.r * 0.85);
+      }
+      // health bar (kept clear of the taller boss art)
+      var hbw = t.r * 1.6, hx = -hbw / 2;
+      var hy = (bossImg ? -bh / 2 - byoff - 26 : -t.r - 30);
       ART.rr(ctx, hx - 3, hy - 3, hbw + 6, 20, 8, 'rgba(0,0,0,0.5)');
       ART.rr(ctx, hx, hy, hbw * Math.max(0, t.hp) / t.maxHp, 14, 7, '#ff4d6d');
     } else if (t.type === 'chest') {
@@ -1117,6 +1125,7 @@ var GAME = (function () {
     ART.drawCharacter(ctx, p.equipped.character, 150, GROUND + 10, 1.15, {
       hat: p.equipped.hat,
       outfitColor: outfit.swap,
+      outfitId: p.equipped.outfit,
       shiny: p.equipped.shiny,
       t: st.t,
       look: 1,

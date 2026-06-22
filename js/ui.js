@@ -28,6 +28,7 @@ var UI = (function () {
     return {
       hat: p.equipped.hat,
       outfitColor: outfit.swap,
+      outfitId: p.equipped.outfit,
       shiny: p.equipped.shiny && SAVE.owns('shiny', p.equipped.character),
       t: t || 1
     };
@@ -179,7 +180,8 @@ var UI = (function () {
 
       portrait(cv, p.equipped.character, {
         hat: p.equipped.hat,
-        outfitColor: DATA.outfitById(p.equipped.outfit).swap
+        outfitColor: DATA.outfitById(p.equipped.outfit).swap,
+        outfitId: p.equipped.outfit
       });
       card.onclick = function () {
         AUDIO.click();
@@ -340,7 +342,7 @@ var UI = (function () {
     {
       name: 'Moon Cave Boss', blurb: 'Defeat the crowned target before your arrows run out!', goal: 1,
       options: { mode: 'adventure', stageIndex: 2, label: 'STAGE 3 · MOON CAVE BOSS', roundSeconds: 50, arrows: 22,
-        moversAt: 0, chaosAt: 0, targetSpeed: 1.08, background: 'cave', theme: 'cave', bossAtStart: true, specialRule: 'boss' }
+        moversAt: 0, chaosAt: 0, targetSpeed: 1.08, background: 'bg_moon_cave', bossAtStart: true, specialRule: 'boss' }
     }
   ];
   var selectedStage = 0;
@@ -595,7 +597,7 @@ var UI = (function () {
           price: o.price,
           owned: SAVE.owns('outfits', o.id),
           equipped: p.equipped.outfit === o.id,
-          draw: function (cv) { portrait(cv, p.equipped.character, { outfitColor: o.swap }); },
+          draw: function (cv) { portrait(cv, p.equipped.character, { outfitColor: o.swap, outfitId: o.id }); },
           buy: function () { SAVE.unlock('outfits', o.id); SAVE.equip('outfit', o.id); },
           equip: function () { SAVE.equip('outfit', o.id); }
         }));

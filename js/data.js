@@ -38,6 +38,13 @@ var DATA = {
       get price() { return TUNING.PRICE_CHARACTER; },
       perkText: '+1s ice · bullseyes freeze every target',
       perk: { freezeBonus: 1, bonusObjBonus: 0.10 }
+    },
+    {
+      id: 'trixie',
+      get name() { return TUNING.NAME_TRIXIE; },
+      get price() { return TUNING.PRICE_CHARACTER; },
+      perkText: '+15% points on fruit and balloons',
+      perk: { bonusObjBonus: 0.15 }
     }
   ],
 

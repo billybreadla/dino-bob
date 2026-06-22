@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v7-webp-bg';
+var CACHE = 'dinobob-v8-v5art';
 var FILES = [
   '.',
   'index.html',
@@ -83,7 +83,23 @@ var FILES = [
   'assets/sprites/hat_crown.png',
   'assets/sprites/hat_pirate.png',
   'assets/sprites/hat_dino.png',
-  'assets/sprites/hat_astro.png'
+  'assets/sprites/hat_astro.png',
+  // V5 art overhaul
+  'assets/sprites/char_trixie.png',
+  'assets/sprites/arm_trixie_upper.png',
+  'assets/sprites/arm_trixie_bowhand.png',
+  'assets/sprites/arm_trixie_stringhand.png',
+  'assets/sprites/char_dinobob_ruby.png',
+  'assets/sprites/char_dinobob_grape.png',
+  'assets/sprites/char_dinobob_gold.png',
+  'assets/sprites/char_dinobob_mint.png',
+  'assets/sprites/char_dinobob_shiny.png',
+  'assets/sprites/boss_moonstone.png',
+  'assets/sprites/bg_moon_cave.webp',
+  'assets/sprites/bg_starlight.webp',
+  'assets/sprites/bg_sunset_beach.webp',
+  'assets/sprites/bg_underwater.webp',
+  'assets/sprites/adventure_map.webp'
 ];
 
 self.addEventListener('install', function (e) {

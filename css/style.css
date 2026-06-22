@@ -351,25 +351,14 @@ html, body {
 .adventure-map {
   position: relative;
   width: min(940px, 94vw);
-  height: min(430px, 52vh);
-  margin-top: 56px;
-  border-radius: 38px;
-  background:
-    radial-gradient(ellipse at 10% 70%, #397e47 0 17%, transparent 18%),
-    radial-gradient(ellipse at 50% 25%, #a9d8ec 0 15%, transparent 16%),
-    radial-gradient(ellipse at 86% 65%, #493962 0 19%, transparent 20%),
-    linear-gradient(160deg, #b9e489, #6caf67 48%, #5b7e84);
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin-top: 34px;
+  border-radius: 28px;
+  background: #1a2238 url('../assets/sprites/adventure_map.webp') center / cover no-repeat;
   border: 6px solid rgba(255,255,255,0.72);
   box-shadow: inset 0 0 0 5px rgba(57,90,44,0.35), 0 18px 45px rgba(0,0,0,0.35);
   overflow: hidden;
-}
-.adventure-map::after {
-  content: '';
-  position: absolute;
-  left: 13%; right: 13%; top: 49%;
-  border-top: 8px dashed rgba(255,248,205,0.92);
-  transform: rotate(-5deg);
-  filter: drop-shadow(0 3px 0 rgba(60,66,42,0.35));
 }
 .stage-node {
   position: absolute;
@@ -386,9 +375,11 @@ html, body {
   text-shadow: 0 2px 0 rgba(0,0,0,0.45);
   box-shadow: 0 8px 0 rgba(36,46,32,0.45), 0 14px 26px rgba(0,0,0,0.25);
 }
-.stage-node:nth-child(1) { left: 8%; bottom: 12%; background: #3d964c; }
-.stage-node:nth-child(2) { left: 43%; top: 9%; background: #3d8fd0; }
-.stage-node:nth-child(3) { right: 7%; bottom: 13%; background: #7652a8; }
+/* positioned to sit on the painted route's platforms (bottom-left meadow,
+   center, top-right moon cave) */
+.stage-node:nth-child(1) { left: 4%; top: 70%; background: #3d964c; }
+.stage-node:nth-child(2) { left: 39%; top: 43%; background: #3d8fd0; }
+.stage-node:nth-child(3) { left: 73%; top: 15%; background: #7652a8; }
 .stage-node.locked { filter: grayscale(0.85) brightness(0.65); cursor: default; }
 .stage-node.complete::before { content: '★'; position: absolute; top: -22px; right: -2px; color: var(--yellow); font-size: 42px; }
 .adventure-detail { min-height: 82px; width: min(650px, 92vw); padding: 13px 22px; text-align: center; }
@@ -684,7 +675,7 @@ html, body {
   .logo { font-size: 52px; }
   .shop-grid { max-height: 46vh; }
   .closet-body { max-height: 50vh; }
-  .adventure-map { height: 250px; margin-top: 46px; }
+  .adventure-map { margin-top: 18px; }
   .stage-node { width: 86px; height: 86px; font-size: 13px; border-width: 4px; }
   .adventure-detail { position: absolute; bottom: 8px; right: 8px; width: 340px; min-height: 64px; padding: 8px 12px; }
   .maker-grid { margin-top: 46px; padding: 14px 18px; gap: 10px 18px; }
