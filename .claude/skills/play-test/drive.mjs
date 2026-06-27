@@ -84,7 +84,8 @@ try {
 
   await click('btn-adventure'); await sleep(900); await shot('03-adventure');
   const nodes = await page.evaluate(() => document.querySelectorAll('#adventure-map .stage-node').length);
-  check('adventure map has 3 stages', nodes === 3, nodes + ' nodes'); await click('btn-adventure-back'); await sleep(400);
+  const wantStages = await page.evaluate(() => (typeof STAGES !== 'undefined' ? STAGES.count : 3));
+  check('adventure map renders all stages', nodes === wantStages, nodes + '/' + wantStages + ' nodes'); await click('btn-adventure-back'); await sleep(400);
 
   await click('btn-challenge'); await sleep(900); await shot('04-challenge');
   const ctrls = await page.evaluate(() => ['challenge-time','challenge-arrows','challenge-speed','challenge-chaos','challenge-bg','challenge-rule'].filter(id => document.getElementById(id)).length);
@@ -93,6 +94,15 @@ try {
   await click('btn-family'); await sleep(800); await shot('05-family');
   const fam = await page.evaluate(() => ({ p1: (document.getElementById('family-player-1')||{}).value, dis: !!(document.getElementById('btn-family-start')||{}).disabled }));
   check('family start enabled with 2 profiles', fam.dis === false); await click('btn-family-back'); await sleep(400);
+
+  await click('btn-settings'); await sleep(500); await shot('05b-settings');
+  const setEls = await page.evaluate(() => ['set-music','set-sfx','set-easy','set-reset'].filter(id => document.getElementById(id)).length);
+  check('settings screen has all controls', setEls === 4, setEls + '/4');
+  await click('set-easy'); await sleep(150);
+  const easyOn = await page.evaluate(() => SAVE.settings().easy === true && document.getElementById('set-easy').classList.contains('on'));
+  check('easier mode toggles + persists', easyOn);
+  await click('set-easy'); await sleep(120);   // back off so it doesn't affect later rounds
+  await click('btn-settings-back'); await sleep(400);
 
   log('== Target Practice');
   await click('btn-play'); await sleep(300);

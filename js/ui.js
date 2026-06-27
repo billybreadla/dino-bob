@@ -4,7 +4,7 @@
 var UI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
-  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family'];
+  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family', 'settings'];
   var activeMode = { type: 'practice', options: null };
   var familySession = null;
 
@@ -340,37 +340,83 @@ var UI = (function () {
 
   function renderAdventure() {
     var p = SAVE.current();
-    var unlocked = p.adventureStage || 0;
+    var stars = p.adventureStars || [];
+    var highestCleared = stars.reduce(function (max, idx) { return Math.max(max, idx); }, -1);
+    var unlocked = Math.min(STAGES.count - 1, Math.max(p.adventureStage || 0, highestCleared + 1));
     selectedStage = Math.min(selectedStage, unlocked);
-    $('adventure-stars').textContent = (p.adventureStars || []).length + ' / ' + STAGES.count + ' ★';
+    $('adventure-stars').textContent = stars.length + ' / ' + STAGES.count + ' ★';
     var map = $('adventure-map');
     map.innerHTML = '';
+    renderAdventureTrail(map, unlocked, stars);
     ADVENTURE.forEach(function (stage, i) {
       var btn = document.createElement('button');
-      var done = (p.adventureStars || []).indexOf(i) !== -1;
+      var done = stars.indexOf(i) !== -1;
       var locked = i > unlocked;
-      btn.className = 'stage-node' + (done ? ' complete' : '') + (locked ? ' locked' : '');
-      btn.innerHTML = (locked ? '🔒<br>' : '') + (i + 1) + '<br>' + stage.name;
+      btn.className = 'stage-node' + (done ? ' complete' : '') + (locked ? ' locked' : '') + (i === selectedStage ? ' selected' : '');
+      btn.setAttribute('aria-label', (locked ? 'Locked stage: ' : 'Stage ' + (i + 1) + ': ') + stage.name);
+      btn.innerHTML =
+        '<span class="stage-sigil stage-sigil-' + ((stage.node && stage.node.sigil) || 'dot') + '"></span>' +
+        '<span class="stage-num">' + (locked ? 'LOCK' : 'STAGE ' + (i + 1)) + '</span>' +
+        '<span class="stage-name">' + (stage.shortName || stage.name) + '</span>';
       // Map node position + color come from the stage data (js/stages.js).
       if (stage.node) {
         btn.style.left = stage.node.x;
         btn.style.top = stage.node.y;
         if (stage.node.color) btn.style.background = stage.node.color;
+        if (stage.node.accent) btn.style.setProperty('--stage-accent', stage.node.accent);
       }
       btn.onclick = function () {
         if (locked) { AUDIO.nope(); return; }
-        AUDIO.click(); selectedStage = i; renderAdventureDetail();
+        AUDIO.click(); selectedStage = i; renderAdventure();
       };
       map.appendChild(btn);
     });
     renderAdventureDetail();
   }
 
+  function renderAdventureTrail(map, unlocked, stars) {
+    var pts = STAGES.nodePoints ? STAGES.nodePoints() : [];
+    if (pts.length < 2) return;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'adventure-trail');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    var path = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+    var shadow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    shadow.setAttribute('class', 'trail-shadow');
+    shadow.setAttribute('points', path);
+    var base = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    base.setAttribute('class', 'trail-base');
+    base.setAttribute('points', path);
+    var lit = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    lit.setAttribute('class', 'trail-lit');
+    lit.setAttribute('points', pts.slice(0, Math.max(1, unlocked + 1)).map(function (p) { return p.x + ',' + p.y; }).join(' '));
+    svg.appendChild(shadow);
+    svg.appendChild(base);
+    svg.appendChild(lit);
+    pts.forEach(function (p, i) {
+      if (stars.indexOf(i) === -1) return;
+      var star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      star.setAttribute('class', 'trail-star');
+      star.setAttribute('cx', p.x);
+      star.setAttribute('cy', p.y);
+      star.setAttribute('r', '1.2');
+      svg.appendChild(star);
+    });
+    map.appendChild(svg);
+  }
+
   function renderAdventureDetail() {
     var stage = ADVENTURE[selectedStage];
     var detail = $('adventure-detail');
-    detail.innerHTML = '<h3>' + stage.name + '</h3><p>' + stage.blurb +
-      STAGES.goalText(selectedStage) + '</p>';
+    var isBoss = stage.win && stage.win.type === 'boss';
+    var accent = stage.node && stage.node.accent ? stage.node.accent : '#ffd23a';
+    detail.style.setProperty('--stage-accent', accent);
+    detail.innerHTML =
+      '<div class="adventure-detail-kicker">Stage ' + (selectedStage + 1) + ' of ' + STAGES.count + (isBoss ? ' · Boss finale' : ' · Painted world') + '</div>' +
+      '<h3>' + stage.name + '</h3><p>' + stage.blurb + STAGES.goalText(selectedStage) + '</p>' +
+      '<div class="adventure-detail-tags"><span>' + (isBoss ? 'Boss battle' : 'Score quest') + '</span><span>' +
+      (stage.background || 'surprise').replace(/^bg_/, '').replace(/_/g, ' ') + '</span></div>';
     var play = document.createElement('button');
     play.className = 'btn btn-orange'; play.textContent = 'PLAY STAGE ' + (selectedStage + 1);
     play.onclick = function () {
@@ -826,8 +872,46 @@ var UI = (function () {
     animateClosetPreview();
   }
 
-  /* ============ music preference ============ */
+  /* ============ settings (audio + accessibility) ============ */
   var musicWanted = true;
+
+  function setToggle(el, on) {
+    if (!el) return;
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-checked', on ? 'true' : 'false');
+    var txt = el.querySelector('.toggle-text');
+    if (txt) txt.textContent = on ? 'ON' : 'OFF';
+  }
+
+  // Keep the header music chip + the settings music toggle in sync, persist the
+  // choice, and start/stop the loop.
+  function setMusicPref(on) {
+    musicWanted = on;
+    SAVE.setSetting('music', on);
+    AUDIO.setMusic(on);
+    $('btn-music').classList.toggle('off', !on);
+    setToggle($('set-music'), on);
+  }
+
+  function renderSettings() {
+    var s = SAVE.settings();
+    setToggle($('set-music'), s.music);
+    setToggle($('set-sfx'), s.sfx);
+    setToggle($('set-easy'), s.easy);
+  }
+
+  function openSettings() {
+    renderSettings();
+    show('settings');
+  }
+
+  // Apply saved settings once at boot (music itself starts on the first tap).
+  function applySettings() {
+    var s = SAVE.settings();
+    musicWanted = s.music;
+    AUDIO.setSfx(s.sfx);
+    $('btn-music').classList.toggle('off', !s.music);
+  }
 
   /* ============ wire up ============ */
 
@@ -875,8 +959,34 @@ var UI = (function () {
       renderProfiles();
     };
     $('btn-music').onclick = function () {
-      musicWanted = AUDIO.toggleMusic();
-      $('btn-music').classList.toggle('off', !musicWanted);
+      AUDIO.unlock();
+      setMusicPref(!musicWanted);
+    };
+    $('btn-settings').onclick = function () { AUDIO.click(); openSettings(); };
+    $('btn-settings-back').onclick = function () { AUDIO.click(); goHome(); };
+    $('set-music').onclick = function () { AUDIO.unlock(); setMusicPref(!SAVE.settings().music); };
+    $('set-sfx').onclick = function () {
+      var on = !SAVE.settings().sfx;
+      SAVE.setSetting('sfx', on);
+      AUDIO.setSfx(on);
+      setToggle($('set-sfx'), on);
+      if (on) AUDIO.click();   // little confirmation chirp when turning back on
+    };
+    $('set-easy').onclick = function () {
+      AUDIO.click();
+      var on = !SAVE.settings().easy;
+      SAVE.setSetting('easy', on);
+      setToggle($('set-easy'), on);
+    };
+    $('set-reset').onclick = function () {
+      AUDIO.click();
+      modal('Reset all progress for this player? Coins, unlocks and stars will be gone!', function () {
+        modal('Are you REALLY sure? This cannot be undone!', function () {
+          SAVE.resetProgress();
+          AUDIO.fanfare();
+          goHome();
+        });
+      });
     };
 
     $('btn-quit-round').onclick = function () {
@@ -930,6 +1040,7 @@ var UI = (function () {
     boot: function () {
       SAVE.load();
       bind();
+      applySettings();
       show('title');
       animateTitle();
     },

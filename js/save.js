@@ -52,6 +52,11 @@ var SAVE = (function () {
       if (!Array.isArray(p.adventureStars)) p.adventureStars = [];
       if (!p.customChallenge) p.customChallenge = null;
     });
+    // device-wide settings (audio + accessibility), not per-profile
+    if (!state.settings) state.settings = {};
+    if (typeof state.settings.music !== 'boolean') state.settings.music = true;
+    if (typeof state.settings.sfx !== 'boolean') state.settings.sfx = true;
+    if (typeof state.settings.easy !== 'boolean') state.settings.easy = false;
     return state;
   }
 
@@ -90,6 +95,26 @@ var SAVE = (function () {
     deleteProfile: function (id) {
       state.profiles = state.profiles.filter(function (p) { return p.id !== id; });
       if (state.currentId === id) state.currentId = state.profiles.length ? state.profiles[0].id : null;
+      persist();
+    },
+
+    /* ----- device settings (audio + accessibility) ----- */
+    settings: function () { if (!state) load(); return state.settings; },
+    setSetting: function (key, val) {
+      if (!state) load();
+      state.settings[key] = val;
+      persist();
+    },
+
+    // Wipe the CURRENT player's progress (coins, unlocks, adventure, stats,
+    // badges, high score) but keep their name/avatar so they stay logged in.
+    resetProgress: function () {
+      var p = current();
+      if (!p) return;
+      var fresh = blankProfile(p.name, p.avatar);
+      fresh.id = p.id;
+      var idx = state.profiles.findIndex(function (x) { return x.id === p.id; });
+      if (idx !== -1) state.profiles[idx] = fresh;
       persist();
     },
 

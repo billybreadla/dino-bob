@@ -346,43 +346,166 @@ html, body {
 .adventure-bg {
   background:
     radial-gradient(circle at 15% 16%, rgba(255,226,79,0.75) 0 42px, transparent 44px),
+    radial-gradient(circle at 84% 18%, rgba(160,118,255,0.34) 0 84px, transparent 210px),
     linear-gradient(180deg, #5db0eb 0 38%, #7fc768 38% 68%, #376f45 68%);
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: max(18px, env(safe-area-inset-top));
 }
 .adventure-map {
   position: relative;
-  width: min(940px, 94vw);
+  width: min(960px, 92vw);
   aspect-ratio: 16 / 9;
   height: auto;
-  margin-top: 34px;
+  margin-top: 72px;
   border-radius: 28px;
   background: #1a2238 url('../assets/sprites/adventure_map.webp') center / cover no-repeat;
   border: 6px solid rgba(255,255,255,0.72);
-  box-shadow: inset 0 0 0 5px rgba(57,90,44,0.35), 0 18px 45px rgba(0,0,0,0.35);
+  box-shadow: inset 0 0 0 5px rgba(57,90,44,0.35), inset 0 -46px 90px rgba(18,20,36,0.30), 0 18px 45px rgba(0,0,0,0.35);
   overflow: hidden;
+}
+.adventure-map::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 18% 78%, rgba(255,226,122,0.20), transparent 18%),
+    radial-gradient(circle at 86% 20%, rgba(176,126,255,0.22), transparent 24%),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(10,8,18,0.12));
+  pointer-events: none;
+}
+.adventure-map::after {
+  content: 'PENNY QUEST MAP';
+  position: absolute;
+  z-index: 4;
+  left: 18px;
+  bottom: 14px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(26,24,34,0.70);
+  color: rgba(255,247,200,0.9);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  border: 2px solid rgba(255,247,200,0.26);
+}
+.adventure-trail {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.adventure-trail polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.trail-shadow { stroke: rgba(25,19,35,0.54); stroke-width: 5.6; transform: translate(0, 1.4px); }
+.trail-base { stroke: rgba(255,247,200,0.48); stroke-width: 3.2; stroke-dasharray: 2 3.2; }
+.trail-lit {
+  stroke: #ffd23a;
+  stroke-width: 4.2;
+  filter: drop-shadow(0 0 5px rgba(255,210,58,0.85));
+}
+.trail-star {
+  fill: #fff1a8;
+  stroke: #6b4a12;
+  stroke-width: 0.4;
+  filter: drop-shadow(0 0 4px rgba(255,226,79,0.9));
 }
 .stage-node {
   position: absolute;
-  z-index: 2;
-  width: 132px;
-  height: 132px;
+  z-index: 3;
+  width: 108px;
+  height: 108px;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 6px solid #fff7c8;
   color: #fff;
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.05;
   cursor: pointer;
   text-shadow: 0 2px 0 rgba(0,0,0,0.45);
-  box-shadow: 0 8px 0 rgba(36,46,32,0.45), 0 14px 26px rgba(0,0,0,0.25);
+  box-shadow: 0 8px 0 rgba(36,46,32,0.45), 0 14px 26px rgba(0,0,0,0.25), inset 0 0 0 5px rgba(255,255,255,0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+.stage-node:hover,
+.stage-node.selected {
+  transform: translate(-50%, -50%) scale(1.07);
+  box-shadow: 0 9px 0 rgba(36,46,32,0.45), 0 20px 36px rgba(0,0,0,0.32), 0 0 0 8px rgba(255,210,58,0.26), inset 0 0 0 5px rgba(255,255,255,0.18);
+}
+.stage-node.locked:hover {
+  transform: translate(-50%, -50%);
+  box-shadow: 0 8px 0 rgba(36,46,32,0.45), 0 14px 26px rgba(0,0,0,0.25), inset 0 0 0 5px rgba(255,255,255,0.14);
+}
+.stage-sigil {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--stage-accent, #ffd23a) 45%, rgba(26,24,34,0.38) 47%);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+}
+.stage-sigil-leaf { border-radius: 70% 28% 70% 28%; transform: rotate(-28deg); }
+.stage-sigil-sun { background: radial-gradient(circle, #fff7c8 0 28%, var(--stage-accent, #ffd23a) 30% 66%, rgba(26,24,34,0.28) 68%); }
+.stage-sigil-peak { clip-path: polygon(50% 4%, 96% 92%, 4% 92%); border-radius: 6px; }
+.stage-sigil-star { clip-path: polygon(50% 0, 61% 34%, 98% 34%, 68% 55%, 80% 94%, 50% 70%, 20% 94%, 32% 55%, 2% 34%, 39% 34%); border-radius: 0; }
+.stage-sigil-bubble { background: radial-gradient(circle at 30% 28%, #fff 0 13%, transparent 15%), radial-gradient(circle, rgba(255,255,255,0.25), var(--stage-accent, #8cf2ff)); }
+.stage-sigil-crown { clip-path: polygon(8% 88%, 92% 88%, 85% 35%, 66% 62%, 50% 24%, 34% 62%, 15% 35%); border-radius: 4px; }
+.stage-num {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  color: rgba(255,247,200,0.9);
+}
+.stage-name {
+  max-width: 84px;
+  text-align: center;
+  font-size: 16px;
 }
 /* Stage node positions + colors now come from each stage's `node` field in
    js/stages.js (applied inline), so adding a stage needs no CSS change. */
 .stage-node.locked { filter: grayscale(0.85) brightness(0.65); cursor: default; }
-.stage-node.complete::before { content: '★'; position: absolute; top: -22px; right: -2px; color: var(--yellow); font-size: 42px; }
-.adventure-detail { min-height: 82px; width: min(650px, 92vw); padding: 13px 22px; text-align: center; }
-.adventure-detail h3 { font-family: var(--font-display); color: var(--yellow); font-size: 22px; }
-.adventure-detail p { font-weight: 750; color: rgba(255,255,255,0.78); margin: 3px 0 8px; }
-.adventure-detail .btn { padding: 9px 22px; }
+.stage-node.complete::before { content: '★'; position: absolute; top: -24px; right: -4px; color: var(--yellow); font-size: 42px; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)); }
+.adventure-detail {
+  min-height: 118px;
+  width: min(720px, 92vw);
+  padding: 15px 24px 16px;
+  text-align: center;
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 16px 44px rgba(0,0,0,0.38), inset 0 0 0 2px rgba(255,255,255,0.05);
+}
+.adventure-detail-kicker {
+  color: var(--stage-accent, #ffd23a);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.adventure-detail h3 { font-family: var(--font-display); color: var(--yellow); font-size: 25px; }
+.adventure-detail p { font-weight: 750; color: rgba(255,255,255,0.82); margin: 3px 0 8px; }
+.adventure-detail-tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 2px 0 10px; }
+.adventure-detail-tags span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.78);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+.adventure-detail .btn { padding: 9px 24px; }
 
 .maker-bg {
   background:
@@ -672,9 +795,84 @@ html, body {
   .logo { font-size: 52px; }
   .shop-grid { max-height: 46vh; }
   .closet-body { max-height: 50vh; }
-  .adventure-map { margin-top: 18px; }
-  .stage-node { width: 86px; height: 86px; font-size: 13px; border-width: 4px; }
-  .adventure-detail { position: absolute; bottom: 8px; right: 8px; width: 340px; min-height: 64px; padding: 8px 12px; }
+  .adventure-map { margin-top: 56px; }
+  .stage-node { width: 74px; height: 74px; font-size: 12px; border-width: 4px; gap: 1px; }
+  .stage-name { font-size: 12px; max-width: 60px; }
+  .stage-num { font-size: 8px; }
+  .stage-sigil { width: 18px; height: 18px; }
+  .adventure-detail { position: absolute; bottom: 8px; right: 8px; width: 390px; min-height: 64px; padding: 8px 12px; }
+  .adventure-detail h3 { font-size: 19px; }
+  .adventure-detail p, .adventure-detail-tags { display: none; }
   .maker-grid { margin-top: 46px; padding: 14px 18px; gap: 10px 18px; }
   .family-panel { margin-top: 46px; padding: 14px; gap: 10px; }
+}
+
+/* ============ settings ============ */
+
+.settings-panel {
+  width: min(560px, 94vw);
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.setting-row {
+  background: var(--panel);
+  border: 3px solid var(--panel-2);
+  border-radius: 18px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.setting-row.danger-row { border-color: rgba(232,95,95,0.5); }
+.setting-label { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.setting-title { font-family: var(--font-display); color: #fff; font-size: 19px; letter-spacing: 0.5px; }
+.setting-sub { color: rgba(255,255,255,0.6); font-weight: 700; font-size: 12.5px; }
+.setting-row .btn-red { font-size: 16px; padding: 10px 22px; }
+
+/* pill toggle switch */
+.toggle {
+  flex-shrink: 0;
+  position: relative;
+  width: 92px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: #4a4458;
+  cursor: pointer;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.35);
+  transition: background 0.18s ease;
+}
+.toggle.on { background: var(--green); }
+.toggle-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+  transition: left 0.18s ease;
+}
+.toggle.on .toggle-knob { left: 52px; }
+.toggle-text {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 14px; left: auto;          /* OFF: knob on the left, label on the right */
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: #fff;
+}
+.toggle.on .toggle-text { left: 16px; right: auto; }
+.settings-note {
+  margin-top: 6px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 700;
+  font-size: 12.5px;
+  text-align: center;
+  line-height: 1.4;
 }

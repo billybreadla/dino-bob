@@ -36,6 +36,7 @@
   <symbol id="icon-map" viewBox="0 0 24 24"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16m6-14v16"/></symbol>
   <symbol id="icon-wand" viewBox="0 0 24 24"><path d="m5 19 11-11 3 3L8 22zM15 4h4M17 2v4M5 5h3M6.5 3.5v3"/></symbol>
   <symbol id="icon-family" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.4-4.2 2.2-6.3 5.5-6.3s5.1 2.1 5.5 6.3M13.5 15c1-.8 2.1-1.2 3.5-1.2 2.7 0 4.2 1.8 4.5 5.2"/></symbol>
+  <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.1M12 18.3v3.1M21.4 12h-3.1M5.7 12H2.6M18.6 5.4l-2.2 2.2M7.6 16.4l-2.2 2.2M18.6 18.6l-2.2-2.2M7.6 7.6 5.4 5.4"/></symbol>
 </svg>
 
 <!-- ===================== INTRO (Dino Bob's Opening Adventure) ===================== -->
@@ -92,6 +93,7 @@
     <div class="chip name-chip" id="home-name">—</div>
     <div class="home-top-right">
       <button id="btn-music" class="chip btn-chip icon-chip" title="Music on/off" aria-label="Music on or off"><svg class="game-icon"><use href="#icon-music"/></svg></button>
+      <button id="btn-settings" class="chip btn-chip icon-chip" title="Settings" aria-label="Settings"><svg class="game-icon"><use href="#icon-settings"/></svg></button>
       <button id="btn-switch-profile" class="chip btn-chip icon-chip" title="Switch player" aria-label="Switch player"><svg class="game-icon"><use href="#icon-player"/></svg></button>
     </div>
   </div>
@@ -137,7 +139,7 @@
     <label><span>Arrows <b id="challenge-arrows-value">18</b></span><input id="challenge-arrows" type="range" min="5" max="40" value="18"></label>
     <label><span>Target speed <b id="challenge-speed-value">Normal</b></span><input id="challenge-speed" type="range" min="60" max="180" step="10" value="100"></label>
     <label><span>Action style</span><select id="challenge-chaos"><option value="calm">Calm</option><option value="mixed" selected>Mixed</option><option value="wild">Wild!</option></select></label>
-    <label><span>Scenery</span><select id="challenge-bg"><option value="random">Surprise me</option><option value="bg_meadow">Enchanted Forest</option><option value="bg_mountain">Mountain Kingdom</option><option value="cave">Moon Cave</option></select></label>
+    <label><span>Scenery</span><select id="challenge-bg"><option value="random">Surprise me</option><option value="bg_meadow">Enchanted Forest</option><option value="bg_sunset_beach">Sunset Beach</option><option value="bg_mountain">Mountain Kingdom</option><option value="bg_starlight">Starlight Ridge</option><option value="bg_underwater">Bubble Reef</option><option value="cave">Moon Cave</option></select></label>
     <label><span>Special rule</span><select id="challenge-rule"><option value="normal">Everything</option><option value="balloons">Balloon party</option><option value="fruit">Fruit frenzy</option><option value="boss">Boss battle</option></select></label>
   </div>
   <button id="btn-challenge-start" class="btn btn-big btn-pink"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY MY CHALLENGE</span></button>
@@ -214,6 +216,33 @@
     <canvas id="closet-preview" width="170" height="180"></canvas>
   </div>
   <div id="closet-body" class="closet-body"></div>
+</section>
+
+<!-- ===================== SETTINGS ===================== -->
+<section id="screen-settings" class="screen arcade-bg hidden">
+  <div class="mode-top">
+    <button id="btn-settings-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-settings"/></svg><span>SETTINGS</span></h2>
+  </div>
+  <div class="settings-panel">
+    <div class="setting-row">
+      <div class="setting-label"><span class="setting-title">Music</span><span class="setting-sub">Background tunes</span></div>
+      <button id="set-music" class="toggle" role="switch" aria-checked="true"><span class="toggle-knob"></span><span class="toggle-text">ON</span></button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label"><span class="setting-title">Sound Effects</span><span class="setting-sub">Pops, coins and fanfares</span></div>
+      <button id="set-sfx" class="toggle" role="switch" aria-checked="true"><span class="toggle-knob"></span><span class="toggle-text">ON</span></button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label"><span class="setting-title">Easier Mode</span><span class="setting-sub">More time, more arrows, slower targets</span></div>
+      <button id="set-easy" class="toggle" role="switch" aria-checked="false"><span class="toggle-knob"></span><span class="toggle-text">OFF</span></button>
+    </div>
+    <div class="setting-row danger-row">
+      <div class="setting-label"><span class="setting-title">Reset Progress</span><span class="setting-sub">Erase this player's coins, unlocks &amp; stars</span></div>
+      <button id="set-reset" class="btn btn-red">RESET</button>
+    </div>
+    <p class="settings-note">Settings are saved on this device. <b>Reset Progress</b> only affects the current player.</p>
+  </div>
 </section>
 
 <!-- confetti / fireworks overlay -->

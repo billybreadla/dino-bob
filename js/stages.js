@@ -16,7 +16,8 @@
  *   win       how to clear it:  { type:'score', goal: 900 }
  *                          or:  { type:'boss',  boss:'moonstone' }
  *   node      where its dot sits on the painted map: x/y are CSS percentages
- *             across the map, color is the dot color.
+ *             across the map, color is the dot color. Optional `sigil` and
+ *             `accent` make the map marker and detail card feel hand-authored.
  *
  * TO ADD A BOSS: add an entry to BOSSES (keyed by id), then point a stage at it
  * with win:{ type:'boss', boss:'<id>' }.
@@ -36,29 +37,62 @@ var STAGES = (function () {
     {
       id: 'whispering-woods',
       name: 'Whispering Woods',
+      shortName: 'Woods',
       blurb: 'Warm up among balloons and gentle targets.',
       background: 'bg_meadow',
       round: { roundSeconds: 40, arrows: 16, moversAt: 20, chaosAt: 34, targetSpeed: 0.82 },
       win: { type: 'score', goal: 700 },
-      node: { x: '4%', y: '70%', color: '#3d964c' }
+      node: { x: '8%', y: '70%', color: '#3d964c', accent: '#9fd636', sigil: 'leaf' }
+    },
+    {
+      id: 'sunset-beach',
+      name: 'Sunset Beach',
+      shortName: 'Beach',
+      blurb: 'Fruit targets bounce through warm gold-and-pink seaside air.',
+      background: 'bg_sunset_beach',
+      round: { roundSeconds: 42, arrows: 17, moversAt: 14, chaosAt: 32, targetSpeed: 0.95, specialRule: 'fruit' },
+      win: { type: 'score', goal: 950 },
+      node: { x: '22%', y: '57%', color: '#f28a32', accent: '#ffd23a', sigil: 'sun' }
     },
     {
       id: 'sky-high-peaks',
       name: 'Sky-High Peaks',
+      shortName: 'Peaks',
       blurb: 'Faster targets sweep across the mountain air.',
       background: 'bg_mountain',
       round: { roundSeconds: 45, arrows: 18, moversAt: 8, chaosAt: 27, targetSpeed: 1.18 },
       win: { type: 'score', goal: 1250 },
-      node: { x: '39%', y: '43%', color: '#3d8fd0' }
+      node: { x: '40%', y: '42%', color: '#3d8fd0', accent: '#62e6ff', sigil: 'peak' }
+    },
+    {
+      id: 'starlight-ridge',
+      name: 'Starlight Ridge',
+      shortName: 'Stars',
+      blurb: 'Slow, glowing shots cross a midnight sky full of tricky movers.',
+      background: 'bg_starlight',
+      round: { roundSeconds: 46, arrows: 18, moversAt: 6, chaosAt: 25, targetSpeed: 1.08 },
+      win: { type: 'score', goal: 1500 },
+      node: { x: '57%', y: '30%', color: '#7652a8', accent: '#caa7ff', sigil: 'star' }
+    },
+    {
+      id: 'bubble-reef',
+      name: 'Bubble Reef',
+      shortName: 'Reef',
+      blurb: 'Balloon currents drift underwater before the final cave.',
+      background: 'bg_underwater',
+      round: { roundSeconds: 48, arrows: 20, moversAt: 7, chaosAt: 28, targetSpeed: 1.10, specialRule: 'balloons' },
+      win: { type: 'score', goal: 1700 },
+      node: { x: '72%', y: '43%', color: '#23aaa2', accent: '#8cf2ff', sigil: 'bubble' }
     },
     {
       id: 'moon-cave-boss',
       name: 'Moon Cave Boss',
-      blurb: 'Defeat the crowned target before your arrows run out!',
+      shortName: 'Cave',
+      blurb: 'Face the Moonstone King in the glowing cave finale.',
       background: 'bg_moon_cave',
       round: { roundSeconds: 50, arrows: 22, moversAt: 0, chaosAt: 0, targetSpeed: 1.08 },
       win: { type: 'boss', boss: 'moonstone' },
-      node: { x: '73%', y: '15%', color: '#7652a8' }
+      node: { x: '84%', y: '18%', color: '#3e255f', accent: '#ffe27a', sigil: 'crown' }
     }
   ];
 
@@ -99,6 +133,16 @@ var STAGES = (function () {
     return ' Goal: ' + s.win.goal + ' points.';
   }
 
+  function nodePoints() {
+    return LIST.map(function (s) {
+      var n = s.node || { x: '50%', y: '50%' };
+      return {
+        x: parseFloat(n.x),
+        y: parseFloat(n.y)
+      };
+    });
+  }
+
   function bossDef(id) { return BOSSES[id] || BOSSES.moonstone; }
 
   return {
@@ -108,6 +152,7 @@ var STAGES = (function () {
     optionsFor: optionsFor,
     won: won,
     goalText: goalText,
+    nodePoints: nodePoints,
     bossDef: bossDef
   };
 })();

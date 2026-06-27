@@ -34,6 +34,13 @@ var GAME = (function () {
       bossId: options.bossId || null,
       theme: options.theme || null
     };
+    // Accessibility: Easier Mode gives more time, more arrows, slower targets.
+    if (typeof SAVE !== 'undefined' && SAVE.settings && SAVE.settings().easy) {
+      rules.arrows = Math.ceil(rules.arrows * 1.25);
+      rules.roundSeconds = Math.round(rules.roundSeconds * 1.25);
+      rules.targetSpeed = rules.targetSpeed * 0.8;
+      rules.easy = true;
+    }
     return {
       profile: p,
       char: char,

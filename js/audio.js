@@ -4,6 +4,7 @@
 var AUDIO = (function () {
   var ctx = null;
   var musicOn = true;
+  var sfxOn = true;
   var sfxGain, musicGain;
   var musicTimer = null;
 
@@ -13,7 +14,7 @@ var AUDIO = (function () {
     if (!AC) return false;
     ctx = new AC();
     sfxGain = ctx.createGain();
-    sfxGain.gain.value = 0.5;
+    sfxGain.gain.value = sfxOn ? 0.5 : 0;
     sfxGain.connect(ctx.destination);
     musicGain = ctx.createGain();
     musicGain.gain.value = 0.16;
@@ -96,7 +97,12 @@ var AUDIO = (function () {
       if (musicTimer) { this.stopMusic(); return false; }
       this.startMusic(); return true;
     },
+    setMusic: function (on) { if (on) this.startMusic(); else this.stopMusic(); },
     musicPlaying: function () { return !!musicTimer; },
+
+    /* ----- sound effects on/off (master SFX gain) ----- */
+    setSfx: function (on) { sfxOn = on; if (sfxGain) sfxGain.gain.value = on ? 0.5 : 0; },
+    sfxEnabled: function () { return sfxOn; },
 
     /* ----- game sfx ----- */
     shoot: function () { noise({ freq: 2400, slide: 300, dur: 0.18, vol: 0.35 }); },
