@@ -37,6 +37,7 @@
   <symbol id="icon-wand" viewBox="0 0 24 24"><path d="m5 19 11-11 3 3L8 22zM15 4h4M17 2v4M5 5h3M6.5 3.5v3"/></symbol>
   <symbol id="icon-family" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.4-4.2 2.2-6.3 5.5-6.3s5.1 2.1 5.5 6.3M13.5 15c1-.8 2.1-1.2 3.5-1.2 2.7 0 4.2 1.8 4.5 5.2"/></symbol>
   <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.1M12 18.3v3.1M21.4 12h-3.1M5.7 12H2.6M18.6 5.4l-2.2 2.2M7.6 16.4l-2.2 2.2M18.6 18.6l-2.2-2.2M7.6 7.6 5.4 5.4"/></symbol>
+  <symbol id="icon-quests" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4V20.5H6z"/><path d="M14.5 3.5v4h4"/><path d="M8.5 12l1.5 1.5 3-3M9 17h6"/></symbol>
 </svg>
 
 <!-- ===================== INTRO (Dino Bob's Opening Adventure) ===================== -->
@@ -99,6 +100,7 @@
   </div>
   <canvas id="home-hero" width="420" height="430"></canvas>
   <div class="chip perk-chip" id="home-perk">—</div>
+  <button id="btn-quests" class="quest-banner"><svg class="game-icon"><use href="#icon-quests"/></svg><span>Daily Quests</span><span id="home-quests-badge" class="quest-badge hidden">0</span></button>
   <div class="home-buttons">
     <button id="btn-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-target"/></svg><span>TARGET PRACTICE</span></button>
     <button id="btn-adventure" class="btn btn-big btn-orange"><svg class="game-icon"><use href="#icon-map"/></svg><span>ADVENTURE</span></button>
@@ -251,6 +253,16 @@
     </div>
     <p class="settings-note">Settings are saved on this device. <b>Reset Progress</b> only affects the current player.</p>
   </div>
+</section>
+
+<!-- ===================== DAILY QUESTS ===================== -->
+<section id="screen-quests" class="screen arcade-bg hidden">
+  <div class="mode-top">
+    <button id="btn-quests-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-quests"/></svg><span>DAILY QUESTS</span></h2>
+  </div>
+  <p class="quests-sub">Three new goals every day. Finish one to claim its coins!</p>
+  <div id="quests-list" class="quests-list"></div>
 </section>
 
 <!-- confetti / fireworks overlay -->

@@ -113,6 +113,18 @@ var DATA = {
     { id: 'combo_x5',       emoji: '🔥', name: 'On Fire!',       desc: 'Reach a x5 combo' }
   ],
 
+  // Daily quest templates. Each day picks 3 (see SAVE.dailyQuests). Progress is
+  // cumulative across the day's rounds; %n in text is replaced with the target.
+  questPool: [
+    { id: 'q_bullseyes', icon: '🎯', text: 'Hit %n bullseyes',        stat: 'bullseyes', target: 8,    reward: 40 },
+    { id: 'q_balloons',  icon: '🎈', text: 'Pop %n balloons',         stat: 'balloons',  target: 15,   reward: 40 },
+    { id: 'q_fruits',    icon: '🍉', text: 'Splat %n fruits',         stat: 'fruits',    target: 12,   reward: 40 },
+    { id: 'q_chests',    icon: '🎁', text: 'Open %n treasure chests', stat: 'chests',    target: 3,    reward: 55 },
+    { id: 'q_coins',     icon: '🪙', text: 'Earn %n coins',           stat: 'coins',     target: 200,  reward: 40 },
+    { id: 'q_rounds',    icon: '🏹', text: 'Play %n rounds',          stat: 'rounds',    target: 3,    reward: 30 },
+    { id: 'q_score',     icon: '⭐', text: 'Score %n points total',   stat: 'score',     target: 1500, reward: 50 }
+  ],
+
   outfits: [
     { id: 'classic', name: 'Classic',      price: 0,    swap: null },
     { id: 'ruby',    name: 'Ruby Red',     get price() { return TUNING.PRICE_OUTFIT; }, swap: '#e23b3b' },

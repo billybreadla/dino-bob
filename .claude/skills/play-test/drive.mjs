@@ -116,6 +116,21 @@ try {
   await click('set-easy'); await sleep(120);   // back off so it doesn't affect later rounds
   await click('btn-settings-back'); await sleep(400);
 
+  // daily quests: 3 render; complete them via the save API, reopen, claim one.
+  await click('btn-quests'); await sleep(400); await shot('05c-quests');
+  const qCount = await page.evaluate(() => document.querySelectorAll('#quests-list .quest-card').length);
+  check('daily quests render (3)', qCount === 3, qCount + ' cards');
+  await click('btn-quests-back'); await sleep(150);
+  await page.evaluate(() => SAVE.addQuestProgress({ bullseyes: 999, balloons: 999, fruits: 999, chests: 999, coins: 99999, rounds: 999, score: 999999 }));
+  await click('btn-quests'); await sleep(300);
+  const coinsBefore = await page.evaluate(() => SAVE.current().coins);
+  const claimBtns = await page.evaluate(() => document.querySelectorAll('#quests-list .quest-claim').length);
+  await page.evaluate(() => { const b = document.querySelector('#quests-list .quest-claim'); if (b) b.click(); });
+  await sleep(200);
+  const coinsAfter = await page.evaluate(() => SAVE.current().coins);
+  check('quest claim pays out', claimBtns === 3 && coinsAfter > coinsBefore, 'claimable=' + claimBtns + ' coins ' + coinsBefore + '->' + coinsAfter);
+  await click('btn-quests-back'); await sleep(300);
+
   log('== Target Practice');
   await click('btn-play'); await sleep(300);
   await sleep(3600);

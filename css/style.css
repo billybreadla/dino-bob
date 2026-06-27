@@ -944,3 +944,73 @@ body.reduced-motion *::after {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============ daily quests ============ */
+
+.quest-banner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--yellow);
+  border: none;
+  border-radius: 999px;
+  padding: 9px 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--gold), 0 8px 18px rgba(0,0,0,0.28);
+  transition: transform 0.08s ease;
+}
+.quest-banner:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold); }
+.quest-banner.ready { animation: pulse 1.4s ease-in-out infinite; }
+.quest-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 0 #b54040;
+}
+
+.quests-sub { color: rgba(255,255,255,0.78); font-weight: 750; font-size: 14px; text-align: center; margin-top: 4px; }
+.quests-list {
+  width: min(560px, 94vw);
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quest-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 3px solid var(--panel-2);
+  border-radius: 18px;
+  padding: 12px 16px;
+}
+.quest-card.done { border-color: var(--green); }
+.quest-card.claimed { opacity: 0.6; }
+.quest-icon { font-size: 34px; flex: 0 0 auto; width: 44px; text-align: center; }
+.quest-main { flex: 1 1 auto; min-width: 0; text-align: left; }
+.quest-text { font-family: var(--font-display); color: #fff; font-size: 17px; }
+.quest-bar {
+  margin: 6px 0 3px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+.quest-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--green), #9fd636); transition: width 0.3s ease; }
+.quest-progress { color: rgba(255,255,255,0.62); font-weight: 800; font-size: 12px; }
+.quest-action { flex: 0 0 auto; }
+.quest-reward { color: var(--yellow); font-family: var(--font-display); font-size: 15px; }
+.quest-claim { font-size: 15px; padding: 9px 14px; }
+.quest-claimed { color: var(--green); font-size: 28px; font-weight: 900; }

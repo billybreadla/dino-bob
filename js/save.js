@@ -15,6 +15,7 @@ var SAVE = (function () {
       adventureStage: 0,
       adventureStars: [],
       adventureStarRatings: {},
+      quests: null,     // { day:'YYYY-MM-DD', list:[{id,target,reward,progress,claimed}] }
       customChallenge: null,
       stats: {},        // running tallies for badges (bullseyes, balloons, ...)
       badges: [],       // earned badge ids
@@ -78,6 +79,34 @@ var SAVE = (function () {
     if (!state) load();
     var p = state.profiles.find(function (p) { return p.id === state.currentId; });
     return p || null;
+  }
+
+  /* ----- daily quests ----- */
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  // Deterministic per-day pick so every session that day sees the same quests.
+  function pickDailyQuests(day) {
+    var pool = (typeof DATA !== 'undefined' && DATA.questPool) ? DATA.questPool.slice() : [];
+    var seed = 0;
+    for (var i = 0; i < day.length; i++) seed = (seed * 31 + day.charCodeAt(i)) >>> 0;
+    function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+    for (var j = pool.length - 1; j > 0; j--) {       // seeded Fisher-Yates
+      var k = Math.floor(rnd() * (j + 1));
+      var tmp = pool[j]; pool[j] = pool[k]; pool[k] = tmp;
+    }
+    return pool.slice(0, 3).map(function (q) {
+      return { id: q.id, target: q.target, reward: q.reward, progress: 0, claimed: false };
+    });
+  }
+  function ensureQuests(p) {
+    var day = todayStr();
+    if (!p.quests || p.quests.day !== day) {
+      p.quests = { day: day, list: pickDailyQuests(day) };
+      persist();
+    }
+    return p.quests.list;
   }
 
   return {
@@ -200,6 +229,48 @@ var SAVE = (function () {
       p.coins = Math.max(0, Math.round((p.coins || 0) + reward));
       persist();
       return { oldStars: oldStars, newStars: Math.max(oldStars, stars), improved: improved, reward: reward, replay: improved === 0 };
+    },
+
+    // today's 3 quests (regenerates at the start of a new day)
+    dailyQuests: function () {
+      var p = current();
+      if (!p) return [];
+      return ensureQuests(p);
+    },
+
+    // Apply a finished round's totals to today's quests. `deltas` is keyed by the
+    // quest `stat` names (bullseyes, balloons, fruits, chests, coins, rounds, score).
+    addQuestProgress: function (deltas) {
+      var p = current();
+      if (!p) return;
+      var list = ensureQuests(p);
+      var pool = (typeof DATA !== 'undefined' && DATA.questPool) ? DATA.questPool : [];
+      list.forEach(function (q) {
+        var tmpl = pool.find(function (t) { return t.id === q.id; });
+        if (!tmpl) return;
+        var d = deltas[tmpl.stat] || 0;
+        if (d > 0 && q.progress < q.target) q.progress = Math.min(q.target, q.progress + d);
+      });
+      persist();
+    },
+
+    // Claim a finished quest's coins once; returns the reward (0 if not claimable).
+    claimQuest: function (id) {
+      var p = current();
+      if (!p) return 0;
+      var q = ensureQuests(p).find(function (x) { return x.id === id; });
+      if (!q || q.claimed || q.progress < q.target) return 0;
+      q.claimed = true;
+      p.coins = Math.max(0, Math.round((p.coins || 0) + q.reward));
+      persist();
+      return q.reward;
+    },
+
+    // How many quests are done but not yet claimed (for the home badge).
+    questsClaimable: function () {
+      var p = current();
+      if (!p) return 0;
+      return ensureQuests(p).filter(function (q) { return !q.claimed && q.progress >= q.target; }).length;
     },
 
     // add n to a running stat, return the new total

@@ -4,7 +4,7 @@
 var UI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
-  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family', 'settings'];
+  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family', 'settings', 'quests'];
   var activeMode = { type: 'practice', options: null };
   var familySession = null;
 
@@ -249,6 +249,7 @@ var UI = (function () {
     var char = DATA.characterById(p.equipped.character);
     var arrow = DATA.arrowById(p.equipped.arrow);
     $('home-perk').textContent = char.name + ': ' + char.perkText + ' · ' + arrow.name;
+    renderQuestBanner();
     show('home');
     animateHome();
   }
@@ -263,10 +264,86 @@ var UI = (function () {
     GAME.start($('game-canvas'), function (results) {
       if (activeMode.type === 'family') handleFamilyResult(results);
       else {
+        creditQuests(results);
         if (activeMode.type === 'adventure') finishAdventureRound(results);
         showResults(results);
       }
     }, options || activeMode.options || {});
+  }
+
+  // Feed a finished round's totals into today's daily quests (single-player only).
+  function creditQuests(r) {
+    var s = r.stats || {};
+    SAVE.addQuestProgress({
+      bullseyes: s.bullseyes || 0,
+      balloons: s.balloons || 0,
+      fruits: s.fruits || 0,
+      chests: s.chests || 0,
+      coins: r.coins || 0,
+      rounds: 1,
+      score: r.score || 0
+    });
+  }
+
+  /* ============ daily quests ============ */
+
+  function questTmpl(id) {
+    return (DATA.questPool || []).find(function (t) { return t.id === id; }) || { icon: '❓', text: 'Quest', target: 1 };
+  }
+
+  // Home banner: show how many quests are ready to claim.
+  function renderQuestBanner() {
+    var btn = $('btn-quests');
+    if (!btn) return;
+    var ready = SAVE.questsClaimable();
+    var badge = $('home-quests-badge');
+    if (badge) {
+      badge.textContent = ready;
+      badge.classList.toggle('hidden', ready === 0);
+    }
+    btn.classList.toggle('ready', ready > 0);
+  }
+
+  function openQuests() {
+    renderQuests();
+    show('quests');
+  }
+
+  function renderQuests() {
+    var list = $('quests-list');
+    list.innerHTML = '';
+    SAVE.dailyQuests().forEach(function (q) {
+      var t = questTmpl(q.id);
+      var done = q.progress >= q.target;
+      var card = document.createElement('div');
+      card.className = 'quest-card' + (q.claimed ? ' claimed' : (done ? ' done' : ''));
+      var pct = Math.round(100 * Math.min(1, q.progress / q.target));
+      card.innerHTML =
+        '<div class="quest-icon">' + t.icon + '</div>' +
+        '<div class="quest-main">' +
+          '<div class="quest-text">' + t.text.replace('%n', t.target) + '</div>' +
+          '<div class="quest-bar"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="quest-progress">' + Math.min(q.progress, q.target) + ' / ' + q.target + '</div>' +
+        '</div>';
+      var action = document.createElement('div');
+      action.className = 'quest-action';
+      if (q.claimed) {
+        action.innerHTML = '<span class="quest-claimed">✓</span>';
+      } else if (done) {
+        var claim = document.createElement('button');
+        claim.className = 'btn btn-green quest-claim';
+        claim.textContent = '+' + q.reward + ' 🪙';
+        claim.onclick = function () {
+          var got = SAVE.claimQuest(q.id);
+          if (got > 0) { AUDIO.coin(); fx.confetti(); renderQuests(); renderQuestBanner(); $('home-coins').textContent = SAVE.current().coins; }
+        };
+        action.appendChild(claim);
+      } else {
+        action.innerHTML = '<span class="quest-reward">+' + q.reward + ' 🪙</span>';
+      }
+      card.appendChild(action);
+      list.appendChild(card);
+    });
   }
 
   function showResults(r) {
@@ -999,6 +1076,8 @@ var UI = (function () {
     $('btn-family').onclick = function () { AUDIO.click(); openFamily(); };
     $('btn-arcade').onclick = function () { AUDIO.click(); openArcade(); };
     $('btn-closet').onclick = function () { AUDIO.click(); openCloset(); };
+    $('btn-quests').onclick = function () { AUDIO.click(); openQuests(); };
+    $('btn-quests-back').onclick = function () { AUDIO.click(); goHome(); };
     $('btn-switch-profile').onclick = function () {
       AUDIO.click();
       show('profiles');

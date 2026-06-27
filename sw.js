@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v19-boss-webp';
+var CACHE = 'dinobob-v20-daily-quests';
 var FILES = [
   '.',
   'index.html',
