@@ -31,9 +31,10 @@ var TUNING = {
   COMBO_MAX: 5,         // biggest multiplier you can reach (x5)
 
   // ---------- OBSIDIAN BLACK HOLE ----------
-  BLACKHOLE_RADIUS: 300,   // how far the black hole reaches to suck things in
-  BLACKHOLE_TIME: 1.1,     // seconds it stays open (expands then contracts)
-  BLACKHOLE_PULL: 7,       // how hard it pulls targets toward the center
+  BLACKHOLE_RADIUS: 210,   // how far the black hole reaches to suck things in
+  BLACKHOLE_TIME: 0.95,    // seconds it stays open (expands then contracts)
+  BLACKHOLE_PULL: 4.4,     // how hard it pulls targets toward the center
+  BLACKHOLE_MAX_EATS: 3,   // max targets one black hole can fully swallow
 
   // ---------- POWER-UPS ----------
   POWERUP_ARROWS: 3,       // bonus arrows from the arrow power-up

@@ -52,6 +52,7 @@ var GAME = (function () {
       floaters: [],
       coins: [],              // coins flying to the HUD
       bolts: [],              // lightning visuals
+      brokenArrows: [],       // snap visuals when an arrow hits armor
       blackholes: [],         // obsidian-arrow black holes
       shake: 0,
       t: 0,                   // elapsed seconds (for animation)
@@ -306,6 +307,7 @@ var GAME = (function () {
       vx: Math.cos(st.aim.angle) * speed,
       vy: Math.sin(st.aim.angle) * speed,
       pierceLeft: a.pierce ? 1 : 0,
+      blackholeSpent: false,
       dead: false, t: 0
     });
     AUDIO.shoot();
@@ -444,9 +446,17 @@ var GAME = (function () {
   /* ============ obsidian black hole ============ */
 
   function spawnBlackhole(x, y) {
-    st.blackholes.push({ x: x, y: y, t: 0, life: TUNING.BLACKHOLE_TIME });
+    st.blackholes.push({
+      x: x,
+      y: y,
+      t: 0,
+      life: TUNING.BLACKHOLE_TIME,
+      eaten: 0,
+      spin: rand(-1, 1) < 0 ? -1 : 1,
+      seed: rand(0, Math.PI * 2)
+    });
     AUDIO.zap();
-    if (TUNING.SCREEN_SHAKE) st.shake = 0.4;
+    if (TUNING.SCREEN_SHAKE) st.shake = 0.24;
     earn('blackhole');
   }
 
@@ -473,19 +483,33 @@ var GAME = (function () {
   function updateBlackholes(dt) {
     st.blackholes.forEach(function (bh) {
       bh.t += dt; // runs in real time, not affected by slow-mo
+      if (bh.eaten == null) bh.eaten = 0;
+      if (!bh.spin) bh.spin = 1;
+      if (bh.seed == null) bh.seed = 0;
       st.targets.forEach(function (o) {
         if (o.dead || o.type === 'boss') return; // the boss is too big to pull
+        if (bh.eaten >= TUNING.BLACKHOLE_MAX_EATS) return;
         var dx = bh.x - o.x, dy = bh.y - o.y;
         var dist = Math.hypot(dx, dy) || 0.001;
         if (dist < TUNING.BLACKHOLE_RADIUS) {
-          o.motion = 'static';                 // stop its own movement
+          // Pause the target's own pattern while it is inside the pull,
+          // but let moving targets resume afterward.
           o.frozenUntil = st.t + 0.05;
-          var f = TUNING.BLACKHOLE_PULL * (1 - dist / TUNING.BLACKHOLE_RADIUS);
-          o.x += dx / dist * f * 60 * dt;
-          o.y += dy / dist * f * 60 * dt;
-          if (dist < 40) consumeByHole(o);
+          var pull = TUNING.BLACKHOLE_PULL * Math.pow(1 - dist / TUNING.BLACKHOLE_RADIUS, 1.35);
+          var swirl = Math.min(1.8, pull * 0.55);
+          var nx = dx / dist, ny = dy / dist;
+          o.x += (nx * pull + -ny * swirl * bh.spin) * 60 * dt;
+          o.y += (ny * pull + nx * swirl * bh.spin) * 60 * dt;
+          if (dist < 28) {
+            consumeByHole(o);
+            if (o.dead) {
+              bh.eaten++;
+              bh.pulse = 0.16;
+            }
+          }
         }
       });
+      bh.pulse = Math.max(0, (bh.pulse || 0) - dt);
     });
     st.blackholes = st.blackholes.filter(function (bh) { return bh.t < bh.life; });
   }
@@ -570,7 +594,7 @@ var GAME = (function () {
         earn('boss');
       } else {
         award(25, hit.x, hit.y - 10, {});
-        AUDIO.thunk();
+        snapArrow(hit.x, hit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
       }
     } else if (t.type === 'chest') {
       t.hp--;
@@ -586,13 +610,16 @@ var GAME = (function () {
         if (TUNING.SCREEN_SHAKE) st.shake = 0.3;
         track('chests', 'chests_10', 10);
       } else {
-        AUDIO.thunk();
+        snapArrow(hit.x, hit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
         st.floaters.push({ x: t.x, y: t.y - 70, vy: -70, life: 0.9, text: 'One more!', color: '#fff' });
       }
     }
 
     // ----- obsidian black hole -----
-    if (st.arrowType.blackhole) spawnBlackhole(hit.x, hit.y);
+    if (st.arrowType.blackhole && !ar.blackholeSpent) {
+      spawnBlackhole(hit.x, hit.y);
+      ar.blackholeSpent = true;
+    }
 
     // ----- arrow powers -----
     if (st.arrowType.freeze && !t.dead) { /* chest survived: still freeze nothing */ }
@@ -638,6 +665,8 @@ var GAME = (function () {
             best.dead = true; AUDIO.chest();
             spawnCoins(Math.ceil(TUNING.COINS_FROM_CHEST / 2), best.x, best.y - 20);
             track('chests', 'chests_10', 10);
+          } else {
+            snapArrow(best.x, best.y, Math.atan2(best.y - hit.y, best.x - hit.x), st.arrowType);
           }
         }
       }
@@ -698,6 +727,20 @@ var GAME = (function () {
     st.particles.push({ x: x, y: y, vx: 0, vy: 0, life: 0.4, max: 0.4, color: color, ring: true, r: 10 });
   }
 
+  function snapArrow(x, y, angle, type) {
+    if (AUDIO.snap) AUDIO.snap(); else AUDIO.thunk();
+    if (TUNING.SCREEN_SHAKE) st.shake = Math.max(st.shake, 0.16);
+    st.floaters.push({ x: x, y: y - 42, vy: -66, life: 0.7, text: 'SNAP!', big: false, color: '#ffe3a3' });
+    for (var i = 0; i < 9; i++) {
+      part(x, y, rand(-160, 160), rand(-230, 40), rand(0.24, 0.55), pick(['#5a321c', '#a76b36', '#f4d08a']), rand(2, 5), true);
+    }
+    var speed = 260;
+    st.brokenArrows.push(
+      { x: x - Math.cos(angle) * 10, y: y - Math.sin(angle) * 10, vx: -Math.cos(angle) * speed + rand(-70, 40), vy: -Math.sin(angle) * speed + rand(-160, -40), rot: angle + rand(-0.9, -0.35), vr: rand(-8, -4), life: 0.75, max: 0.75, side: -1, type: type },
+      { x: x + Math.cos(angle) * 10, y: y + Math.sin(angle) * 10, vx: Math.cos(angle) * speed + rand(-40, 70), vy: Math.sin(angle) * speed + rand(-160, -40), rot: angle + rand(0.35, 0.9), vr: rand(4, 8), life: 0.75, max: 0.75, side: 1, type: type }
+    );
+  }
+
   function updateParticles(dt) {
     st.particles.forEach(function (p) {
       p.life -= dt;
@@ -712,6 +755,15 @@ var GAME = (function () {
 
     st.bolts.forEach(function (b) { b.life -= dt; });
     st.bolts = st.bolts.filter(function (b) { return b.life > 0; });
+
+    st.brokenArrows.forEach(function (b) {
+      b.life -= dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.vy += 900 * dt;
+      b.rot += b.vr * dt;
+    });
+    st.brokenArrows = st.brokenArrows.filter(function (b) { return b.life > 0; });
 
     // coins: burst out, then home to the HUD counter
     st.coins.forEach(function (c) {
@@ -909,20 +961,233 @@ var GAME = (function () {
     }
   }
 
+  function drawStageAtmosphere() {
+    var name = st.bgName || '';
+    ctx.save();
+
+    // Soft scene-grade overlays make the painted worlds feel like one coherent
+    // diorama without touching the actual background assets.
+    if (name.indexOf('moon_cave') >= 0 || st.rules.theme === 'cave') {
+      var cave = ctx.createRadialGradient(W * 0.55, H * 0.45, 130, W * 0.55, H * 0.45, 880);
+      cave.addColorStop(0, 'rgba(111,92,255,0.10)');
+      cave.addColorStop(0.72, 'rgba(14,16,44,0.18)');
+      cave.addColorStop(1, 'rgba(5,6,16,0.36)');
+      ctx.fillStyle = cave; ctx.fillRect(0, 0, W, H);
+      for (var i = 0; i < 22; i++) {
+        var gx = (i * 131 + Math.sin(st.t * 0.4 + i) * 12) % W;
+        var gy = 120 + ((i * 73 + st.t * 18) % 620);
+        ART.circle(ctx, gx, gy, 2 + (i % 3), i % 2 ? 'rgba(126,236,255,0.38)' : 'rgba(190,145,255,0.28)');
+      }
+    } else if (name.indexOf('underwater') >= 0) {
+      ctx.fillStyle = 'rgba(34,164,190,0.12)'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(208,255,255,0.16)';
+      ctx.lineWidth = 3;
+      for (var u = 0; u < 7; u++) {
+        var yy = 110 + u * 92 + Math.sin(st.t * 0.9 + u) * 12;
+        ctx.beginPath();
+        for (var x = -30; x <= W + 30; x += 60) {
+          var wy = yy + Math.sin(x * 0.015 + st.t * 1.7 + u) * 12;
+          if (x === -30) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+        }
+        ctx.stroke();
+      }
+      for (var b = 0; b < 14; b++) {
+        var bx = (b * 117 + Math.sin(st.t + b) * 18) % W;
+        var by = H - ((st.t * (28 + b % 4 * 10) + b * 79) % H);
+        ctx.strokeStyle = 'rgba(220,255,255,0.35)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bx, by, 5 + (b % 4) * 3, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else if (name.indexOf('starlight') >= 0) {
+      ctx.fillStyle = 'rgba(21,24,72,0.12)'; ctx.fillRect(0, 0, W, H);
+      for (var s = 0; s < 32; s++) {
+        var sx = (s * 97 + 47) % W;
+        var sy = 40 + (s * 53) % 360;
+        var tw = 0.35 + Math.sin(st.t * 2.3 + s) * 0.25;
+        ART.circle(ctx, sx, sy, 1.5 + (s % 3), 'rgba(255,244,168,' + (0.25 + tw) + ')');
+      }
+    } else if (name.indexOf('sunset') >= 0) {
+      var sunset = ctx.createLinearGradient(0, 0, 0, H);
+      sunset.addColorStop(0, 'rgba(255,142,92,0.16)');
+      sunset.addColorStop(0.55, 'rgba(255,220,138,0.08)');
+      sunset.addColorStop(1, 'rgba(63,32,50,0.12)');
+      ctx.fillStyle = sunset; ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(0, 0, W, H);
+      for (var p = 0; p < 10; p++) {
+        var px = (p * 173 + st.t * (8 + p % 3)) % (W + 80) - 40;
+        var py = 180 + (p * 61) % 410;
+        ART.circle(ctx, px, py, 2.5, 'rgba(255,255,255,0.28)');
+      }
+    }
+
+    // Gentle vignette focuses the play area like a stage.
+    var vignette = ctx.createRadialGradient(W * 0.48, H * 0.48, 260, W * 0.5, H * 0.5, 920);
+    vignette.addColorStop(0, 'rgba(255,255,255,0)');
+    vignette.addColorStop(0.72, 'rgba(24,22,34,0.04)');
+    vignette.addColorStop(1, 'rgba(24,22,34,0.18)');
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  function drawForegroundDepth() {
+    ctx.save();
+    var g = ctx.createLinearGradient(0, GROUND - 12, 0, H);
+    g.addColorStop(0, 'rgba(72,138,44,0)');
+    g.addColorStop(1, 'rgba(32,88,35,0.34)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, GROUND - 18, W, H - GROUND + 18);
+
+    for (var i = 0; i < 18; i++) {
+      var x = (i * 101 + 33) % W;
+      var y = GROUND + 10 + (i % 4) * 24;
+      var h = 18 + (i % 5) * 7;
+      ctx.strokeStyle = i % 3 ? 'rgba(47,125,70,0.42)' : 'rgba(255,210,58,0.42)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y + h);
+      ctx.quadraticCurveTo(x + Math.sin(st.t + i) * 8, y + h * 0.45, x + 5, y);
+      ctx.stroke();
+    }
+
+    for (var r = 0; r < 7; r++) {
+      ART.ellipse(ctx, 80 + r * 240, H - 18 + (r % 2) * 8, 34 + (r % 3) * 10, 12, 'rgba(57,58,52,0.18)');
+    }
+    ctx.restore();
+  }
+
+  function drawObjectAura(t) {
+    if (t.type === 'boss') return;
+    var pulse = 1 + Math.sin(st.t * 5 + t.x * 0.01) * 0.05;
+    var color =
+      t.type === 'golden' ? 'rgba(255,226,70,0.44)' :
+      t.type === 'powerup' ? 'rgba(98,230,255,0.30)' :
+      t.type === 'chest' ? 'rgba(255,210,58,0.18)' :
+      t.type === 'bullseye' ? 'rgba(255,255,255,0.14)' : '';
+    if (!color) return;
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = t.type === 'powerup' ? 5 : 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, t.r * (1.16 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawGroundShadow(t) {
+    if (t.type === 'balloon' || t.type === 'powerup') return;
+    var drop = Math.max(18, GROUND - t.y);
+    var alpha = Math.max(0.08, Math.min(0.26, 0.28 - drop / 2600));
+    var w = t.type === 'boss' ? t.r * 1.9 : t.r * 1.25;
+    var h = t.type === 'boss' ? 18 : 9;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ART.ellipse(ctx, 0, GROUND - t.y + 8, w, h, 'rgba(23,21,22,1)');
+    ctx.restore();
+  }
+
   function drawBlackholes() {
     st.blackholes.forEach(function (bh) {
       var p = bh.t / bh.life;
+      if (!bh.spin) bh.spin = 1;
+      if (bh.seed == null) bh.seed = 0;
       var env = p < 0.45 ? p / 0.45 : (p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1);
       env = Math.max(0, Math.min(1, env));
       var frame = p < 0.25 ? 0 : (p < 0.55 ? 1 : 2);
       var img = SPRITES.get('blackhole_' + frame) || SPRITES.get('blackhole_1');
-      var R = TUNING.BLACKHOLE_RADIUS * 0.95 * env;
+      var pulse = (bh.pulse || 0) * 2.4;
+      var wob = 1 + Math.sin(st.t * 18 + bh.seed) * 0.05 + pulse;
+      var R = TUNING.BLACKHOLE_RADIUS * 0.95 * env * wob;
       ctx.save();
       ctx.translate(bh.x, bh.y);
-      ctx.rotate(bh.t * 6);
       ctx.globalAlpha = env;
-      if (img) ctx.drawImage(img, -R, -R, R * 2, R * 2);
-      else ART.circle(ctx, 0, 0, R, '#0a1a2a');
+
+      // Gravity well shimmer: the outer rings make the pull radius readable,
+      // while the sprite stays as the dark center of the effect.
+      for (var i = 0; i < 3; i++) {
+        var rr = R * (0.48 + i * 0.24 + ((st.t * 0.9 + i * 0.17 + bh.seed) % 0.18));
+        ctx.beginPath();
+        ctx.strokeStyle = i === 0 ? '#72f0ff' : (i === 1 ? '#8b5cff' : '#1b2438');
+        ctx.globalAlpha = env * (0.28 - i * 0.06);
+        ctx.lineWidth = Math.max(2, 6 - i * 1.4);
+        ctx.ellipse(0, 0, rr, rr * (0.55 + i * 0.08), bh.spin * (st.t * 3.8 + i), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.rotate(bh.spin * (bh.t * 8 + bh.seed));
+      ctx.globalAlpha = env;
+      if (img) ctx.drawImage(img, -R * 0.62, -R * 0.62, R * 1.24, R * 1.24);
+      else ART.circle(ctx, 0, 0, R * 0.62, '#0a1a2a');
+
+      // Spark crumbs orbiting inward make it feel like space is being twisted.
+      for (var j = 0; j < 10; j++) {
+        var a = bh.seed + st.t * bh.spin * (3.2 + j * 0.07) + j * 0.78;
+        var spiral = R * (0.18 + ((j * 0.13 + p * 1.4) % 0.78));
+        var sx = Math.cos(a) * spiral;
+        var sy = Math.sin(a) * spiral * 0.62;
+        ctx.globalAlpha = env * (0.15 + (j % 3) * 0.04);
+        ctx.fillStyle = j % 2 ? '#72f0ff' : '#d8b4ff';
+        ctx.beginPath();
+        ctx.arc(sx, sy, Math.max(1.5, R * 0.012), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  function drawBrokenArrows() {
+    st.brokenArrows.forEach(function (b) {
+      var alpha = Math.max(0, b.life / b.max);
+      var s = 1;
+      var shaft = b.side < 0 ? [-42, 2] : [-2, 42];
+      var type = b.type || st.arrowType;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = type && type.color ? type.color : '#7a4a23';
+      ctx.lineWidth = 7 * s;
+      ctx.beginPath();
+      ctx.moveTo(shaft[0] * s, 0);
+      ctx.lineTo(shaft[1] * s, 0);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath();
+      ctx.moveTo(shaft[0] * s, -2 * s);
+      ctx.lineTo(shaft[1] * s, -2 * s);
+      ctx.stroke();
+
+      ctx.fillStyle = '#f4d08a';
+      ctx.beginPath();
+      ctx.moveTo(-2 * s, -9 * s);
+      ctx.lineTo(8 * s, 0);
+      ctx.lineTo(-2 * s, 9 * s);
+      ctx.closePath();
+      ctx.fill();
+
+      if (b.side > 0) {
+        ctx.fillStyle = type && type.tipColor ? type.tipColor : '#d9dde4';
+        ctx.beginPath();
+        ctx.moveTo(47 * s, 0);
+        ctx.lineTo(32 * s, -9 * s);
+        ctx.lineTo(32 * s, 9 * s);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#7bd3ff';
+        ctx.beginPath();
+        ctx.moveTo(-47 * s, -10 * s);
+        ctx.lineTo(-31 * s, 0);
+        ctx.lineTo(-47 * s, 10 * s);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
       ctx.globalAlpha = 1;
     });
@@ -933,6 +1198,8 @@ var GAME = (function () {
     ctx.save();
     var wob = Math.sin(st.t * 40) * (t.wobble || 0) * 4;
     ctx.translate(t.x + wob, t.y);
+    drawGroundShadow(t);
+    drawObjectAura(t);
 
     if (t.type === 'bullseye') {
       var timg = SPRITES.get('target');
@@ -1153,8 +1420,20 @@ var GAME = (function () {
   }
 
   function hudPanel(x, y, w, h) {
-    ctx.fillStyle = 'rgba(26,24,34,0.82)';
-    ART.rr(ctx, x, y, w, h, h / 2, 'rgba(26,24,34,0.82)');
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.28)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+    ART.rr(ctx, x, y, w, h, h / 2, 'rgba(26,24,34,0.86)');
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x + 1, y + 1, w - 2, h - 2, h / 2 - 1);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ART.rr(ctx, x + 10, y + 6, w - 20, Math.max(4, h * 0.22), h * 0.12, 'rgba(255,255,255,0.08)');
+    ctx.restore();
   }
 
   function drawHUD() {
@@ -1246,8 +1525,10 @@ var GAME = (function () {
     }
 
     drawBackground();
+    drawStageAtmosphere();
     st.targets.forEach(drawTarget);
     drawBlackholes();
+    drawBrokenArrows();
     drawAim();
     drawPlayer();
 
@@ -1297,6 +1578,7 @@ var GAME = (function () {
     // homing coins
     st.coins.forEach(function (c) { ART.drawCoin(ctx, c.x, c.y, 13, c.t); });
 
+    drawForegroundDepth();
     drawHUD();
 
     // countdown

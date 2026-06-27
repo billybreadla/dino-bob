@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v8-v5art';
+var CACHE = 'dinobob-v9-obsidian-balance';
 var FILES = [
   '.',
   'index.html',

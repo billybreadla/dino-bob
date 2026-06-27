@@ -105,6 +105,11 @@ var AUDIO = (function () {
       noise({ freq: 500, dur: 0.08, vol: 0.5 });
       tone({ freq: 130, slide: 70, type: 'square', dur: 0.12, vol: 0.25 });
     },
+    snap: function () {
+      noise({ freq: 1800, filter: 'highpass', slide: 650, dur: 0.09, vol: 0.42 });
+      tone({ freq: 360, slide: 110, type: 'square', dur: 0.08, vol: 0.16 });
+      tone({ freq: 190, slide: 80, type: 'triangle', dur: 0.11, vol: 0.12, delay: 0.045 });
+    },
     bullseye: function () {
       tone({ freq: 660, type: 'square', dur: 0.1, vol: 0.25 });
       tone({ freq: 880, type: 'square', dur: 0.12, vol: 0.25, delay: 0.08 });

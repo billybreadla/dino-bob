@@ -82,9 +82,9 @@ var DATA = {
     {
       id: 'obsidian', name: 'Obsidian Arrow',
       get price() { return TUNING.PRICE_OBSIDIAN_ARROW; },
-      scoreBonus: 1.50, gravityFactor: 0.20, speedFactor: 1.5,
+      scoreBonus: 0.75, gravityFactor: 0.35, speedFactor: 1.35,
       blackhole: true,
-      perkText: '+150% points · opens a BLACK HOLE that sucks in everything nearby!',
+      perkText: '+75% points · opens a small BLACK HOLE that can swallow up to 3 nearby targets!',
       color: '#1a2630', tipColor: '#3fe0ff'
     }
   ],
