@@ -7,3 +7,9 @@
 # loads its intro from intro/, not from here, so this is excluded to keep the
 # repo lean. Remove this line if you want it tracked too.
 Dino Bob's Opening Adventure/
+
+# 3D prerender source/masters + design concepts (build artifacts, ~13MB, not shipped)
+assets/source/generated-3d-2026-06-27/
+assets/source/pre-3d-2026-06-27/
+assets/source/prerendered-3d-2026-06-27/
+assets/concepts/

@@ -15,6 +15,7 @@ var SPRITES = (function () {
     'bg_meadow', 'bg_mountain', 'target', 'coin',
     'arrow_obsidian', 'blackhole_0', 'blackhole_1', 'blackhole_2',
     'chest_closed', 'chest_semi', 'chest_open',
+    'chest_3d_0', 'chest_3d_1', 'chest_3d_2', 'chest_3d_3', 'chest_3d_4', 'chest_3d_5', 'chest_3d_6', 'chest_3d_7',
     'fruit_apple', 'fruit_banana', 'fruit_pineapple', 'fruit_strawberry',
     'fruit_orange', 'fruit_grapes', 'fruit_pear', 'fruit_cherry', 'fruit_watermelon',
     'hat_cap', 'hat_viking', 'hat_robin', 'hat_bandana', 'hat_wizard',
@@ -22,11 +23,15 @@ var SPRITES = (function () {
     // V5 art overhaul
     'char_trixie', 'arm_trixie_upper', 'arm_trixie_bowhand', 'arm_trixie_stringhand',
     'char_dinobob_ruby', 'char_dinobob_grape', 'char_dinobob_gold', 'char_dinobob_mint', 'char_dinobob_shiny',
-    'boss_moonstone',
+    'boss_moonstone', 'boss_moonstone_cracked', 'boss_moonstone_broken',
+    'boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2',
+    'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5',
     'bg_moon_cave', 'bg_starlight', 'bg_sunset_beach', 'bg_underwater', 'adventure_map'
   ];
-  // The big background scenes ship as WebP (~85% smaller); the rest stay PNG.
-  var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1 };
+  // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
+  var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,
+    boss_moonstone: 1, boss_moonstone_cracked: 1, boss_moonstone_broken: 1,
+    boss_moonstone_3d_0: 1, boss_moonstone_3d_1: 1, boss_moonstone_3d_2: 1, boss_moonstone_3d_3: 1, boss_moonstone_3d_4: 1, boss_moonstone_3d_5: 1 };
   var imgs = {};
   NAMES.forEach(function (n) {
     var im = new Image();

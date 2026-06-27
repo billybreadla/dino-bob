@@ -26,12 +26,21 @@
 var STAGES = (function () {
 
   // Bosses are big, multi-hit targets.
-  //   sprite  SPRITES name for the boss art
-  //   hp      how many hits to defeat
-  //   scale   art size relative to the round hitbox radius
-  //   lift    fraction to raise the art so its weak-spot lines up with the hitbox
+  //   sprite         SPRITES name for the boss art
+  //   damageSprites  optional sprites from healthy -> near-defeat
+  //   hp             how many hits to defeat
+  //   scale          art size relative to the round hitbox radius
+  //   lift           fraction to raise the art so its weak-spot lines up with the hitbox
   var BOSSES = {
-    moonstone: { name: 'Moonstone King', sprite: 'boss_moonstone', hp: 6, scale: 2.5, lift: 0.06 }
+    moonstone: {
+      name: 'Moonstone King',
+      sprite: 'boss_moonstone',
+      damageSprites: ['boss_moonstone', 'boss_moonstone_cracked', 'boss_moonstone_broken'],
+      renderFrames: ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'],
+      hp: 6,
+      scale: 2.5,
+      lift: 0.06
+    }
   };
 
   var LIST = [

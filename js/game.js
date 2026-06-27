@@ -165,7 +165,7 @@ var GAME = (function () {
     return {
       type: 'chest', dead: false, hp: 2, frozenUntil: 0,
       x: rand(950, 1480), y: GROUND - 34,
-      r: 44, wobble: 0
+      r: 52, wobble: 0
     };
   }
 
@@ -283,6 +283,7 @@ var GAME = (function () {
     dt *= sm * st.rules.targetSpeed;
     if (!frozen) t.mt = (t.mt || 0) + dt;
     t.wobble = Math.max(0, (t.wobble || 0) - dt * 4);
+    t.hitFlash = Math.max(0, (t.hitFlash || 0) - dt * 4.5);
 
     if (t.type === 'bullseye' || t.type === 'boss') {
       if (t.motion === 'slide' && !frozen) {
@@ -604,7 +605,10 @@ var GAME = (function () {
     } else if (t.type === 'boss') {
       t.hp--;
       t.wobble = 1;
-      splinters(hit.x, hit.y);
+      t.hitFlash = 0.28;
+      t.hitSide = hit.x < t.x ? -1 : 1;
+      stoneChips(hit.x, hit.y, t.hp <= 0 ? 22 : 13);
+      bossCrackPulse(t.x, t.y, t.hp / t.maxHp);
       if (t.hp <= 0) {
         st.stats.bossDefeated = true;
         award(TUNING.SCORE_BOSS, t.x, t.y - t.r - 20, {});
@@ -613,27 +617,36 @@ var GAME = (function () {
         addShake(0.5);
         ring(t.x, t.y, '#ffd23a');
         burst(t.x, t.y, '#ff5fa2');
+        bossDefeatBurst(t.x, t.y);
         spawnCoins(20, t.x, t.y);
         st.floaters.push({ x: t.x, y: t.y - t.r, vy: -50, life: 1.8, text: 'BOSS DOWN!', big: true, color: '#ffd23a' });
         earn('boss');
       } else {
+        if (AUDIO.bossHit) AUDIO.bossHit(); else AUDIO.thunk();
+        addShake(0.24);
         award(25, hit.x, hit.y - 10, {});
         snapArrow(hit.x, hit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
       }
     } else if (t.type === 'chest') {
       t.hp--;
       t.wobble = 1;
+      t.hitFlash = 0.22;
       if (t.hp <= 0) {
         st.stats.chests++;
         award(TUNING.SCORE_CHEST, t.x, t.y - 50, { bonusObj: true });
         t.opened = true;          // show the fully-open chest, then it fades
-        t.openTimer = 0.7;
+        t.openTimer = 1.35;
+        t.openStart = 1.35;
         AUDIO.chest();
         ring(t.x, t.y, '#ffd23a');
+        chestSparkleBurst(t.x, t.y - 38);
         spawnCoins(TUNING.COINS_FROM_CHEST, t.x, t.y - 20);
         addShake(0.3);
         track('chests', 'chests_10', 10);
       } else {
+        if (AUDIO.chestCrack) AUDIO.chestCrack(); else AUDIO.thunk();
+        ring(t.x, t.y - 28, '#ffd23a');
+        chestCrackBurst(hit.x, hit.y);
         snapArrow(hit.x, hit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
         st.floaters.push({ x: t.x, y: t.y - 70, vy: -70, life: 0.9, text: 'One more!', color: '#fff' });
       }
@@ -683,13 +696,17 @@ var GAME = (function () {
           best.dead = true; fruitSplat(best);
           track('fruits', 'fruits_100', 100);
         } else if (best.type === 'chest') {
-          best.hp--; best.wobble = 1;
+          best.hp--; best.wobble = 1; best.hitFlash = 0.2;
           if (best.hp <= 0) {
             award(TUNING.SCORE_CHEST, best.x, best.y - 50, { half: true, bonusObj: true });
-            best.dead = true; AUDIO.chest();
+            best.opened = true; best.openTimer = 1.1; best.openStart = 1.1; AUDIO.chest();
+            chestSparkleBurst(best.x, best.y - 38);
             spawnCoins(Math.ceil(TUNING.COINS_FROM_CHEST / 2), best.x, best.y - 20);
             track('chests', 'chests_10', 10);
           } else {
+            if (AUDIO.chestCrack) AUDIO.chestCrack();
+            ring(best.x, best.y - 28, '#ffd23a');
+            chestCrackBurst(best.x, best.y);
             snapArrow(best.x, best.y, Math.atan2(best.y - hit.y, best.x - hit.x), st.arrowType);
           }
         }
@@ -724,6 +741,36 @@ var GAME = (function () {
   }
   function splinters(x, y) {
     for (var i = 0; i < motionCount(10); i++) part(x, y, rand(-260, 260), rand(-320, 60), rand(0.3, 0.7), pick(['#a06a35', '#8a5a2b', '#e8dccb']), rand(2, 5));
+  }
+  function stoneChips(x, y, n) {
+    for (var i = 0; i < motionCount(n || 12); i++) {
+      part(x, y, rand(-310, 310), rand(-360, 80), rand(0.34, 0.78), pick(['#8fa89e', '#5f7c76', '#d1ddd2', '#74d8cc']), rand(3, 8));
+    }
+  }
+  function bossCrackPulse(x, y, healthFrac) {
+    ring(x, y, healthFrac < 0.35 ? '#ffd23a' : '#62e6ff');
+    if (reducedMotion()) return;
+    for (var i = 0; i < 9; i++) {
+      var a = i * Math.PI * 2 / 9 + rand(-0.18, 0.18);
+      part(x + Math.cos(a) * 24, y + Math.sin(a) * 18, Math.cos(a) * rand(90, 240), Math.sin(a) * rand(70, 190), rand(0.22, 0.45), pick(['#ffe78a', '#62e6ff', '#ffffff']), rand(2, 4), false);
+    }
+  }
+  function bossDefeatBurst(x, y) {
+    for (var i = 0; i < motionCount(34); i++) {
+      var a = rand(0, Math.PI * 2);
+      var sp = rand(120, 430);
+      part(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 80, rand(0.45, 1.0), pick(['#8fa89e', '#ffd23a', '#62e6ff', '#ffffff']), rand(3, 9));
+    }
+  }
+  function chestCrackBurst(x, y) {
+    for (var i = 0; i < motionCount(20); i++) {
+      part(x, y, rand(-330, 330), rand(-380, 70), rand(0.30, 0.70), pick(['#8a5a2b', '#d28b38', '#ffd23a', '#fff0a0']), rand(3, 8));
+    }
+  }
+  function chestSparkleBurst(x, y) {
+    for (var i = 0; i < motionCount(36); i++) {
+      part(x, y, rand(-360, 360), rand(-460, -20), rand(0.45, 1.05), pick(['#ffd23a', '#fff2a8', '#62e6ff', '#ffffff']), rand(3, 8), false);
+    }
   }
   function burst(x, y, color) {
     for (var i = 0; i < motionCount(14); i++) part(x, y, rand(-320, 320), rand(-320, 320), rand(0.25, 0.6), color, rand(3, 7));
@@ -1220,6 +1267,232 @@ var GAME = (function () {
     });
   }
 
+  function bossDamageSprite(bdef, t) {
+    if (bdef.renderFrames && bdef.renderFrames.length) {
+      var healthDamage = t.maxHp ? 1 - Math.max(0, t.hp) / t.maxHp : 0;
+      var hitFlash = Math.max(0, Math.min(1, t.hitFlash || 0));
+      if (hitFlash > 0.1) return bdef.renderFrames[healthDamage > 0.42 ? 3 : 1] || bdef.sprite;
+      if (healthDamage > 0.72) return bdef.renderFrames[4] || bdef.sprite;
+      if (healthDamage > 0.28) return bdef.renderFrames[2] || bdef.sprite;
+      return bdef.renderFrames[0] || bdef.sprite;
+    }
+    var bossSprite = bdef.sprite;
+    if (bdef.damageSprites && bdef.damageSprites.length && t.maxHp) {
+      var damage = 1 - Math.max(0, t.hp) / t.maxHp;
+      var damageIndex = Math.min(bdef.damageSprites.length - 1, Math.floor(damage * bdef.damageSprites.length));
+      bossSprite = bdef.damageSprites[damageIndex] || bdef.sprite;
+    }
+    return bossSprite;
+  }
+
+  function chest3DFrame(t) {
+    if (t.opened) {
+      var openTotal = t.openStart || 1.35;
+      var openProgress = 1 - Math.max(0, t.openTimer || 0) / openTotal;
+      var idx = 3 + Math.min(4, Math.floor(Math.max(0, Math.min(0.999, openProgress)) * 5));
+      return 'chest_3d_' + idx;
+    }
+    if (t.hp === 1) {
+      return (t.hitFlash || 0) > 0.05 ? 'chest_3d_1' : 'chest_3d_2';
+    }
+    return 'chest_3d_0';
+  }
+
+  function drawBossCrop(img, sx, sy, sw, sh, bw, bh, byoff, tx, ty, rot, scale) {
+    if (!img) return;
+    var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    var x = -bw / 2 + sx * bw, y = -bh / 2 - byoff + sy * bh;
+    var w = sw * bw, h = sh * bh;
+    ctx.save();
+    ctx.translate(x + w * 0.5 + tx, y + h * 0.5 + ty);
+    ctx.rotate(rot || 0);
+    ctx.scale(scale || 1, scale || 1);
+    ctx.drawImage(img, sx * iw, sy * ih, sw * iw, sh * ih, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  function drawMoonstoneCrackLines(t, bw, bh, byoff) {
+    var damage = t.maxHp ? 1 - Math.max(0, t.hp) / t.maxHp : 0;
+    if (damage <= 0.03) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.32 + damage * 0.34;
+    ctx.strokeStyle = damage > 0.55 ? '#ffe78a' : '#86f6ff';
+    ctx.lineWidth = 3 + damage * 3;
+    var cracks = [
+      [[-30, -18], [-58, -58], [-44, -94], [-78, -128]],
+      [[28, -12], [60, -48], [54, -88], [92, -122]],
+      [[-8, 34], [-34, 72], [-24, 104], [-58, 146]],
+      [[18, 40], [48, 84], [38, 128], [70, 170]]
+    ];
+    cracks.forEach(function (line, i) {
+      if (damage < 0.22 + i * 0.12) return;
+      ctx.beginPath();
+      line.forEach(function (p, j) {
+        var x = p[0] * (bw / 390), y = p[1] * (bh / 390);
+        if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawBoss2p5D(t, bdef, bossImg) {
+    var img = bossImg || SPRITES.get('target');
+    if (!img) {
+      ART.circle(ctx, 0, 0, t.r, '#e23b3b');
+      return { bh: t.r * 2, byoff: 0, bossImg: null };
+    }
+
+    var bw = t.r * (bossImg ? bdef.scale : 2.15);
+    var bh = bw * img.height / img.width;
+    var byoff = bossImg ? bh * bdef.lift : 0;
+    var recoil = Math.max(0, Math.min(1, t.wobble || 0));
+    var flash = Math.max(0, Math.min(1, t.hitFlash || 0));
+    var side = t.hitSide || 1;
+    var breathe = reducedMotion() ? 0 : Math.sin(st.t * 2.1 + t.mt) * 0.014;
+    var targetPulse = reducedMotion() ? 0 : Math.sin(st.t * 6.2) * 0.08;
+
+    ctx.save();
+    ctx.translate(side * recoil * 7, -recoil * 10 + Math.sin(st.t * 2 + t.mt) * (reducedMotion() ? 0 : 3));
+    ctx.scale(1 + breathe + recoil * 0.025, 1 - breathe * 0.55);
+
+    var glow = ctx.createRadialGradient(0, 0, 8, 0, 0, t.r * (1.1 + targetPulse));
+    glow.addColorStop(0, 'rgba(255,226,86,' + (0.22 + flash * 0.36) + ')');
+    glow.addColorStop(0.38, 'rgba(98,230,255,' + (0.10 + flash * 0.2) + ')');
+    glow.addColorStop(1, 'rgba(98,230,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, t.r * 1.2, 0, Math.PI * 2); ctx.fill();
+
+    ctx.drawImage(img, -bw / 2, -bh / 2 - byoff, bw, bh);
+
+    if (bossImg && !reducedMotion()) {
+      var armSwing = Math.sin(st.t * 2.7 + t.mt) * 0.018 + recoil * 0.05;
+      drawBossCrop(img, 0.02, 0.28, 0.29, 0.50, bw, bh, byoff, -recoil * 8, recoil * 7, -armSwing - recoil * 0.03, 1);
+      drawBossCrop(img, 0.69, 0.28, 0.29, 0.50, bw, bh, byoff, recoil * 8, recoil * 7, armSwing + recoil * 0.03, 1);
+      drawBossCrop(img, 0.27, 0.03, 0.46, 0.29, bw, bh, byoff, side * recoil * 10, -recoil * 8, side * recoil * 0.06 + Math.sin(st.t * 4.2) * 0.008, 1);
+    }
+
+    drawMoonstoneCrackLines(t, bw, bh, byoff);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.55 + flash * 0.42;
+    ctx.strokeStyle = '#ffd23a';
+    ctx.lineWidth = 8 + flash * 8;
+    ctx.beginPath(); ctx.arc(0, 0, t.r * (0.38 + targetPulse * 0.3), 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#fff5b8';
+    ctx.lineWidth = 3 + flash * 4;
+    ctx.beginPath(); ctx.arc(0, 0, t.r * 0.22, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    if (flash > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = flash * 0.55;
+      ctx.fillStyle = '#fff8c8';
+      ctx.fillRect(-bw / 2, -bh / 2 - byoff, bw, bh);
+      ctx.restore();
+    }
+    ctx.restore();
+    return { bh: bh, byoff: byoff, bossImg: bossImg };
+  }
+
+  function drawChest2p5D(t, cimg) {
+    var frameImg = SPRITES.get(chest3DFrame(t));
+    if (frameImg) cimg = frameImg;
+    var cw = t.r * 3.05;
+    var ch = cw * cimg.height / cimg.width;
+    var wob = Math.max(0, Math.min(1, t.wobble || 0));
+    var flash = Math.max(0, Math.min(1, t.hitFlash || 0));
+    var openProgress = t.opened ? 1 - Math.max(0, t.openTimer || 0) / (t.openStart || 0.95) : 0;
+    openProgress = Math.max(0, Math.min(1, openProgress));
+    var bounce = wob ? Math.sin((1 - wob) * Math.PI) * 18 : 0;
+    var squash = wob ? Math.sin((1 - wob) * Math.PI) : 0;
+
+    ctx.save();
+    ctx.translate(0, -bounce);
+    ctx.scale(1 + squash * 0.16, 1 - squash * 0.10);
+
+    if (flash > 0.02 || t.opened) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      var shock = t.opened ? (0.4 + openProgress * 0.8) : (1.2 - flash * 0.3);
+      ctx.globalAlpha = t.opened ? (0.22 + openProgress * 0.2) : flash * 0.75;
+      ctx.strokeStyle = t.opened ? '#fff2a8' : '#ffd23a';
+      ctx.lineWidth = t.opened ? 7 : 10;
+      ctx.beginPath();
+      ctx.ellipse(0, -t.r * 0.36, t.r * (1.25 + shock), t.r * (0.62 + shock * 0.35), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (t.opened) {
+      var glowR = t.r * (1.45 + openProgress * 1.05);
+      var g = ctx.createRadialGradient(0, -t.r * 0.55, 4, 0, -t.r * 0.55, glowR);
+      g.addColorStop(0, 'rgba(255,245,156,0.95)');
+      g.addColorStop(0.38, 'rgba(255,185,48,0.42)');
+      g.addColorStop(1, 'rgba(255,185,48,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, -t.r * 0.55, glowR, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.drawImage(cimg, -cw / 2, -ch * 0.62, cw, ch);
+
+    if (t.opened && !reducedMotion()) {
+      var lidLift = 18 + Math.sin(openProgress * Math.PI) * 24;
+      var iw = cimg.naturalWidth || cimg.width, ih = cimg.naturalHeight || cimg.height;
+      ctx.save();
+      ctx.translate(0, -ch * 0.42 - lidLift);
+      ctx.rotate(-0.12 - openProgress * 0.18);
+      ctx.drawImage(cimg, 0, 0, iw, ih * 0.42, -cw / 2, -ch * 0.25, cw, ch * 0.42);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.48 + openProgress * 0.45;
+      for (var i = 0; i < 16; i++) {
+        var a = st.t * (2.2 + i * 0.11) + i * 0.62;
+        var rad = t.r * (0.22 + (i % 5) * 0.13 + openProgress * 0.24);
+        var sx = Math.cos(a) * rad;
+        var sy = -t.r * (0.58 + (i % 4) * 0.14) + Math.sin(a * 1.4) * 14;
+        ART.circle(ctx, sx, sy, 3 + (i % 4), i % 3 ? '#fff5b8' : '#62e6ff');
+      }
+      ctx.restore();
+    }
+
+    if (!t.opened && t.hp === 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#fff0a0';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-cw * 0.16, -ch * 0.45);
+      ctx.lineTo(-cw * 0.02, -ch * 0.33);
+      ctx.lineTo(-cw * 0.08, -ch * 0.12);
+      ctx.lineTo(cw * 0.05, ch * 0.03);
+      ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.32 + Math.sin(st.t * 7) * 0.12;
+      ctx.strokeStyle = '#ffd23a';
+      ctx.lineWidth = 9;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (flash > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = flash * 0.45;
+      ctx.fillStyle = '#fff3b0';
+      ctx.fillRect(-cw / 2, -ch * 0.62, cw, ch);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   function drawTarget(t) {
     var frozen = st.t < t.frozenUntil;
     ctx.save();
@@ -1329,18 +1602,9 @@ var GAME = (function () {
       ctx.fillText(t.kind === 'arrows' ? '+3' : '⏱', 0, 2);
     } else if (t.type === 'boss') {
       var bdef = STAGES.bossDef(t.bossId);
-      var bossImg = SPRITES.get(bdef.sprite);
-      var bimgT = bossImg || SPRITES.get('target');
-      var byoff = 0;
-      if (bimgT) {
-        var bw = t.r * (bossImg ? bdef.scale : 2.15), bh = bw * bimgT.height / bimgT.width;
-        // the boss art's weak-spot may sit below its center, so lift the art to
-        // line that bullseye up with the round's hitbox (per-boss `lift`).
-        byoff = bossImg ? bh * bdef.lift : 0;
-        ctx.drawImage(bimgT, -bw / 2, -bh / 2 - byoff, bw, bh);
-      } else {
-        ART.circle(ctx, 0, 0, t.r, '#e23b3b');
-      }
+      var bossSprite = bossDamageSprite(bdef, t);
+      var bossImg = SPRITES.get(bossSprite) || SPRITES.get(bdef.sprite);
+      var bossDraw = drawBoss2p5D(t, bdef, bossImg);
       if (!bossImg) {   // the Moonstone art already wears its crown
         ctx.font = Math.round(t.r * 0.7) + 'px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -1348,16 +1612,14 @@ var GAME = (function () {
       }
       // health bar (kept clear of the taller boss art)
       var hbw = t.r * 1.6, hx = -hbw / 2;
-      var hy = (bossImg ? -bh / 2 - byoff - 26 : -t.r - 30);
+      var hy = (bossImg ? -bossDraw.bh / 2 - bossDraw.byoff - 26 : -t.r - 30);
       ART.rr(ctx, hx - 3, hy - 3, hbw + 6, 20, 8, 'rgba(0,0,0,0.5)');
       ART.rr(ctx, hx, hy, hbw * Math.max(0, t.hp) / t.maxHp, 14, 7, '#ff4d6d');
     } else if (t.type === 'chest') {
       var cname = t.opened ? 'chest_open' : (t.hp === 1 ? 'chest_semi' : 'chest_closed');
       var cimg = SPRITES.get(cname);
       if (cimg) {
-        var cw = t.r * 2.7;
-        var ch = cw * cimg.height / cimg.width;
-        ctx.drawImage(cimg, -cw / 2, -ch * 0.62, cw, ch);
+        drawChest2p5D(t, cimg);
       } else {
       ART.rr(ctx, -44, -20, 88, 54, 8, '#8a5a2b');
       ART.rr(ctx, -44, -34, 88, 26, 10, '#a06a35');

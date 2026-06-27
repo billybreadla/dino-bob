@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v14-adventure-stars';
+var CACHE = 'dinobob-v19-boss-webp';
 var FILES = [
   '.',
   'index.html',
@@ -67,6 +67,14 @@ var FILES = [
   'assets/sprites/chest_closed.png',
   'assets/sprites/chest_semi.png',
   'assets/sprites/chest_open.png',
+  'assets/sprites/chest_3d_0.png',
+  'assets/sprites/chest_3d_1.png',
+  'assets/sprites/chest_3d_2.png',
+  'assets/sprites/chest_3d_3.png',
+  'assets/sprites/chest_3d_4.png',
+  'assets/sprites/chest_3d_5.png',
+  'assets/sprites/chest_3d_6.png',
+  'assets/sprites/chest_3d_7.png',
   'assets/sprites/fruit_apple.png',
   'assets/sprites/fruit_banana.png',
   'assets/sprites/fruit_pineapple.png',
@@ -95,7 +103,15 @@ var FILES = [
   'assets/sprites/char_dinobob_gold.png',
   'assets/sprites/char_dinobob_mint.png',
   'assets/sprites/char_dinobob_shiny.png',
-  'assets/sprites/boss_moonstone.png',
+  'assets/sprites/boss_moonstone.webp',
+  'assets/sprites/boss_moonstone_cracked.webp',
+  'assets/sprites/boss_moonstone_broken.webp',
+  'assets/sprites/boss_moonstone_3d_0.webp',
+  'assets/sprites/boss_moonstone_3d_1.webp',
+  'assets/sprites/boss_moonstone_3d_2.webp',
+  'assets/sprites/boss_moonstone_3d_3.webp',
+  'assets/sprites/boss_moonstone_3d_4.webp',
+  'assets/sprites/boss_moonstone_3d_5.webp',
   'assets/sprites/bg_moon_cave.webp',
   'assets/sprites/bg_starlight.webp',
   'assets/sprites/bg_sunset_beach.webp',

@@ -132,6 +132,15 @@ var AUDIO = (function () {
         tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.3, delay: i * 0.09 });
       });
     },
+    chestCrack: function () {
+      noise({ freq: 900, filter: 'bandpass', slide: 240, dur: 0.13, vol: 0.38 });
+      tone({ freq: 260, slide: 120, type: 'square', dur: 0.11, vol: 0.13, delay: 0.02 });
+    },
+    bossHit: function () {
+      noise({ freq: 560, slide: 95, dur: 0.20, vol: 0.46 });
+      tone({ freq: 120, slide: 62, type: 'sawtooth', dur: 0.18, vol: 0.18 });
+      tone({ freq: 420, slide: 260, type: 'triangle', dur: 0.12, vol: 0.12, delay: 0.04 });
+    },
     freeze: function () { tone({ freq: 1800, slide: 600, type: 'sine', dur: 0.4, vol: 0.25 }); },
     zap: function () { tone({ freq: 1400, slide: 120, type: 'sawtooth', dur: 0.18, vol: 0.25 }); },
     tick: function () { tone({ freq: 880, type: 'square', dur: 0.05, vol: 0.15 }); },
