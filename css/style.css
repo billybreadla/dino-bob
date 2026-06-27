@@ -477,6 +477,18 @@ html, body {
    js/stages.js (applied inline), so adding a stage needs no CSS change. */
 .stage-node.locked { filter: grayscale(0.85) brightness(0.65); cursor: default; }
 .stage-node.complete::before { content: '★'; position: absolute; top: -24px; right: -4px; color: var(--yellow); font-size: 42px; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)); }
+.stage-rating {
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--yellow);
+  font-size: 20px;
+  letter-spacing: -1px;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.45);
+}
+.stage-rating .dim { color: rgba(255,255,255,0.32); }
 .adventure-detail {
   min-height: 118px;
   width: min(720px, 92vw);
@@ -504,6 +516,20 @@ html, body {
   font-size: 12px;
   font-weight: 850;
   text-transform: capitalize;
+}
+.adventure-detail-stars {
+  margin: 0 auto 5px;
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 25px;
+  letter-spacing: 3px;
+}
+.adventure-detail-stars .dim { color: rgba(255,255,255,0.25); }
+.adventure-detail-goals {
+  color: rgba(255,255,255,0.62);
+  font-weight: 850;
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 .adventure-detail .btn { padding: 9px 24px; }
 
@@ -628,6 +654,26 @@ html, body {
   animation: shimmer 1.2s linear infinite;
 }
 @keyframes shimmer { to { background-position: 200%; } }
+.adventure-result {
+  border: 2px solid rgba(255,210,58,0.36);
+  border-radius: 16px;
+  padding: 9px 12px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255,210,58,0.16), rgba(255,255,255,0.06));
+}
+.adventure-result-stars {
+  font-family: var(--font-display);
+  color: var(--yellow);
+  font-size: 30px;
+  letter-spacing: 5px;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.35);
+}
+.adventure-result-stars .dim { color: rgba(255,255,255,0.24); }
+.adventure-result-text {
+  color: rgba(255,255,255,0.82);
+  font-weight: 900;
+  font-size: 13px;
+}
 .results-buttons { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 
 /* ============ arcade ============ */
@@ -802,7 +848,9 @@ html, body {
   .stage-sigil { width: 18px; height: 18px; }
   .adventure-detail { position: absolute; bottom: 8px; right: 8px; width: 390px; min-height: 64px; padding: 8px 12px; }
   .adventure-detail h3 { font-size: 19px; }
-  .adventure-detail p, .adventure-detail-tags { display: none; }
+  .adventure-detail p, .adventure-detail-tags, .adventure-detail-goals { display: none; }
+  .adventure-detail-stars { font-size: 18px; margin-bottom: 0; }
+  .stage-rating { bottom: -15px; font-size: 14px; }
   .maker-grid { margin-top: 46px; padding: 14px 18px; gap: 10px 18px; }
   .family-panel { margin-top: 46px; padding: 14px; gap: 10px; }
 }
@@ -875,4 +923,24 @@ html, body {
   font-size: 12.5px;
   text-align: center;
   line-height: 1.4;
+}
+
+body.reduced-motion *,
+body.reduced-motion *::before,
+body.reduced-motion *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

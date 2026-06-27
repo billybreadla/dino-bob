@@ -15,6 +15,7 @@
  *             targetSpeed (optional: specialRule 'balloons'|'fruit', theme)
  *   win       how to clear it:  { type:'score', goal: 900 }
  *                          or:  { type:'boss',  boss:'moonstone' }
+ *             Score stages use the goal to award 1-3 stars.
  *   node      where its dot sits on the painted map: x/y are CSS percentages
  *             across the map, color is the dot color. Optional `sigil` and
  *             `accent` make the map marker and detail card feel hand-authored.
@@ -126,11 +127,36 @@ var STAGES = (function () {
     return r.score >= s.win.goal;
   }
 
+  function starRating(i, r) {
+    var s = LIST[i];
+    if (!s || !won(i, r)) return 0;
+    if (s.win.type === 'boss') {
+      var shots = r.stats && r.stats.shots ? r.stats.shots : 0;
+      var hits = r.stats && r.stats.hits ? r.stats.hits : 0;
+      var accuracy = shots ? hits / shots : 0;
+      var arrowsLeft = r.arrowsLeft || 0;
+      if (accuracy >= 0.55 && arrowsLeft >= 6) return 3;
+      if (accuracy >= 0.40 || arrowsLeft >= 3) return 2;
+      return 1;
+    }
+    var goal = s.win.goal || 1;
+    if (r.score >= Math.round(goal * 1.45)) return 3;
+    if (r.score >= Math.round(goal * 1.20)) return 2;
+    return 1;
+  }
+
   // Short goal text for the detail panel (empty for boss stages).
   function goalText(i) {
     var s = LIST[i];
     if (!s || s.win.type !== 'score') return '';
-    return ' Goal: ' + s.win.goal + ' points.';
+    return ' 1★ ' + s.win.goal + ' · 2★ ' + Math.round(s.win.goal * 1.20) + ' · 3★ ' + Math.round(s.win.goal * 1.45) + ' points.';
+  }
+
+  function starGoalText(i) {
+    var s = LIST[i];
+    if (!s) return '';
+    if (s.win.type === 'boss') return '1★ beat the boss · 2★ sharp or spare arrows · 3★ accurate + 6 arrows left';
+    return '1★ ' + s.win.goal + ' · 2★ ' + Math.round(s.win.goal * 1.20) + ' · 3★ ' + Math.round(s.win.goal * 1.45);
   }
 
   function nodePoints() {
@@ -151,7 +177,9 @@ var STAGES = (function () {
     count: LIST.length,
     optionsFor: optionsFor,
     won: won,
+    starRating: starRating,
     goalText: goalText,
+    starGoalText: starGoalText,
     nodePoints: nodePoints,
     bossDef: bossDef
   };

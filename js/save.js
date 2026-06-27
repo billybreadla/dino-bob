@@ -14,6 +14,7 @@ var SAVE = (function () {
       roundsPlayed: 0,
       adventureStage: 0,
       adventureStars: [],
+      adventureStarRatings: {},
       customChallenge: null,
       stats: {},        // running tallies for badges (bullseyes, balloons, ...)
       badges: [],       // earned badge ids
@@ -50,6 +51,10 @@ var SAVE = (function () {
       if (!Array.isArray(p.badges)) p.badges = [];
       if (typeof p.adventureStage !== 'number') p.adventureStage = 0;
       if (!Array.isArray(p.adventureStars)) p.adventureStars = [];
+      if (!p.adventureStarRatings) p.adventureStarRatings = {};
+      p.adventureStars.forEach(function (idx) {
+        if (!p.adventureStarRatings[idx]) p.adventureStarRatings[idx] = 1;
+      });
       if (!p.customChallenge) p.customChallenge = null;
     });
     // device-wide settings (audio + accessibility), not per-profile
@@ -57,6 +62,9 @@ var SAVE = (function () {
     if (typeof state.settings.music !== 'boolean') state.settings.music = true;
     if (typeof state.settings.sfx !== 'boolean') state.settings.sfx = true;
     if (typeof state.settings.easy !== 'boolean') state.settings.easy = false;
+    if (typeof state.settings.reducedMotion !== 'boolean') {
+      state.settings.reducedMotion = !!(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
     return state;
   }
 
@@ -159,15 +167,39 @@ var SAVE = (function () {
       persist();
     },
 
-    completeAdventureStage: function (stageIndex) {
+    adventureStarRating: function (stageIndex) {
       var p = current();
-      if (!p) return;
+      if (!p) return 0;
+      if (p.adventureStarRatings && p.adventureStarRatings[stageIndex]) return p.adventureStarRatings[stageIndex];
+      return p.adventureStars && p.adventureStars.indexOf(stageIndex) !== -1 ? 1 : 0;
+    },
+
+    adventureStarTotal: function () {
+      var p = current();
+      if (!p) return 0;
+      var total = 0;
+      var ratings = p.adventureStarRatings || {};
+      Object.keys(ratings).forEach(function (k) { total += ratings[k] || 0; });
+      return total;
+    },
+
+    completeAdventureStage: function (stageIndex, stars) {
+      var p = current();
+      if (!p) return { oldStars: 0, newStars: 0, improved: 0, reward: 0, replay: false };
+      stars = Math.max(1, Math.min(3, stars || 1));
+      if (!p.adventureStarRatings) p.adventureStarRatings = {};
+      var oldStars = p.adventureStarRatings[stageIndex] || (p.adventureStars.indexOf(stageIndex) !== -1 ? 1 : 0);
+      var improved = Math.max(0, stars - oldStars);
+      if (stars > oldStars) p.adventureStarRatings[stageIndex] = stars;
       if (p.adventureStars.indexOf(stageIndex) === -1) p.adventureStars.push(stageIndex);
       // Unlock the next stage. Cap at the last stage so progression grows with
       // however many stages are defined in js/stages.js (no hard-coded count).
       var lastStage = (typeof STAGES !== 'undefined' ? STAGES.count : 3) - 1;
       p.adventureStage = Math.max(p.adventureStage || 0, Math.min(lastStage, stageIndex + 1));
+      var reward = 25 + improved * 75;
+      p.coins = Math.max(0, Math.round((p.coins || 0) + reward));
       persist();
+      return { oldStars: oldStars, newStars: Math.max(oldStars, stars), improved: improved, reward: reward, replay: improved === 0 };
     },
 
     // add n to a running stat, return the new total

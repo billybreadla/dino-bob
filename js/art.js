@@ -509,14 +509,15 @@ var ART = (function () {
   function drawArrow(ctx, x, y, angle, type, scale, t, motion) {
     var s = scale || 1;
     var flying = motion && motion.flight;
+    var reduced = motion && motion.reducedMotion;
     var phase = (t || 0) * 26;
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(angle + (flying ? Math.sin(phase * 1.7) * 0.008 : 0));
+    ctx.rotate(angle + (flying && !reduced ? Math.sin(phase * 1.7) * 0.008 : 0));
 
     if (flying) {
-      var trailLength = Math.min(105, 42 + (motion.speed || 0) * 0.025) * s;
+      var trailLength = (reduced ? Math.min(45, 20 + (motion.speed || 0) * 0.008) : Math.min(105, 42 + (motion.speed || 0) * 0.025)) * s;
       var grad = ctx.createLinearGradient(-trailLength, 0, -8 * s, 0);
       var trailColor = type.id === 'fire' ? '255,122,26' :
         type.id === 'ice' ? '146,225,255' :
@@ -524,16 +525,16 @@ var ART = (function () {
       grad.addColorStop(0, 'rgba(' + trailColor + ',0)');
       grad.addColorStop(1, 'rgba(' + trailColor + ',0.48)');
       ctx.strokeStyle = grad;
-      ctx.lineWidth = (type.id === 'fire' ? 10 : 5) * s;
+      ctx.lineWidth = (reduced ? 3 : (type.id === 'fire' ? 10 : 5)) * s;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-trailLength, Math.sin(phase) * 2 * s);
+      ctx.moveTo(-trailLength, reduced ? 0 : Math.sin(phase) * 2 * s);
       ctx.lineTo(-18 * s, 0);
       ctx.stroke();
 
       // Small, deterministic flickers give each magic arrow a distinct feel
       // without adding particle objects to the physics simulation.
-      if (type.id === 'fire' || type.id === 'ice') {
+      if (!reduced && (type.id === 'fire' || type.id === 'ice')) {
         for (var m = 0; m < 3; m++) {
           ctx.globalAlpha = 0.28 + m * 0.13;
           circle(ctx, (-32 - m * 18) * s, Math.sin(phase + m * 2.1) * 6 * s,
@@ -541,7 +542,7 @@ var ART = (function () {
             type.id === 'fire' ? (m ? '#ff7a1a' : '#ffd23a') : (m ? '#bfeaff' : '#ffffff'));
         }
         ctx.globalAlpha = 1;
-      } else if (type.id === 'lightning') {
+      } else if (!reduced && type.id === 'lightning') {
         ctx.strokeStyle = 'rgba(255,239,112,0.9)';
         ctx.lineWidth = 2.5 * s;
         ctx.beginPath();
@@ -559,7 +560,7 @@ var ART = (function () {
       var w = 92 * s;
       var h = w * img.height / img.width;
       ctx.save();
-      if (flying) ctx.scale(1, 0.9 + Math.abs(Math.cos(phase)) * 0.1);
+      if (flying && !reduced) ctx.scale(1, 0.9 + Math.abs(Math.cos(phase)) * 0.1);
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
       ctx.restore();
       ctx.restore();

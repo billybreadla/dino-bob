@@ -88,17 +88,19 @@ var UI = (function () {
     return {
       confetti: function () {
         ensure();
-        for (var i = 0; i < TUNING.CONFETTI_AMOUNT; i++) {
+        var reduced = wantsReducedMotion();
+        var total = reduced ? Math.min(18, Math.ceil(TUNING.CONFETTI_AMOUNT * 0.15)) : TUNING.CONFETTI_AMOUNT;
+        for (var i = 0; i < total; i++) {
           parts.push({
             x: Math.random() * canvas.width,
-            y: -20 - Math.random() * canvas.height * 0.3,
-            vx: (Math.random() - 0.5) * 120,
-            vy: 120 + Math.random() * 240,
-            grav: 60,
-            r: 4 + Math.random() * 6,
+            y: reduced ? canvas.height * 0.12 + Math.random() * canvas.height * 0.18 : -20 - Math.random() * canvas.height * 0.3,
+            vx: (Math.random() - 0.5) * (reduced ? 36 : 120),
+            vy: reduced ? 35 + Math.random() * 55 : 120 + Math.random() * 240,
+            grav: reduced ? 18 : 60,
+            r: 4 + Math.random() * (reduced ? 3 : 6),
             rot: Math.random() * 6,
-            vr: (Math.random() - 0.5) * 10,
-            life: 2 + Math.random() * 1.5,
+            vr: (Math.random() - 0.5) * (reduced ? 2 : 10),
+            life: reduced ? 0.8 + Math.random() * 0.4 : 2 + Math.random() * 1.5,
             color: COLORS[i % COLORS.length],
             shape: 'rect'
           });
@@ -107,28 +109,30 @@ var UI = (function () {
       },
       fireworks: function (n) {
         ensure();
-        var count = n || TUNING.HIGH_SCORE_FIREWORKS;
+        var reduced = wantsReducedMotion();
+        var count = reduced ? 1 : (n || TUNING.HIGH_SCORE_FIREWORKS);
         for (var f = 0; f < count; f++) {
           (function (f) {
             setTimeout(function () {
-              AUDIO.firework();
+              if (!reduced) AUDIO.firework();
               var cx = canvas.width * (0.15 + Math.random() * 0.7);
               var cy = canvas.height * (0.15 + Math.random() * 0.45);
               var color = COLORS[Math.floor(Math.random() * COLORS.length)];
-              for (var i = 0; i < 36; i++) {
-                var a = i / 36 * Math.PI * 2;
-                var sp = 120 + Math.random() * 220;
+              var sparks = reduced ? 10 : 36;
+              for (var i = 0; i < sparks; i++) {
+                var a = i / sparks * Math.PI * 2;
+                var sp = reduced ? 45 + Math.random() * 55 : 120 + Math.random() * 220;
                 parts.push({
                   x: cx, y: cy,
                   vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                  grav: 160, r: 2.5 + Math.random() * 3,
+                  grav: reduced ? 45 : 160, r: 2.5 + Math.random() * (reduced ? 1.5 : 3),
                   rot: 0, vr: 0,
-                  life: 0.8 + Math.random() * 0.7,
+                  life: reduced ? 0.45 + Math.random() * 0.25 : 0.8 + Math.random() * 0.7,
                   color: color, shape: 'dot'
                 });
               }
               kick();
-            }, f * 420);
+            }, f * (reduced ? 0 : 420));
           })(f);
         }
       }
@@ -288,6 +292,20 @@ var UI = (function () {
     var banner = $('results-highscore');
     banner.classList.toggle('hidden', !r.isHighScore);
     $('results-header').textContent = r.adventureWon ? 'STAGE COMPLETE!' : (r.isHighScore ? 'AMAZING!' : 'ROUND OVER!');
+    var adventureRow = $('results-adventure-row');
+    if (adventureRow) {
+      if (activeMode.type === 'adventure' && r.adventureWon) {
+        var reward = r.adventureReward || { improved: 0, reward: r.adventureRewardCoins || 0, replay: false };
+        adventureRow.classList.remove('hidden');
+        $('results-adventure-stars').innerHTML = starHTML(r.adventureStars || 1);
+        $('results-adventure-text').textContent =
+          (reward.improved > 0 ? '+' + reward.improved + ' new star' + (reward.improved > 1 ? 's' : '') : 'Replay clear') +
+          ' · +' + (reward.reward || 0) + ' bonus coins';
+        $('results-coins').textContent = '+' + ((r.coins || 0) + (reward.reward || 0));
+      } else {
+        adventureRow.classList.add('hidden');
+      }
+    }
     animateResultCharacter(r);
     if (r.isHighScore && r.score > 0) {
       fx.fireworks();
@@ -332,6 +350,13 @@ var UI = (function () {
   var ADVENTURE = STAGES.list;
   var selectedStage = 0;
 
+  function starHTML(n) {
+    n = Math.max(0, Math.min(3, n || 0));
+    var out = '';
+    for (var i = 1; i <= 3; i++) out += i <= n ? '★' : '<span class="dim">★</span>';
+    return out;
+  }
+
   function openAdventure() {
     activeMode = { type: 'adventure', options: null, stage: 0 };
     show('adventure');
@@ -341,23 +366,26 @@ var UI = (function () {
   function renderAdventure() {
     var p = SAVE.current();
     var stars = p.adventureStars || [];
+    var starTotal = SAVE.adventureStarTotal ? SAVE.adventureStarTotal() : stars.length;
     var highestCleared = stars.reduce(function (max, idx) { return Math.max(max, idx); }, -1);
     var unlocked = Math.min(STAGES.count - 1, Math.max(p.adventureStage || 0, highestCleared + 1));
     selectedStage = Math.min(selectedStage, unlocked);
-    $('adventure-stars').textContent = stars.length + ' / ' + STAGES.count + ' ★';
+    $('adventure-stars').textContent = starTotal + ' / ' + (STAGES.count * 3) + ' ★';
     var map = $('adventure-map');
     map.innerHTML = '';
     renderAdventureTrail(map, unlocked, stars);
     ADVENTURE.forEach(function (stage, i) {
       var btn = document.createElement('button');
       var done = stars.indexOf(i) !== -1;
+      var rating = SAVE.adventureStarRating ? SAVE.adventureStarRating(i) : (done ? 1 : 0);
       var locked = i > unlocked;
       btn.className = 'stage-node' + (done ? ' complete' : '') + (locked ? ' locked' : '') + (i === selectedStage ? ' selected' : '');
       btn.setAttribute('aria-label', (locked ? 'Locked stage: ' : 'Stage ' + (i + 1) + ': ') + stage.name);
       btn.innerHTML =
         '<span class="stage-sigil stage-sigil-' + ((stage.node && stage.node.sigil) || 'dot') + '"></span>' +
         '<span class="stage-num">' + (locked ? 'LOCK' : 'STAGE ' + (i + 1)) + '</span>' +
-        '<span class="stage-name">' + (stage.shortName || stage.name) + '</span>';
+        '<span class="stage-name">' + (stage.shortName || stage.name) + '</span>' +
+        (rating ? '<span class="stage-rating">' + starHTML(rating) + '</span>' : '');
       // Map node position + color come from the stage data (js/stages.js).
       if (stage.node) {
         btn.style.left = stage.node.x;
@@ -410,11 +438,14 @@ var UI = (function () {
     var stage = ADVENTURE[selectedStage];
     var detail = $('adventure-detail');
     var isBoss = stage.win && stage.win.type === 'boss';
+    var rating = SAVE.adventureStarRating ? SAVE.adventureStarRating(selectedStage) : 0;
     var accent = stage.node && stage.node.accent ? stage.node.accent : '#ffd23a';
     detail.style.setProperty('--stage-accent', accent);
     detail.innerHTML =
       '<div class="adventure-detail-kicker">Stage ' + (selectedStage + 1) + ' of ' + STAGES.count + (isBoss ? ' · Boss finale' : ' · Painted world') + '</div>' +
-      '<h3>' + stage.name + '</h3><p>' + stage.blurb + STAGES.goalText(selectedStage) + '</p>' +
+      '<div class="adventure-detail-stars">' + starHTML(rating) + '</div>' +
+      '<h3>' + stage.name + '</h3><p>' + stage.blurb + '</p>' +
+      '<div class="adventure-detail-goals">' + STAGES.starGoalText(selectedStage) + '</div>' +
       '<div class="adventure-detail-tags"><span>' + (isBoss ? 'Boss battle' : 'Score quest') + '</span><span>' +
       (stage.background || 'surprise').replace(/^bg_/, '').replace(/_/g, ' ') + '</span></div>';
     var play = document.createElement('button');
@@ -433,8 +464,12 @@ var UI = (function () {
     var stageIndex = activeMode.stage || 0;
     var won = STAGES.won(stageIndex, r);
     if (won) {
-      SAVE.completeAdventureStage(stageIndex);
+      var stars = STAGES.starRating(stageIndex, r);
+      var reward = SAVE.completeAdventureStage(stageIndex, stars);
       r.adventureWon = true;
+      r.adventureStars = stars;
+      r.adventureReward = reward;
+      r.adventureRewardCoins = reward.reward;
       $('results-header').textContent = 'STAGE COMPLETE!';
       fx.confetti();
     }
@@ -875,6 +910,15 @@ var UI = (function () {
   /* ============ settings (audio + accessibility) ============ */
   var musicWanted = true;
 
+  function wantsReducedMotion() {
+    var s = SAVE.settings();
+    return !!(s && s.reducedMotion);
+  }
+
+  function applyReducedMotionClass(on) {
+    document.body.classList.toggle('reduced-motion', !!on);
+  }
+
   function setToggle(el, on) {
     if (!el) return;
     el.classList.toggle('on', on);
@@ -898,6 +942,7 @@ var UI = (function () {
     setToggle($('set-music'), s.music);
     setToggle($('set-sfx'), s.sfx);
     setToggle($('set-easy'), s.easy);
+    setToggle($('set-reduced-motion'), s.reducedMotion);
   }
 
   function openSettings() {
@@ -910,6 +955,7 @@ var UI = (function () {
     var s = SAVE.settings();
     musicWanted = s.music;
     AUDIO.setSfx(s.sfx);
+    applyReducedMotionClass(s.reducedMotion);
     $('btn-music').classList.toggle('off', !s.music);
   }
 
@@ -977,6 +1023,13 @@ var UI = (function () {
       var on = !SAVE.settings().easy;
       SAVE.setSetting('easy', on);
       setToggle($('set-easy'), on);
+    };
+    $('set-reduced-motion').onclick = function () {
+      AUDIO.click();
+      var on = !SAVE.settings().reducedMotion;
+      SAVE.setSetting('reducedMotion', on);
+      setToggle($('set-reduced-motion'), on);
+      applyReducedMotionClass(on);
     };
     $('set-reset').onclick = function () {
       AUDIO.click();

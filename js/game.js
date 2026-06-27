@@ -34,6 +34,7 @@ var GAME = (function () {
       bossId: options.bossId || null,
       theme: options.theme || null
     };
+    rules.reducedMotion = !!(typeof SAVE !== 'undefined' && SAVE.settings && SAVE.settings().reducedMotion);
     // Accessibility: Easier Mode gives more time, more arrows, slower targets.
     if (typeof SAVE !== 'undefined' && SAVE.settings && SAVE.settings().easy) {
       rules.arrows = Math.ceil(rules.arrows * 1.25);
@@ -81,6 +82,18 @@ var GAME = (function () {
         (options.background === 'cave' ? 'bg_moon_cave' : options.background) :
         ['bg_meadow', 'bg_mountain', 'bg_sunset_beach', 'bg_starlight', 'bg_underwater'][(Math.random() * 5) | 0]
     };
+  }
+
+  function reducedMotion() {
+    return !!(st && st.rules && st.rules.reducedMotion);
+  }
+
+  function addShake(amount) {
+    if (!reducedMotion() && TUNING.SCREEN_SHAKE) st.shake = Math.max(st.shake, amount);
+  }
+
+  function motionCount(n) {
+    return reducedMotion() ? Math.max(1, Math.ceil(n * 0.35)) : n;
   }
 
   /* ============ targets ============ */
@@ -467,7 +480,7 @@ var GAME = (function () {
       seed: rand(0, Math.PI * 2)
     });
     AUDIO.zap();
-    if (TUNING.SCREEN_SHAKE) st.shake = 0.24;
+    addShake(0.24);
     earn('blackhole');
   }
 
@@ -551,9 +564,9 @@ var GAME = (function () {
       splinters(hit.x, hit.y);
       if (base === rings[0]) {
         st.stats.bullseyes++;
-        st.cinematicUntil = st.t + 0.34;
+        st.cinematicUntil = reducedMotion() ? st.t : st.t + 0.34;
         AUDIO.bullseye();
-        if (TUNING.SCREEN_SHAKE) st.shake = 0.35;
+        addShake(0.35);
         ring(t.x, t.y, '#ffd23a');
         st.floaters.push({ x: t.x, y: t.y - t.r - 56, vy: -70, life: 1.3, text: 'BULLSEYE!', big: true, color: '#ffd23a' });
         earn('first_bullseye');
@@ -580,7 +593,7 @@ var GAME = (function () {
       award(TUNING.SCORE_GOLDEN, t.x, t.y - 20, { bonusObj: true });
       t.dead = true;
       AUDIO.chest();
-      if (TUNING.SCREEN_SHAKE) st.shake = 0.3;
+      addShake(0.3);
       ring(t.x, t.y, '#ffd23a');
       burst(t.x, t.y, '#ffd23a');
       spawnCoins(12, t.x, t.y);
@@ -597,7 +610,7 @@ var GAME = (function () {
         award(TUNING.SCORE_BOSS, t.x, t.y - t.r - 20, {});
         t.dead = true;
         AUDIO.chest();
-        if (TUNING.SCREEN_SHAKE) st.shake = 0.5;
+        addShake(0.5);
         ring(t.x, t.y, '#ffd23a');
         burst(t.x, t.y, '#ff5fa2');
         spawnCoins(20, t.x, t.y);
@@ -618,7 +631,7 @@ var GAME = (function () {
         AUDIO.chest();
         ring(t.x, t.y, '#ffd23a');
         spawnCoins(TUNING.COINS_FROM_CHEST, t.x, t.y - 20);
-        if (TUNING.SCREEN_SHAKE) st.shake = 0.3;
+        addShake(0.3);
         track('chests', 'chests_10', 10);
       } else {
         snapArrow(hit.x, hit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
@@ -710,10 +723,10 @@ var GAME = (function () {
     st.particles.push({ x: x, y: y, vx: vx, vy: vy, life: life, max: life, color: color, r: r, grav: grav !== false });
   }
   function splinters(x, y) {
-    for (var i = 0; i < 10; i++) part(x, y, rand(-260, 260), rand(-320, 60), rand(0.3, 0.7), pick(['#a06a35', '#8a5a2b', '#e8dccb']), rand(2, 5));
+    for (var i = 0; i < motionCount(10); i++) part(x, y, rand(-260, 260), rand(-320, 60), rand(0.3, 0.7), pick(['#a06a35', '#8a5a2b', '#e8dccb']), rand(2, 5));
   }
   function burst(x, y, color) {
-    for (var i = 0; i < 14; i++) part(x, y, rand(-320, 320), rand(-320, 320), rand(0.25, 0.6), color, rand(3, 7));
+    for (var i = 0; i < motionCount(14); i++) part(x, y, rand(-320, 320), rand(-320, 320), rand(0.25, 0.6), color, rand(3, 7));
   }
   function fruitSplat(t) {
     var colors = {
@@ -723,16 +736,16 @@ var GAME = (function () {
       pear: ['#9fd636', '#eef7c8'], grapes: ['#8e4fd0', '#c9a8ff'],
       pineapple: ['#ffcf3a', '#e8a91d']
     }[t.kind] || ['#ff9a1a', '#ffd9a0'];
-    for (var i = 0; i < 16; i++) part(t.x, t.y, rand(-300, 300), rand(-360, 100), rand(0.3, 0.8), pick(colors), rand(3, 8));
+    for (var i = 0; i < motionCount(16); i++) part(t.x, t.y, rand(-300, 300), rand(-360, 100), rand(0.3, 0.8), pick(colors), rand(3, 8));
   }
   function dust(x, y) {
-    for (var i = 0; i < 6; i++) part(x, y, rand(-90, 90), rand(-140, -30), rand(0.2, 0.5), '#cbb27e', rand(2, 5));
+    for (var i = 0; i < motionCount(6); i++) part(x, y, rand(-90, 90), rand(-140, -30), rand(0.2, 0.5), '#cbb27e', rand(2, 5));
   }
   function flame(x, y) {
-    for (var i = 0; i < 8; i++) part(x, y, rand(-140, 140), rand(-200, -40), rand(0.2, 0.5), pick(['#ff7a1a', '#ffb43a']), rand(3, 6), false);
+    for (var i = 0; i < motionCount(8); i++) part(x, y, rand(-140, 140), rand(-200, -40), rand(0.2, 0.5), pick(['#ff7a1a', '#ffb43a']), rand(3, 6), false);
   }
   function snow(x, y) {
-    for (var i = 0; i < 8; i++) part(x, y, rand(-100, 100), rand(-160, -20), rand(0.4, 0.8), pick(['#bfeaff', '#ffffff']), rand(2, 5), false);
+    for (var i = 0; i < motionCount(8); i++) part(x, y, rand(-100, 100), rand(-160, -20), rand(0.4, 0.8), pick(['#bfeaff', '#ffffff']), rand(2, 5), false);
   }
   function ring(x, y, color) {
     st.particles.push({ x: x, y: y, vx: 0, vy: 0, life: 0.4, max: 0.4, color: color, ring: true, r: 10 });
@@ -740,9 +753,9 @@ var GAME = (function () {
 
   function snapArrow(x, y, angle, type) {
     if (AUDIO.snap) AUDIO.snap(); else AUDIO.thunk();
-    if (TUNING.SCREEN_SHAKE) st.shake = Math.max(st.shake, 0.16);
+    addShake(0.16);
     st.floaters.push({ x: x, y: y - 42, vy: -66, life: 0.7, text: 'SNAP!', big: false, color: '#ffe3a3' });
-    for (var i = 0; i < 9; i++) {
+    for (var i = 0; i < motionCount(9); i++) {
       part(x, y, rand(-160, 160), rand(-230, 40), rand(0.24, 0.55), pick(['#5a321c', '#a76b36', '#f4d08a']), rand(2, 5), true);
     }
     var speed = 260;
@@ -861,6 +874,8 @@ var GAME = (function () {
       coins: total,
       coinsFromScore: coinsFromScore,
       coinsDirect: st.coinsDirect,
+      arrowsLeft: st.arrowsLeft,
+      roundArrows: st.rules.arrows,
       coinBonus: coinBonus,
       isHighScore: isHigh,
       highScore: SAVE.current().highScore
@@ -974,6 +989,7 @@ var GAME = (function () {
 
   function drawStageAtmosphere() {
     var name = st.bgName || '';
+    var calm = reducedMotion();
     ctx.save();
 
     // Soft scene-grade overlays make the painted worlds feel like one coherent
@@ -984,37 +1000,37 @@ var GAME = (function () {
       cave.addColorStop(0.72, 'rgba(14,16,44,0.18)');
       cave.addColorStop(1, 'rgba(5,6,16,0.36)');
       ctx.fillStyle = cave; ctx.fillRect(0, 0, W, H);
-      for (var i = 0; i < 22; i++) {
-        var gx = (i * 131 + Math.sin(st.t * 0.4 + i) * 12) % W;
-        var gy = 120 + ((i * 73 + st.t * 18) % 620);
+      for (var i = 0; i < (calm ? 7 : 22); i++) {
+        var gx = (i * 131 + (calm ? 0 : Math.sin(st.t * 0.4 + i) * 12)) % W;
+        var gy = 120 + ((i * 73 + (calm ? 0 : st.t * 18)) % 620);
         ART.circle(ctx, gx, gy, 2 + (i % 3), i % 2 ? 'rgba(126,236,255,0.38)' : 'rgba(190,145,255,0.28)');
       }
     } else if (name.indexOf('underwater') >= 0) {
       ctx.fillStyle = 'rgba(34,164,190,0.12)'; ctx.fillRect(0, 0, W, H);
       ctx.strokeStyle = 'rgba(208,255,255,0.16)';
       ctx.lineWidth = 3;
-      for (var u = 0; u < 7; u++) {
-        var yy = 110 + u * 92 + Math.sin(st.t * 0.9 + u) * 12;
+      for (var u = 0; u < (calm ? 3 : 7); u++) {
+        var yy = 110 + u * 92 + (calm ? 0 : Math.sin(st.t * 0.9 + u) * 12);
         ctx.beginPath();
         for (var x = -30; x <= W + 30; x += 60) {
-          var wy = yy + Math.sin(x * 0.015 + st.t * 1.7 + u) * 12;
+          var wy = yy + (calm ? Math.sin(x * 0.015 + u) * 4 : Math.sin(x * 0.015 + st.t * 1.7 + u) * 12);
           if (x === -30) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
         }
         ctx.stroke();
       }
-      for (var b = 0; b < 14; b++) {
-        var bx = (b * 117 + Math.sin(st.t + b) * 18) % W;
-        var by = H - ((st.t * (28 + b % 4 * 10) + b * 79) % H);
+      for (var b = 0; b < (calm ? 5 : 14); b++) {
+        var bx = (b * 117 + (calm ? 0 : Math.sin(st.t + b) * 18)) % W;
+        var by = calm ? (160 + b * 83) % H : H - ((st.t * (28 + b % 4 * 10) + b * 79) % H);
         ctx.strokeStyle = 'rgba(220,255,255,0.35)';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(bx, by, 5 + (b % 4) * 3, 0, Math.PI * 2); ctx.stroke();
       }
     } else if (name.indexOf('starlight') >= 0) {
       ctx.fillStyle = 'rgba(21,24,72,0.12)'; ctx.fillRect(0, 0, W, H);
-      for (var s = 0; s < 32; s++) {
+      for (var s = 0; s < (calm ? 12 : 32); s++) {
         var sx = (s * 97 + 47) % W;
         var sy = 40 + (s * 53) % 360;
-        var tw = 0.35 + Math.sin(st.t * 2.3 + s) * 0.25;
+        var tw = calm ? 0.35 : 0.35 + Math.sin(st.t * 2.3 + s) * 0.25;
         ART.circle(ctx, sx, sy, 1.5 + (s % 3), 'rgba(255,244,168,' + (0.25 + tw) + ')');
       }
     } else if (name.indexOf('sunset') >= 0) {
@@ -1026,8 +1042,8 @@ var GAME = (function () {
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.05)';
       ctx.fillRect(0, 0, W, H);
-      for (var p = 0; p < 10; p++) {
-        var px = (p * 173 + st.t * (8 + p % 3)) % (W + 80) - 40;
+      for (var p = 0; p < (calm ? 4 : 10); p++) {
+        var px = (p * 173 + (calm ? 0 : st.t * (8 + p % 3))) % (W + 80) - 40;
         var py = 180 + (p * 61) % 410;
         ART.circle(ctx, px, py, 2.5, 'rgba(255,255,255,0.28)');
       }
@@ -1050,7 +1066,7 @@ var GAME = (function () {
     ctx.fillStyle = g;
     ctx.fillRect(0, GROUND - 18, W, H - GROUND + 18);
 
-    for (var i = 0; i < 18; i++) {
+    for (var i = 0; i < (reducedMotion() ? 8 : 18); i++) {
       var x = (i * 101 + 33) % W;
       var y = GROUND + 10 + (i % 4) * 24;
       var h = 18 + (i % 5) * 7;
@@ -1058,7 +1074,7 @@ var GAME = (function () {
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(x, y + h);
-      ctx.quadraticCurveTo(x + Math.sin(st.t + i) * 8, y + h * 0.45, x + 5, y);
+      ctx.quadraticCurveTo(x + (reducedMotion() ? 0 : Math.sin(st.t + i) * 8), y + h * 0.45, x + 5, y);
       ctx.stroke();
     }
 
@@ -1070,7 +1086,7 @@ var GAME = (function () {
 
   function drawObjectAura(t) {
     if (t.type === 'boss') return;
-    var pulse = 1 + Math.sin(st.t * 5 + t.x * 0.01) * 0.05;
+    var pulse = reducedMotion() ? 1 : 1 + Math.sin(st.t * 5 + t.x * 0.01) * 0.05;
     var color =
       t.type === 'golden' ? 'rgba(255,226,70,0.44)' :
       t.type === 'powerup' ? 'rgba(98,230,255,0.30)' :
@@ -1109,7 +1125,7 @@ var GAME = (function () {
       var frame = p < 0.25 ? 0 : (p < 0.55 ? 1 : 2);
       var img = SPRITES.get('blackhole_' + frame) || SPRITES.get('blackhole_1');
       var pulse = (bh.pulse || 0) * 2.4;
-      var wob = 1 + Math.sin(st.t * 18 + bh.seed) * 0.05 + pulse;
+      var wob = reducedMotion() ? 1 + pulse * 0.35 : 1 + Math.sin(st.t * 18 + bh.seed) * 0.05 + pulse;
       var R = TUNING.BLACKHOLE_RADIUS * 0.95 * env * wob;
       ctx.save();
       ctx.translate(bh.x, bh.y);
@@ -1117,24 +1133,24 @@ var GAME = (function () {
 
       // Gravity well shimmer: the outer rings make the pull radius readable,
       // while the sprite stays as the dark center of the effect.
-      for (var i = 0; i < 3; i++) {
-        var rr = R * (0.48 + i * 0.24 + ((st.t * 0.9 + i * 0.17 + bh.seed) % 0.18));
+      for (var i = 0; i < (reducedMotion() ? 1 : 3); i++) {
+        var rr = R * (0.48 + i * 0.24 + (reducedMotion() ? 0.08 : ((st.t * 0.9 + i * 0.17 + bh.seed) % 0.18)));
         ctx.beginPath();
         ctx.strokeStyle = i === 0 ? '#72f0ff' : (i === 1 ? '#8b5cff' : '#1b2438');
         ctx.globalAlpha = env * (0.28 - i * 0.06);
         ctx.lineWidth = Math.max(2, 6 - i * 1.4);
-        ctx.ellipse(0, 0, rr, rr * (0.55 + i * 0.08), bh.spin * (st.t * 3.8 + i), 0, Math.PI * 2);
+        ctx.ellipse(0, 0, rr, rr * (0.55 + i * 0.08), reducedMotion() ? i * 0.35 : bh.spin * (st.t * 3.8 + i), 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      ctx.rotate(bh.spin * (bh.t * 8 + bh.seed));
+      ctx.rotate(reducedMotion() ? bh.seed : bh.spin * (bh.t * 8 + bh.seed));
       ctx.globalAlpha = env;
       if (img) ctx.drawImage(img, -R * 0.62, -R * 0.62, R * 1.24, R * 1.24);
       else ART.circle(ctx, 0, 0, R * 0.62, '#0a1a2a');
 
       // Spark crumbs orbiting inward make it feel like space is being twisted.
-      for (var j = 0; j < 10; j++) {
-        var a = bh.seed + st.t * bh.spin * (3.2 + j * 0.07) + j * 0.78;
+      for (var j = 0; j < (reducedMotion() ? 3 : 10); j++) {
+        var a = bh.seed + (reducedMotion() ? 0 : st.t * bh.spin * (3.2 + j * 0.07)) + j * 0.78;
         var spiral = R * (0.18 + ((j * 0.13 + p * 1.4) % 0.78));
         var sx = Math.cos(a) * spiral;
         var sy = Math.sin(a) * spiral * 0.62;
@@ -1532,7 +1548,7 @@ var GAME = (function () {
 
   function render() {
     ctx.save();
-    if (st.shake > 0) {
+    if (!reducedMotion() && st.shake > 0) {
       ctx.translate(rand(-1, 1) * st.shake * 22, rand(-1, 1) * st.shake * 22);
     }
 
@@ -1549,7 +1565,8 @@ var GAME = (function () {
       if (a.dead) return;
       ART.drawArrow(ctx, a.x, a.y, Math.atan2(a.vy, a.vx), st.arrowType, 1, a.t, {
         flight: true,
-        speed: Math.hypot(a.vx, a.vy)
+        speed: Math.hypot(a.vx, a.vy),
+        reducedMotion: reducedMotion()
       });
     });
 

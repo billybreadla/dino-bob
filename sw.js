@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v12-settings';
+var CACHE = 'dinobob-v14-adventure-stars';
 var FILES = [
   '.',
   'index.html',

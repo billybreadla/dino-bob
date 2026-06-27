@@ -178,6 +178,10 @@
     <canvas id="results-character" width="170" height="150"></canvas>
     <p id="results-quip" class="results-quip"></p>
     <div id="results-highscore" class="highscore-banner hidden">🎆 NEW HIGH SCORE! 🎆</div>
+    <div id="results-adventure-row" class="adventure-result hidden">
+      <div id="results-adventure-stars" class="adventure-result-stars">★ ★ ★</div>
+      <div id="results-adventure-text" class="adventure-result-text">Adventure reward</div>
+    </div>
     <div class="results-row results-score"><span>Score</span><b id="results-score">0</b></div>
     <div class="results-row"><span>🎯 Accuracy</span><b id="results-accuracy">0%</b></div>
     <div class="results-row"><span>🌟 Bullseyes</span><b id="results-bullseyes">0</b></div>
@@ -236,6 +240,10 @@
     <div class="setting-row">
       <div class="setting-label"><span class="setting-title">Easier Mode</span><span class="setting-sub">More time, more arrows, slower targets</span></div>
       <button id="set-easy" class="toggle" role="switch" aria-checked="false"><span class="toggle-knob"></span><span class="toggle-text">OFF</span></button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label"><span class="setting-title">Reduced Motion</span><span class="setting-sub">Less shake, fewer bursts, calmer effects</span></div>
+      <button id="set-reduced-motion" class="toggle" role="switch" aria-checked="false"><span class="toggle-knob"></span><span class="toggle-text">OFF</span></button>
     </div>
     <div class="setting-row danger-row">
       <div class="setting-label"><span class="setting-title">Reset Progress</span><span class="setting-sub">Erase this player's coins, unlocks &amp; stars</span></div>
