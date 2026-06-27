@@ -31,6 +31,7 @@ var GAME = (function () {
       targetSpeed: options.targetSpeed || 1,
       specialRule: options.specialRule || 'normal',
       bossAtStart: !!options.bossAtStart,
+      bossId: options.bossId || null,
       theme: options.theme || null
     };
     return {
@@ -171,10 +172,13 @@ var GAME = (function () {
     };
   }
 
-  // End-of-round boss: a giant target that takes several hits.
+  // End-of-round boss: a giant target that takes several hits. Which boss (art +
+  // hit count) comes from the stage's boss config in js/stages.js.
   function makeBoss() {
+    var def = STAGES.bossDef(st.rules.bossId);
     return {
-      type: 'boss', dead: false, hp: 6, maxHp: 6, frozenUntil: 0,
+      type: 'boss', bossId: st.rules.bossId || 'moonstone',
+      dead: false, hp: def.hp, maxHp: def.hp, frozenUntil: 0,
       x: W / 2 + 120, baseX: W / 2 + 120, y: 300,
       r: 130, wobble: 0, mt: 0,
       motion: 'slide', range: 220, speed: 1.0
@@ -1301,14 +1305,15 @@ var GAME = (function () {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(t.kind === 'arrows' ? '+3' : '⏱', 0, 2);
     } else if (t.type === 'boss') {
-      var bossImg = SPRITES.get('boss_moonstone');
+      var bdef = STAGES.bossDef(t.bossId);
+      var bossImg = SPRITES.get(bdef.sprite);
       var bimgT = bossImg || SPRITES.get('target');
       var byoff = 0;
       if (bimgT) {
-        var bw = t.r * (bossImg ? 2.5 : 2.15), bh = bw * bimgT.height / bimgT.width;
-        // the Moonstone King's chest weak-spot sits a touch below its center,
-        // so lift the art to line that bullseye up with the round's hitbox.
-        byoff = bossImg ? bh * 0.06 : 0;
+        var bw = t.r * (bossImg ? bdef.scale : 2.15), bh = bw * bimgT.height / bimgT.width;
+        // the boss art's weak-spot may sit below its center, so lift the art to
+        // line that bullseye up with the round's hitbox (per-boss `lift`).
+        byoff = bossImg ? bh * bdef.lift : 0;
         ctx.drawImage(bimgT, -bw / 2, -bh / 2 - byoff, bw, bh);
       } else {
         ART.circle(ctx, 0, 0, t.r, '#e23b3b');

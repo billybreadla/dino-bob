@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v9-obsidian-balance';
+var CACHE = 'dinobob-v10-stage-config';
 var FILES = [
   '.',
   'index.html',
@@ -11,6 +11,7 @@ var FILES = [
   'js/audio.js',
   'js/sprites.js',
   'js/art.js',
+  'js/stages.js',
   'js/game.js',
   'js/ui.js',
   'js/main.js',

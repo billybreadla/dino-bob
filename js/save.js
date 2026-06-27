@@ -138,7 +138,10 @@ var SAVE = (function () {
       var p = current();
       if (!p) return;
       if (p.adventureStars.indexOf(stageIndex) === -1) p.adventureStars.push(stageIndex);
-      p.adventureStage = Math.max(p.adventureStage || 0, Math.min(2, stageIndex + 1));
+      // Unlock the next stage. Cap at the last stage so progression grows with
+      // however many stages are defined in js/stages.js (no hard-coded count).
+      var lastStage = (typeof STAGES !== 'undefined' ? STAGES.count : 3) - 1;
+      p.adventureStage = Math.max(p.adventureStage || 0, Math.min(lastStage, stageIndex + 1));
       persist();
     },
 

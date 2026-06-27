@@ -328,23 +328,8 @@ var UI = (function () {
 
   /* ============ adventure map ============ */
 
-  var ADVENTURE = [
-    {
-      name: 'Whispering Woods', blurb: 'Warm up among balloons and gentle targets.', goal: 700,
-      options: { mode: 'adventure', stageIndex: 0, label: 'STAGE 1 · WHISPERING WOODS', roundSeconds: 40, arrows: 16,
-        moversAt: 20, chaosAt: 34, targetSpeed: 0.82, background: 'bg_meadow' }
-    },
-    {
-      name: 'Sky-High Peaks', blurb: 'Faster targets sweep across the mountain air.', goal: 1250,
-      options: { mode: 'adventure', stageIndex: 1, label: 'STAGE 2 · SKY-HIGH PEAKS', roundSeconds: 45, arrows: 18,
-        moversAt: 8, chaosAt: 27, targetSpeed: 1.18, background: 'bg_mountain' }
-    },
-    {
-      name: 'Moon Cave Boss', blurb: 'Defeat the crowned target before your arrows run out!', goal: 1,
-      options: { mode: 'adventure', stageIndex: 2, label: 'STAGE 3 · MOON CAVE BOSS', roundSeconds: 50, arrows: 22,
-        moversAt: 0, chaosAt: 0, targetSpeed: 1.08, background: 'bg_moon_cave', bossAtStart: true, specialRule: 'boss' }
-    }
-  ];
+  // Stage + boss data lives in js/stages.js so new worlds can be added there.
+  var ADVENTURE = STAGES.list;
   var selectedStage = 0;
 
   function openAdventure() {
@@ -357,7 +342,7 @@ var UI = (function () {
     var p = SAVE.current();
     var unlocked = p.adventureStage || 0;
     selectedStage = Math.min(selectedStage, unlocked);
-    $('adventure-stars').textContent = (p.adventureStars || []).length + ' / 3 ★';
+    $('adventure-stars').textContent = (p.adventureStars || []).length + ' / ' + STAGES.count + ' ★';
     var map = $('adventure-map');
     map.innerHTML = '';
     ADVENTURE.forEach(function (stage, i) {
@@ -366,6 +351,12 @@ var UI = (function () {
       var locked = i > unlocked;
       btn.className = 'stage-node' + (done ? ' complete' : '') + (locked ? ' locked' : '');
       btn.innerHTML = (locked ? '🔒<br>' : '') + (i + 1) + '<br>' + stage.name;
+      // Map node position + color come from the stage data (js/stages.js).
+      if (stage.node) {
+        btn.style.left = stage.node.x;
+        btn.style.top = stage.node.y;
+        if (stage.node.color) btn.style.background = stage.node.color;
+      }
       btn.onclick = function () {
         if (locked) { AUDIO.nope(); return; }
         AUDIO.click(); selectedStage = i; renderAdventureDetail();
@@ -379,13 +370,14 @@ var UI = (function () {
     var stage = ADVENTURE[selectedStage];
     var detail = $('adventure-detail');
     detail.innerHTML = '<h3>' + stage.name + '</h3><p>' + stage.blurb +
-      (selectedStage < 2 ? ' Goal: ' + stage.goal + ' points.' : '') + '</p>';
+      STAGES.goalText(selectedStage) + '</p>';
     var play = document.createElement('button');
     play.className = 'btn btn-orange'; play.textContent = 'PLAY STAGE ' + (selectedStage + 1);
     play.onclick = function () {
       AUDIO.click();
-      activeMode = { type: 'adventure', options: stage.options, stage: selectedStage };
-      startRound(stage.options, 'adventure');
+      var options = STAGES.optionsFor(selectedStage);
+      activeMode = { type: 'adventure', options: options, stage: selectedStage };
+      startRound(options, 'adventure');
       activeMode.stage = selectedStage;
     };
     detail.appendChild(play);
@@ -393,7 +385,7 @@ var UI = (function () {
 
   function finishAdventureRound(r) {
     var stageIndex = activeMode.stage || 0;
-    var won = stageIndex === 2 ? r.stats.bossDefeated : r.score >= ADVENTURE[stageIndex].goal;
+    var won = STAGES.won(stageIndex, r);
     if (won) {
       SAVE.completeAdventureStage(stageIndex);
       r.adventureWon = true;

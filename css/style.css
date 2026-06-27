@@ -375,11 +375,8 @@ html, body {
   text-shadow: 0 2px 0 rgba(0,0,0,0.45);
   box-shadow: 0 8px 0 rgba(36,46,32,0.45), 0 14px 26px rgba(0,0,0,0.25);
 }
-/* positioned to sit on the painted route's platforms (bottom-left meadow,
-   center, top-right moon cave) */
-.stage-node:nth-child(1) { left: 4%; top: 70%; background: #3d964c; }
-.stage-node:nth-child(2) { left: 39%; top: 43%; background: #3d8fd0; }
-.stage-node:nth-child(3) { left: 73%; top: 15%; background: #7652a8; }
+/* Stage node positions + colors now come from each stage's `node` field in
+   js/stages.js (applied inline), so adding a stage needs no CSS change. */
 .stage-node.locked { filter: grayscale(0.85) brightness(0.65); cursor: default; }
 .stage-node.complete::before { content: '★'; position: absolute; top: -22px; right: -2px; color: var(--yellow); font-size: 42px; }
 .adventure-detail { min-height: 82px; width: min(650px, 92vw); padding: 13px 22px; text-align: center; }
