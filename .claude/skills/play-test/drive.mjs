@@ -87,6 +87,18 @@ try {
   const wantStages = await page.evaluate(() => (typeof STAGES !== 'undefined' ? STAGES.count : 3));
   check('adventure map renders all stages', nodes === wantStages, nodes + '/' + wantStages + ' nodes'); await click('btn-adventure-back'); await sleep(400);
 
+  // star ratings end to end: award 2 stars on stage 0 via the real save API,
+  // reopen the map, and confirm the node + total counter show them.
+  await page.evaluate(() => { SAVE.completeAdventureStage(0, 2); });
+  await click('btn-adventure'); await sleep(500);
+  const starState = await page.evaluate(() => {
+    const node = document.querySelector('#adventure-map .stage-node .stage-rating');
+    const dim = node ? node.querySelectorAll('.dim').length : -1;
+    return { rating: SAVE.adventureStarRating(0), filled: node ? 3 - dim : -1, total: SAVE.adventureStarTotal(), label: document.getElementById('adventure-stars').textContent };
+  });
+  check('star ratings store + render (2★ on stage 1)', starState.rating === 2 && starState.filled === 2 && starState.total >= 2, JSON.stringify(starState));
+  await click('btn-adventure-back'); await sleep(300);
+
   await click('btn-challenge'); await sleep(900); await shot('04-challenge');
   const ctrls = await page.evaluate(() => ['challenge-time','challenge-arrows','challenge-speed','challenge-chaos','challenge-bg','challenge-rule'].filter(id => document.getElementById(id)).length);
   check('challenge maker has 6 controls', ctrls === 6, ctrls + '/6'); await click('btn-challenge-back'); await sleep(400);
