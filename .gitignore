@@ -8,8 +8,8 @@
 # repo lean. Remove this line if you want it tracked too.
 Dino Bob's Opening Adventure/
 
-# 3D prerender source/masters + design concepts (build artifacts, ~13MB, not shipped)
-assets/source/generated-3d-2026-06-27/
-assets/source/pre-3d-2026-06-27/
-assets/source/prerendered-3d-2026-06-27/
+# Art-pipeline source dumps + design concepts (build artifacts, not shipped).
+# The already-tracked assets/source/art-overhaul-v5/ masters stay tracked;
+# new source dumps (3D prerenders, smooth-arms, etc.) are ignored.
+assets/source/
 assets/concepts/
