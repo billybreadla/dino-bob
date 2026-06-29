@@ -1684,12 +1684,17 @@ var GAME = (function () {
   function drawPlayer() {
     var p = st.profile;
     var id = p.equipped.character;
-    var poseImg = SPRITES.get('char_' + id + '_archer');
     var angle = st.aiming ? st.aim.angle : -0.25;
     var draw = st.aiming ? st.aim.power : 0;
     var recoil = st.releaseKick || 0;
-    // Lean back a touch while drawing, kick forward on release. Applied to the
-    // whole player so the baked bow + the nocked arrow move together.
+    // Draw-stage frames: 0 = relaxed, 1 = half draw, 2 = full draw. The string
+    // hand pulls back as you aim harder. Characters without frames fall back to
+    // the single static archer pose.
+    var frame = !st.aiming ? 0 : (draw < 0.5 ? 1 : 2);
+    var poseImg = SPRITES.get('char_' + id + '_draw' + frame);
+    var hasFrames = !!poseImg;
+    if (!poseImg) poseImg = SPRITES.get('char_' + id + '_archer');
+    // Lean back a touch while drawing, kick forward on release.
     var lean = -draw * 8 + recoil * 14;
     var liftY = draw * 2;
     var bx = BOW.x + lean, by = BOW.y + liftY;
@@ -1717,13 +1722,16 @@ var GAME = (function () {
       ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2);
     }
 
-    // Nocked / ready arrow (shows aim direction in both paths).
-    var nockX = bx - Math.cos(angle) * draw * 46;
-    var nockY = by - Math.sin(angle) * draw * 46;
-    if (!st.aiming && st.arrowsLeft > 0 && !st.over) {
-      ART.drawArrow(ctx, bx, by, angle, st.arrowType, 1, st.t);
-    } else if (st.aiming) {
-      ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t);
+    // Nocked arrow for poses WITHOUT baked draw frames (the draw frames already
+    // show the arrow pulling back). Aim direction comes from drawAim's dots.
+    if (!hasFrames) {
+      var nockX = bx - Math.cos(angle) * draw * 46;
+      var nockY = by - Math.sin(angle) * draw * 46;
+      if (!st.aiming && st.arrowsLeft > 0 && !st.over) {
+        ART.drawArrow(ctx, bx, by, angle, st.arrowType, 1, st.t);
+      } else if (st.aiming) {
+        ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t);
+      }
     }
 
     if (ARCHER_DEBUG) {

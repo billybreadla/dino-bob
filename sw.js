@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v23-archer-pose';
+var CACHE = 'dinobob-v24-draw-anim';
 var FILES = [
   '.',
   'index.html',
@@ -123,7 +123,10 @@ var FILES = [
   'assets/sprites/char_astronaut_archer.png',
   'assets/sprites/char_robot_archer.png',
   'assets/sprites/char_bear_archer.png',
-  'assets/sprites/char_trixie_archer.png'
+  'assets/sprites/char_trixie_archer.png',
+  'assets/sprites/char_dinobob_draw0.png',
+  'assets/sprites/char_dinobob_draw1.png',
+  'assets/sprites/char_dinobob_draw2.png'
 ];
 
 self.addEventListener('install', function (e) {

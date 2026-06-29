@@ -29,7 +29,9 @@ var SPRITES = (function () {
     'bg_moon_cave', 'bg_starlight', 'bg_sunset_beach', 'bg_underwater', 'adventure_map',
     // Integrated in-game archer poses (replace the old articulated arms)
     'char_dinobob_archer', 'char_ninja_archer', 'char_astronaut_archer',
-    'char_robot_archer', 'char_bear_archer', 'char_trixie_archer'
+    'char_robot_archer', 'char_bear_archer', 'char_trixie_archer',
+    // Dino Bob draw-animation frames (string hand pulls back; 0 relaxed..2 full)
+    'char_dinobob_draw0', 'char_dinobob_draw1', 'char_dinobob_draw2'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,
