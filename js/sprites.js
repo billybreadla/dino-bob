@@ -26,7 +26,10 @@ var SPRITES = (function () {
     'boss_moonstone', 'boss_moonstone_cracked', 'boss_moonstone_broken',
     'boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2',
     'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5',
-    'bg_moon_cave', 'bg_starlight', 'bg_sunset_beach', 'bg_underwater', 'adventure_map'
+    'bg_moon_cave', 'bg_starlight', 'bg_sunset_beach', 'bg_underwater', 'adventure_map',
+    // Integrated in-game archer poses (replace the old articulated arms)
+    'char_dinobob_archer', 'char_ninja_archer', 'char_astronaut_archer',
+    'char_robot_archer', 'char_bear_archer', 'char_trixie_archer'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,

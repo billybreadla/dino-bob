@@ -1676,36 +1676,64 @@ var GAME = (function () {
     ctx.globalAlpha = 1;
   }
 
+  // Where the bow's arrow-rest sits inside the archer pose sprite, as a fraction
+  // of the image (calibrated so the painted bow lands on the BOW anchor).
+  var ARCHER_BOW_FX = 0.82, ARCHER_BOW_FY = 0.64, ARCHER_HEIGHT = 320;
+  var ARCHER_DEBUG = false;
+
   function drawPlayer() {
     var p = st.profile;
-    var outfit = DATA.outfitById(p.equipped.outfit);
-    ART.drawCharacter(ctx, p.equipped.character, 150, GROUND + 10, 1.15, {
-      hat: p.equipped.hat,
-      outfitColor: outfit.swap,
-      outfitId: p.equipped.outfit,
-      shiny: p.equipped.shiny,
-      t: st.t,
-      look: 1,
-      aimPower: st.aiming ? st.aim.power : 0,
-      aimAngle: st.aim.angle,
-      recoil: st.releaseKick,
-      archer: true
-    });
+    var id = p.equipped.character;
+    var poseImg = SPRITES.get('char_' + id + '_archer');
     var angle = st.aiming ? st.aim.angle : -0.25;
     var draw = st.aiming ? st.aim.power : 0;
-    var nockX = BOW.x - Math.cos(angle) * draw * 46;
-    var nockY = BOW.y - Math.sin(angle) * draw * 46;
-    ART.drawArcherArms(ctx, p.equipped.character, 150, GROUND + 10, 1.15,
-      { x: BOW.x, y: BOW.y }, { x: nockX, y: nockY }, {
-        aimPower: draw,
-        aimAngle: angle,
-        recoil: st.releaseKick
+    var recoil = st.releaseKick || 0;
+    // Lean back a touch while drawing, kick forward on release. Applied to the
+    // whole player so the baked bow + the nocked arrow move together.
+    var lean = -draw * 8 + recoil * 14;
+    var liftY = draw * 2;
+    var bx = BOW.x + lean, by = BOW.y + liftY;
+
+    if (poseImg) {
+      var h = ARCHER_HEIGHT;
+      var w = poseImg.width * (h / poseImg.height);
+      var dx = bx - ARCHER_BOW_FX * w;
+      var dy = by - ARCHER_BOW_FY * h;
+      ctx.save();
+      if (p.equipped.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.9)'; ctx.shadowBlur = 22; }
+      ctx.drawImage(poseImg, dx, dy, w, h);
+      ctx.restore();
+    } else {
+      // Fallback (pose sprite not loaded yet): old articulated arms.
+      var outfit = DATA.outfitById(p.equipped.outfit);
+      ART.drawCharacter(ctx, id, 150, GROUND + 10, 1.15, {
+        hat: p.equipped.hat, outfitColor: outfit.swap, outfitId: p.equipped.outfit,
+        shiny: p.equipped.shiny, t: st.t, look: 1,
+        aimPower: draw, aimAngle: angle, recoil: recoil, archer: true
       });
-    ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2);
+      var fnX = BOW.x - Math.cos(angle) * draw * 46, fnY = BOW.y - Math.sin(angle) * draw * 46;
+      ART.drawArcherArms(ctx, id, 150, GROUND + 10, 1.15, { x: BOW.x, y: BOW.y },
+        { x: fnX, y: fnY }, { aimPower: draw, aimAngle: angle, recoil: recoil });
+      ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2);
+    }
+
+    // Nocked / ready arrow (shows aim direction in both paths).
+    var nockX = bx - Math.cos(angle) * draw * 46;
+    var nockY = by - Math.sin(angle) * draw * 46;
     if (!st.aiming && st.arrowsLeft > 0 && !st.over) {
-      ART.drawArrow(ctx, BOW.x, BOW.y, angle, st.arrowType, 1, st.t);
+      ART.drawArrow(ctx, bx, by, angle, st.arrowType, 1, st.t);
     } else if (st.aiming) {
       ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t);
+    }
+
+    if (ARCHER_DEBUG) {
+      ctx.save();
+      ctx.strokeStyle = '#ff00ff'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bx - 16, by); ctx.lineTo(bx + 16, by);
+      ctx.moveTo(bx, by - 16); ctx.lineTo(bx, by + 16);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 

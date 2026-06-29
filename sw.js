@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v22-smooth-arms';
+var CACHE = 'dinobob-v23-archer-pose';
 var FILES = [
   '.',
   'index.html',
@@ -116,7 +116,14 @@ var FILES = [
   'assets/sprites/bg_starlight.webp',
   'assets/sprites/bg_sunset_beach.webp',
   'assets/sprites/bg_underwater.webp',
-  'assets/sprites/adventure_map.webp'
+  'assets/sprites/adventure_map.webp',
+  // integrated in-game archer poses
+  'assets/sprites/char_dinobob_archer.png',
+  'assets/sprites/char_ninja_archer.png',
+  'assets/sprites/char_astronaut_archer.png',
+  'assets/sprites/char_robot_archer.png',
+  'assets/sprites/char_bear_archer.png',
+  'assets/sprites/char_trixie_archer.png'
 ];
 
 self.addEventListener('install', function (e) {
