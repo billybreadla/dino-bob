@@ -34,6 +34,35 @@ var UI = (function () {
     };
   }
 
+  function previewCharacter(canvas, charId, opts, t) {
+    var c = canvas.getContext('2d');
+    canvas.width = 260; canvas.height = 220;
+    c.clearRect(0, 0, 260, 220);
+    ART.drawCharacter(c, charId, 130, 210, 1.3, Object.assign({ t: t || 1 }, opts || {}));
+  }
+
+  function previewArrow(canvas, arrow, t) {
+    var c = canvas.getContext('2d');
+    canvas.width = 260; canvas.height = 220;
+    c.clearRect(0, 0, 260, 220);
+    c.save();
+    c.translate(130, 110);
+    var pulse = wantsReducedMotion() ? 1 : 1 + Math.sin((t || 0) * 5) * 0.06;
+    c.scale(pulse, pulse);
+    c.rotate(-0.12);
+    c.globalAlpha = 0.35;
+    c.strokeStyle = arrow.tipColor || '#62e6ff';
+    c.lineWidth = 10;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(-86, 34);
+    c.lineTo(70, -34);
+    c.stroke();
+    c.globalAlpha = 1;
+    ART.drawArrow(c, 0, 0, -Math.PI / 5, arrow, 2.4, 1);
+    c.restore();
+  }
+
   /* ============ modal (double-confirm capable) ============ */
 
   function modal(text, onYes) {
@@ -679,6 +708,10 @@ var UI = (function () {
 
   var currentTab = 'characters';
   var confirmingId = null; // tap-twice-to-buy
+  var arcadePreviewId = null;
+  var arcadePreviewItem = null;
+  var arcadePreviewRaf = null;
+  var arcadePreviewT = 0;
 
   function renderArcade() {
     var p = SAVE.current();
@@ -686,10 +719,15 @@ var UI = (function () {
     var grid = $('arcade-grid');
     grid.innerHTML = '';
     confirmingId = null;
+    var items = [];
+    function addItem(item) {
+      items.push(item);
+      grid.appendChild(shopItem(item));
+    }
 
     if (currentTab === 'characters') {
       DATA.characters.forEach(function (ch) {
-        grid.appendChild(shopItem({
+        addItem({
           id: 'char_' + ch.id,
           name: ch.name,
           perk: ch.perkText,
@@ -697,13 +735,14 @@ var UI = (function () {
           owned: SAVE.owns('characters', ch.id),
           equipped: p.equipped.character === ch.id,
           draw: function (cv) { portrait(cv, ch.id); },
+          previewDraw: function (cv, t) { previewCharacter(cv, ch.id, { t: t }); },
           buy: function () { SAVE.unlock('characters', ch.id); SAVE.equip('character', ch.id); },
           equip: function () { SAVE.equip('character', ch.id); }
-        }));
+        });
       });
     } else if (currentTab === 'arrows') {
       DATA.arrows.forEach(function (a) {
-        grid.appendChild(shopItem({
+        addItem({
           id: 'arrow_' + a.id,
           name: a.name,
           perk: a.perkText,
@@ -715,14 +754,15 @@ var UI = (function () {
             cv.width = 150; cv.height = 160;
             ART.drawArrow(c, 75, 80, -Math.PI / 4, a, 1.7, 1);
           },
+          previewDraw: function (cv, t) { previewArrow(cv, a, t); },
           buy: function () { SAVE.unlock('arrows', a.id); SAVE.equip('arrow', a.id); },
           equip: function () { SAVE.equip('arrow', a.id); }
-        }));
+        });
       });
     } else {
       // skins: hats, then outfits, then shiny variants of owned characters
       DATA.hats.forEach(function (h) {
-        grid.appendChild(shopItem({
+        addItem({
           id: 'hat_' + h.id,
           name: h.name,
           perk: 'A stylish hat!',
@@ -734,13 +774,14 @@ var UI = (function () {
             cv.width = 150; cv.height = 160;
             ART.drawHat(c, h.id, 75, 105, 2.2);
           },
+          previewDraw: function (cv, t) { previewCharacter(cv, p.equipped.character, Object.assign(equippedOpts(p, t), { hat: h.id }), t); },
           buy: function () { SAVE.unlock('hats', h.id); SAVE.equip('hat', h.id); },
           equip: function () { SAVE.equip('hat', h.id); }
-        }));
+        });
       });
       DATA.outfits.forEach(function (o) {
         if (!o.swap) return; // classic is default, not sold
-        grid.appendChild(shopItem({
+        addItem({
           id: 'outfit_' + o.id,
           name: o.name,
           perk: 'A fresh new color!',
@@ -748,13 +789,14 @@ var UI = (function () {
           owned: SAVE.owns('outfits', o.id),
           equipped: p.equipped.outfit === o.id,
           draw: function (cv) { portrait(cv, p.equipped.character, { outfitColor: o.swap, outfitId: o.id }); },
+          previewDraw: function (cv, t) { previewCharacter(cv, p.equipped.character, { hat: p.equipped.hat, outfitColor: o.swap, outfitId: o.id, shiny: p.equipped.shiny, t: t }, t); },
           buy: function () { SAVE.unlock('outfits', o.id); SAVE.equip('outfit', o.id); },
           equip: function () { SAVE.equip('outfit', o.id); }
-        }));
+        });
       });
       p.unlocked.characters.forEach(function (chId) {
         var ch = DATA.characterById(chId);
-        grid.appendChild(shopItem({
+        addItem({
           id: 'shiny_' + chId,
           name: 'Shiny ' + ch.name,
           perk: '✨ Sparkles everywhere! ✨',
@@ -762,6 +804,7 @@ var UI = (function () {
           owned: SAVE.owns('shiny', chId),
           equipped: p.equipped.shiny && p.equipped.character === chId,
           draw: function (cv) { portrait(cv, chId, { shiny: true, t: 1.2 }); },
+          previewDraw: function (cv, t) { previewCharacter(cv, chId, { hat: p.equipped.hat, shiny: true, t: t }, t); },
           buy: function () {
             SAVE.unlock('shiny', chId);
             SAVE.equip('character', chId);
@@ -771,9 +814,69 @@ var UI = (function () {
             SAVE.equip('character', chId);
             SAVE.equip('shiny', true);
           }
-        }));
+        });
       });
     }
+    if (!items.some(function (item) { return item.id === arcadePreviewId; })) {
+      var equipped = items.find(function (item) { return item.equipped; });
+      arcadePreviewId = (equipped || items[0] || {}).id || null;
+    }
+    arcadePreviewItem = items.find(function (item) { return item.id === arcadePreviewId; }) || items[0] || null;
+    Array.from(grid.children).forEach(function (child, i) {
+      child.classList.toggle('selected', !!items[i] && items[i].id === arcadePreviewId);
+    });
+    renderArcadePreview();
+  }
+
+  function renderArcadePreview(t) {
+    var item = arcadePreviewItem;
+    var cv = $('arcade-preview-canvas');
+    var p = SAVE.current();
+    if (!item || !cv) return;
+    (item.previewDraw || item.draw)(cv, t || arcadePreviewT);
+    $('arcade-preview-kicker').textContent = item.equipped ? 'Equipped now' : (item.owned ? 'Unlocked reward' : 'Reward preview');
+    $('arcade-preview-name').textContent = item.name;
+    $('arcade-preview-perk').textContent = item.perk || 'Looks awesome in game.';
+    var status = $('arcade-preview-status');
+    status.className = 'arcade-preview-status';
+    if (item.equipped) {
+      status.classList.add('equipped');
+      status.textContent = '★ Equipped and ready to play';
+    } else if (item.owned) {
+      status.classList.add('owned');
+      status.textContent = 'Unlocked · tap EQUIP on the card';
+    } else if ((p.coins || 0) >= item.price) {
+      status.classList.add('can-buy');
+      status.textContent = 'Costs ' + item.price + ' coins · you can unlock it';
+    } else {
+      status.classList.add('need-coins');
+      status.textContent = 'Costs ' + item.price + ' coins · need ' + (item.price - (p.coins || 0)) + ' more';
+    }
+  }
+
+  function startArcadePreviewLoop() {
+    if (arcadePreviewRaf) return;
+    function loop() {
+      if ($('screen-arcade').classList.contains('hidden')) { arcadePreviewRaf = null; return; }
+      arcadePreviewT += 0.016;
+      renderArcadePreview(arcadePreviewT);
+      arcadePreviewRaf = requestAnimationFrame(loop);
+    }
+    arcadePreviewRaf = requestAnimationFrame(loop);
+  }
+
+  function celebrateArcadePreview() {
+    var panel = $('arcade-preview-panel');
+    var burst = $('arcade-preview-burst');
+    panel.classList.remove('celebrate');
+    burst.classList.remove('hidden');
+    // restart CSS animations
+    void panel.offsetWidth;
+    panel.classList.add('celebrate');
+    setTimeout(function () {
+      burst.classList.add('hidden');
+      panel.classList.remove('celebrate');
+    }, 1200);
   }
 
   function shopItem(item) {
@@ -781,7 +884,14 @@ var UI = (function () {
     var el = document.createElement('div');
     el.className = 'shop-item' +
       (item.owned ? ' owned' : ' locked') +
-      (item.equipped ? ' equipped' : '');
+      (item.equipped ? ' equipped' : '') +
+      (item.id === arcadePreviewId ? ' selected' : '');
+    el.onclick = function () {
+      arcadePreviewId = item.id;
+      arcadePreviewItem = item;
+      AUDIO.click();
+      renderArcade();
+    };
     var cv = document.createElement('canvas');
     el.appendChild(cv);
     item.draw(cv);
@@ -805,9 +915,11 @@ var UI = (function () {
     } else if (item.owned) {
       btn.classList.add('equip');
       btn.textContent = 'EQUIP';
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
         AUDIO.click();
         item.equip();
+        arcadePreviewId = item.id;
         renderArcade();
       };
     } else {
@@ -815,7 +927,11 @@ var UI = (function () {
       btn.classList.add('buy');
       if (!afford) btn.classList.add('cant');
       btn.textContent = '🪙 ' + item.price;
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        arcadePreviewId = item.id;
+        arcadePreviewItem = item;
+        renderArcadePreview();
         if (!afford) { AUDIO.nope(); return; }
         if (confirmingId !== item.id) {
           confirmingId = item.id;
@@ -831,9 +947,11 @@ var UI = (function () {
         // confirmed!
         if (SAVE.spend(item.price)) {
           item.buy();
+          arcadePreviewId = item.id;
           AUDIO.fanfare();
           fx.confetti();
           renderArcade();
+          celebrateArcadePreview();
         } else {
           AUDIO.nope();
         }
@@ -847,6 +965,7 @@ var UI = (function () {
     confirmingId = null;
     show('arcade');
     renderArcade();
+    startArcadePreviewLoop();
   }
 
   /* ============ closet ============ */
@@ -1163,6 +1282,7 @@ var UI = (function () {
         document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
         tab.classList.add('active');
         currentTab = tab.dataset.tab;
+        arcadePreviewId = null;
         renderArcade();
       };
     });

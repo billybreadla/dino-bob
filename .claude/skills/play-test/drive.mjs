@@ -131,6 +131,17 @@ try {
   check('quest claim pays out', claimBtns === 3 && coinsAfter > coinsBefore, 'claimable=' + claimBtns + ' coins ' + coinsBefore + '->' + coinsAfter);
   await click('btn-quests-back'); await sleep(300);
 
+  // arcade shop preview: panel renders with a real item, and the preview swaps
+  // when you change tabs.
+  await click('btn-arcade'); await sleep(600); await shot('07-arcade');
+  const arc1 = await page.evaluate(() => ({ panel: !!document.getElementById('arcade-preview-panel'), name: (document.getElementById('arcade-preview-name') || {}).textContent || '' }));
+  check('shop preview panel renders', arc1.panel && arc1.name.length > 0, JSON.stringify(arc1));
+  await page.evaluate(() => { const t = [...document.querySelectorAll('.tab')].find(x => x.dataset.tab === 'arrows'); if (t) t.click(); });
+  await sleep(500);
+  const arc2 = await page.evaluate(() => (document.getElementById('arcade-preview-name') || {}).textContent || '');
+  check('shop preview updates on tab switch', arc2.length > 0 && arc2 !== arc1.name, 'characters="' + arc1.name + '" arrows="' + arc2 + '"');
+  await click('btn-arcade-back'); await sleep(300);
+
   log('== Target Practice');
   await click('btn-play'); await sleep(300);
   await sleep(3600);
