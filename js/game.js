@@ -109,10 +109,13 @@ var GAME = (function () {
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function makeBullseye(kind) {
-    var r = rand(58, 78);
+    // Some targets stand far away in the distance: drawn small and hazy,
+    // sitting on distant ground, worth FAR_TARGET_MULTIPLIER extra points.
+    var far = kind !== 'swing' && Math.random() < (TUNING.FAR_TARGET_CHANCE || 0);
+    var r = far ? rand(36, 46) : rand(58, 78);
     var x = rand(750, 1480);
     var t = {
-      type: 'bullseye', r: r, hp: 1,
+      type: 'bullseye', r: r, hp: 1, far: far,
       wobble: 0, dead: false, frozenUntil: 0,
       motion: kind, // 'static' | 'slide' | 'swing'
       mt: rand(0, 10)
@@ -123,9 +126,17 @@ var GAME = (function () {
       t.amp = rand(0.5, 0.9) * (phase() === 3 ? 1.2 : 1);
       t.speed = rand(1.2, 1.8) * (phase() === 3 ? 1.5 : 1);
       t.x = t.anchor.x; t.y = t.anchor.y + t.len;
+    } else if (far) {
+      t.baseX = rand(880, 1500);
+      t.y = rand(470, 580);        // high on screen = far down the valley
+      t.x = t.baseX;
+      if (kind === 'slide') {
+        t.range = rand(55, 110);
+        t.speed = rand(1.2, 2.0) * (phase() === 3 ? 1.6 : 1);
+      }
     } else {
       t.baseX = x;
-      t.y = GROUND - r - rand(0, 220);
+      t.y = GROUND - r - rand(0, 150);
       t.x = x;
       if (kind === 'slide') {
         t.range = rand(90, 180);
@@ -199,7 +210,9 @@ var GAME = (function () {
     return {
       type: 'boss', bossId: st.rules.bossId || 'moonstone',
       dead: false, hp: def.hp, maxHp: def.hp, frozenUntil: 0,
-      x: W / 2 + 120, baseX: W / 2 + 120, y: 300,
+      // y puts the boss's feet on the ground so he stands in the scene
+      // instead of floating in the sky (art bottom lands near GROUND).
+      x: W / 2 + 120, baseX: W / 2 + 120, y: 620,
       r: 130, wobble: 0, mt: 0,
       motion: 'slide', range: 220, speed: 1.0
     };
@@ -407,6 +420,7 @@ var GAME = (function () {
     opts = opts || {};
     var mult = 1 + st.arrowType.scoreBonus;
     if (opts.moving) mult *= TUNING.MOVING_TARGET_MULTIPLIER;
+    if (opts.far) mult *= TUNING.FAR_TARGET_MULTIPLIER || 1;
     if (opts.bonusObj) mult *= 1 + (st.perk.bonusObjBonus || 0);
     mult *= st.comboMult;
     if (opts.half) mult *= 0.5;
@@ -560,9 +574,12 @@ var GAME = (function () {
       var d = Math.hypot(hit.x - t.x, hit.y - t.y) / t.r;
       var rings = TUNING.SCORE_BULLSEYE_RINGS;
       var base = d < 0.25 ? rings[0] : d < 0.5 ? rings[1] : d < 0.75 ? rings[2] : rings[3];
-      var pts = award(base, t.x, t.y - t.r - 10, { moving: moving });
+      var pts = award(base, t.x, t.y - t.r - 10, { moving: moving, far: !!t.far });
       t.dead = true;
       splinters(hit.x, hit.y);
+      if (t.far) {
+        st.floaters.push({ x: t.x, y: t.y - t.r - 34, vy: -60, life: 1.2, text: 'LONG SHOT!', big: true, color: '#8fdcff' });
+      }
       if (base === rings[0]) {
         st.stats.bullseyes++;
         st.cinematicUntil = reducedMotion() ? st.t : st.t + 0.34;
@@ -934,6 +951,63 @@ var GAME = (function () {
 
   /* ============ rendering ============ */
 
+  /* Per-biome scene light. Every sprite gets graded once (cached) with the
+     scene's ambient tint plus a top-light/ground-shade gradient, so objects
+     share the background's lighting instead of looking like stickers. */
+  var AMBIENT = {
+    bg_meadow:       { tint: '255,243,214', light: 'rgba(255,255,235,0.13)', shade: 'rgba(46,60,38,0.15)',  haze: '212,234,255' },
+    bg_mountain:     { tint: '224,237,255', light: 'rgba(255,255,255,0.13)', shade: 'rgba(38,52,74,0.17)',  haze: '224,240,255' },
+    bg_sunset_beach: { tint: '255,222,182', light: 'rgba(255,236,190,0.16)', shade: 'rgba(84,42,60,0.17)',  haze: '255,216,176' },
+    bg_starlight:    { tint: '202,210,255', light: 'rgba(216,228,255,0.14)', shade: 'rgba(20,24,64,0.21)',  haze: '178,192,255' },
+    bg_underwater:   { tint: '192,239,237', light: 'rgba(224,255,252,0.14)', shade: 'rgba(16,72,84,0.19)',  haze: '170,231,231' },
+    bg_moon_cave:    { tint: '206,195,255', light: 'rgba(218,206,255,0.14)', shade: 'rgba(24,16,56,0.22)',  haze: '162,152,230' }
+  };
+
+  function ambient() {
+    return AMBIENT[st.bgName] || AMBIENT.bg_meadow;
+  }
+
+  var gradeCache = {};
+  function gradedSprite(name) {
+    var img = SPRITES.get(name);
+    if (!img) return null;
+    var amb = ambient();
+    var key = st.bgName + '|' + name;
+    if (gradeCache[key]) return gradeCache[key];
+    var cv = document.createElement('canvas');
+    cv.width = img.naturalWidth;
+    cv.height = img.naturalHeight;
+    var c = cv.getContext('2d');
+    c.drawImage(img, 0, 0);
+    c.globalCompositeOperation = 'multiply';
+    c.fillStyle = 'rgba(' + amb.tint + ',0.45)';
+    c.fillRect(0, 0, cv.width, cv.height);
+    c.globalCompositeOperation = 'destination-in';
+    c.drawImage(img, 0, 0);   // multiply bleeds into transparent pixels; re-mask
+    c.globalCompositeOperation = 'source-atop';
+    var g = c.createLinearGradient(0, 0, 0, cv.height);
+    g.addColorStop(0, amb.light);
+    g.addColorStop(0.55, 'rgba(0,0,0,0)');
+    g.addColorStop(1, amb.shade);
+    c.fillStyle = g;
+    c.fillRect(0, 0, cv.width, cv.height);
+    c.globalCompositeOperation = 'source-over';
+    gradeCache[key] = cv;
+    return cv;
+  }
+
+  // A soft band of atmospheric haze where the painted background meets the
+  // play plane; separates the "stage" from the backdrop like distant fog.
+  function drawDepthHaze() {
+    var amb = ambient();
+    var g = ctx.createLinearGradient(0, GROUND - 330, 0, GROUND + 50);
+    g.addColorStop(0, 'rgba(' + amb.haze + ',0)');
+    g.addColorStop(0.72, 'rgba(' + amb.haze + ',0.13)');
+    g.addColorStop(1, 'rgba(' + amb.haze + ',0.02)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, GROUND - 330, W, 380);
+  }
+
   function drawBackground() {
     var bg = SPRITES.get(st.bgName) || SPRITES.get('bg_meadow');
     if (bg) {
@@ -1137,8 +1211,7 @@ var GAME = (function () {
     var color =
       t.type === 'golden' ? 'rgba(255,226,70,0.44)' :
       t.type === 'powerup' ? 'rgba(98,230,255,0.30)' :
-      t.type === 'chest' ? 'rgba(255,210,58,0.18)' :
-      t.type === 'bullseye' ? 'rgba(255,255,255,0.14)' : '';
+      t.type === 'chest' ? 'rgba(255,210,58,0.18)' : '';
     if (!color) return;
     ctx.save();
     ctx.globalAlpha = 0.9;
@@ -1150,15 +1223,30 @@ var GAME = (function () {
     ctx.restore();
   }
 
+  // Soft contact shadow under every object. It shrinks and fades the higher
+  // the object flies; this grounding is the strongest "3D" cue we have.
   function drawGroundShadow(t) {
-    if (t.type === 'balloon' || t.type === 'powerup') return;
-    var drop = Math.max(18, GROUND - t.y);
-    var alpha = Math.max(0.08, Math.min(0.26, 0.28 - drop / 2600));
-    var w = t.type === 'boss' ? t.r * 1.9 : t.r * 1.25;
-    var h = t.type === 'boss' ? 18 : 9;
+    // Far targets sit on distant terrain, so their shadow hugs their base
+    // instead of dropping all the way to the near ground line.
+    var local = t.type === 'bullseye' && t.far;
+    if (!local && t.y > GROUND + 10) return;
+    var groundY = local ? t.r * 1.18 + 8 : GROUND - t.y + 8;
+    var drop = local ? 24 : Math.max(0, GROUND - t.y);
+    var k = Math.max(0.2, 1 - drop / 950);
+    var base = t.type === 'boss' ? t.r * 1.7 :
+               (t.type === 'balloon' || t.type === 'powerup') ? t.r * 0.9 : t.r * 1.15;
+    var w = base * (0.5 + 0.5 * k) * (local ? 0.8 : 1);
+    var h = Math.max(5, w * 0.17);
+    var a = (t.type === 'boss' ? 0.26 : 0.3) * k + 0.05;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ART.ellipse(ctx, 0, GROUND - t.y + 8, w, h, 'rgba(23,21,22,1)');
+    ctx.translate(0, groundY);
+    ctx.scale(1, h / w);
+    var g = ctx.createRadialGradient(0, 0, w * 0.12, 0, 0, w);
+    g.addColorStop(0, 'rgba(20,16,20,' + a.toFixed(3) + ')');
+    g.addColorStop(0.6, 'rgba(20,16,20,' + (a * 0.5).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(20,16,20,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, w, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -1400,7 +1488,8 @@ var GAME = (function () {
   }
 
   function drawChest2p5D(t, cimg) {
-    var frameImg = SPRITES.get(chest3DFrame(t));
+    var frameName = chest3DFrame(t);
+    var frameImg = gradedSprite(frameName) || SPRITES.get(frameName);
     if (frameImg) cimg = frameImg;
     var cw = t.r * 3.05;
     var ch = cw * cimg.height / cimg.width;
@@ -1502,7 +1591,7 @@ var GAME = (function () {
     drawObjectAura(t);
 
     if (t.type === 'bullseye') {
-      var timg = SPRITES.get('target');
+      var timg = gradedSprite('target') || SPRITES.get('target');
       if (t.motion === 'swing') {
         // rope
         ctx.strokeStyle = '#8a5a2b';
@@ -1512,12 +1601,28 @@ var GAME = (function () {
         ctx.lineTo(t.anchor.x - (t.x + wob), t.anchor.y - t.y);
         ctx.stroke();
       } else {
-        ART.drawTargetStand(ctx, t.r, GROUND - t.y, timg);
+        // Far targets rest on distant terrain: short legs, not stilts to the
+        // near ground line.
+        ART.drawTargetStand(ctx, t.r, t.far ? t.r * 1.18 : GROUND - t.y, timg);
       }
       if (timg) {
         var tw = t.r * 2.15;
         var th = tw * timg.height / timg.width;
+        // a gentle horizontal breathe reads as the disc turning in space
+        var turn = reducedMotion() ? 0 : Math.sin(st.t * 1.1 + t.mt * 0.7) * 0.035;
+        ctx.save();
+        ctx.scale(1 + turn, 1);
         ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
+        ctx.restore();
+        if (t.far) {
+          // atmospheric veil: distant objects pick up the sky's haze color
+          var amb = ambient();
+          var hz = ctx.createRadialGradient(0, 0, t.r * 0.2, 0, 0, t.r * 1.4);
+          hz.addColorStop(0, 'rgba(' + amb.haze + ',0.18)');
+          hz.addColorStop(1, 'rgba(' + amb.haze + ',0)');
+          ctx.fillStyle = hz;
+          ctx.beginPath(); ctx.arc(0, 0, t.r * 1.4, 0, Math.PI * 2); ctx.fill();
+        }
       } else {
         var rings = [
           [1, '#f4ead2'], [0.78, '#2a2622'], [0.58, '#3aa0e8'], [0.38, '#e23b3b'], [0.2, '#ffd23a']
@@ -1525,7 +1630,7 @@ var GAME = (function () {
         rings.forEach(function (r) { ART.circle(ctx, 0, 0, t.r * r[0], r[1]); });
       }
     } else if (t.type === 'balloon') {
-      var bimg = SPRITES.get('balloon');
+      var bimg = gradedSprite('balloon') || SPRITES.get('balloon');
       if (bimg) {
         var bw = t.r * 2.3;
         var bh = bw * bimg.height / bimg.width;
@@ -1533,6 +1638,12 @@ var GAME = (function () {
         if (t.hue) ctx.filter = 'hue-rotate(' + t.hue + 'deg)';
         ctx.drawImage(bimg, -bw / 2, -bh * 0.42, bw, bh);
         ctx.filter = 'none';
+        // spherical light: white specular up-left, so the bulb reads round
+        var spec = ctx.createRadialGradient(-t.r * 0.34, -t.r * 0.4, 2, -t.r * 0.34, -t.r * 0.4, t.r * 0.85);
+        spec.addColorStop(0, 'rgba(255,255,255,0.32)');
+        spec.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = spec;
+        ctx.beginPath(); ctx.arc(0, -t.r * 0.05, t.r * 0.92, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.strokeStyle = 'rgba(0,0,0,0.3)';
         ctx.lineWidth = 2;
@@ -1549,7 +1660,7 @@ var GAME = (function () {
       }
     } else if (t.type === 'fruit') {
       ctx.rotate(t.mt * (t.spin || 1));
-      var fimg = SPRITES.get('fruit_' + t.kind);
+      var fimg = gradedSprite('fruit_' + t.kind) || SPRITES.get('fruit_' + t.kind);
       if (fimg) {
         var fw = t.r * 2.6;
         var fh = fw * fimg.height / fimg.width;
@@ -1592,10 +1703,17 @@ var GAME = (function () {
         ART.circle(ctx, 0, 0, t.r, '#ffd23a');
       }
     } else if (t.type === 'powerup') {
-      var col = t.kind === 'arrows' ? '#9fd636' : '#62e6ff';
+      var puColors = t.kind === 'arrows' ?
+        ['#d4f7a0', '#9fd636', '#527f18'] : ['#c4f2ff', '#62e6ff', '#1f7fa6'];
       ART.circle(ctx, 0, 0, t.r + 3, 'rgba(255,255,255,0.85)');
-      ART.circle(ctx, 0, 0, t.r, col);
-      ART.ellipse(ctx, -t.r * 0.3, -t.r * 0.35, t.r * 0.25, t.r * 0.32, 'rgba(255,255,255,0.5)');
+      // shaded like a sphere (lit up-left) instead of a flat sticker circle
+      var ball = ctx.createRadialGradient(-t.r * 0.32, -t.r * 0.36, 2, 0, 0, t.r * 1.05);
+      ball.addColorStop(0, puColors[0]);
+      ball.addColorStop(0.55, puColors[1]);
+      ball.addColorStop(1, puColors[2]);
+      ctx.fillStyle = ball;
+      ctx.beginPath(); ctx.arc(0, 0, t.r, 0, Math.PI * 2); ctx.fill();
+      ART.ellipse(ctx, -t.r * 0.32, -t.r * 0.4, t.r * 0.22, t.r * 0.28, 'rgba(255,255,255,0.55)');
       ctx.fillStyle = '#fff';
       ctx.font = '900 ' + Math.round(t.r * 1.0) + 'px Nunito, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1603,7 +1721,7 @@ var GAME = (function () {
     } else if (t.type === 'boss') {
       var bdef = STAGES.bossDef(t.bossId);
       var bossSprite = bossDamageSprite(bdef, t);
-      var bossImg = SPRITES.get(bossSprite) || SPRITES.get(bdef.sprite);
+      var bossImg = gradedSprite(bossSprite) || gradedSprite(bdef.sprite) || SPRITES.get(bossSprite) || SPRITES.get(bdef.sprite);
       var bossDraw = drawBoss2p5D(t, bdef, bossImg);
       if (!bossImg) {   // the Moonstone art already wears its crown
         ctx.font = Math.round(t.r * 0.7) + 'px sans-serif';
@@ -1617,7 +1735,7 @@ var GAME = (function () {
       ART.rr(ctx, hx, hy, hbw * Math.max(0, t.hp) / t.maxHp, 14, 7, '#ff4d6d');
     } else if (t.type === 'chest') {
       var cname = t.opened ? 'chest_open' : (t.hp === 1 ? 'chest_semi' : 'chest_closed');
-      var cimg = SPRITES.get(cname);
+      var cimg = gradedSprite(cname) || SPRITES.get(cname);
       if (cimg) {
         drawChest2p5D(t, cimg);
       } else {
@@ -1691,9 +1809,9 @@ var GAME = (function () {
     // hand pulls back as you aim harder. Characters without frames fall back to
     // the single static archer pose.
     var frame = !st.aiming ? 0 : (draw < 0.5 ? 1 : 2);
-    var poseImg = SPRITES.get('char_' + id + '_draw' + frame);
+    var poseImg = gradedSprite('char_' + id + '_draw' + frame);
     var hasFrames = !!poseImg;
-    if (!poseImg) poseImg = SPRITES.get('char_' + id + '_archer');
+    if (!poseImg) poseImg = gradedSprite('char_' + id + '_archer');
     // Lean back a touch while drawing, kick forward on release.
     var lean = -draw * 8 + recoil * 14;
     var liftY = draw * 2;
@@ -1704,6 +1822,19 @@ var GAME = (function () {
       var w = poseImg.width * (h / poseImg.height);
       var dx = bx - ARCHER_BOW_FX * w;
       var dy = by - ARCHER_BOW_FY * h;
+      // contact shadow at the feet grounds the archer in the scene
+      ctx.save();
+      var psx = dx + w * 0.48, psy = dy + h + 4;
+      var pg = ctx.createRadialGradient(psx, psy, 4, psx, psy, w * 0.42);
+      pg.addColorStop(0, 'rgba(20,16,20,0.30)');
+      pg.addColorStop(0.6, 'rgba(20,16,20,0.15)');
+      pg.addColorStop(1, 'rgba(20,16,20,0)');
+      ctx.translate(psx, psy);
+      ctx.scale(1, 0.16);
+      ctx.translate(-psx, -psy);
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.arc(psx, psy, w * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
       ctx.save();
       if (p.equipped.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.9)'; ctx.shadowBlur = 22; }
       ctx.drawImage(poseImg, dx, dy, w, h);
@@ -1852,11 +1983,23 @@ var GAME = (function () {
 
     drawBackground();
     drawStageAtmosphere();
+    drawDepthHaze();
     st.targets.forEach(drawTarget);
     drawBlackholes();
     drawBrokenArrows();
     drawAim();
     drawPlayer();
+
+    // flying arrows cast a small running shadow on the ground below them
+    st.arrows.forEach(function (a) {
+      if (a.dead || a.y >= GROUND) return;
+      var k = 1 - (GROUND - a.y) / 900;
+      if (k <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = 0.05 + 0.15 * k;
+      ART.ellipse(ctx, a.x, GROUND + 4, 14 + 16 * k, 4 + 2 * k, 'rgba(20,16,20,1)');
+      ctx.restore();
+    });
 
     // arrows in flight
     st.arrows.forEach(function (a) {

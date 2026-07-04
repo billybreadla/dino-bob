@@ -26,6 +26,11 @@ var TUNING = {
   SCORE_BOSS: 600,              // beating the boss target
   MOVING_TARGET_MULTIPLIER: 2,   // moving targets are worth 2x!
 
+  // ---------- FARAWAY TARGETS ----------
+  // Some targets appear far in the distance: smaller, hazier, harder to hit.
+  FAR_TARGET_CHANCE: 0.25,     // how often a target spawns far away (0 = never, 1 = always)
+  FAR_TARGET_MULTIPLIER: 2,    // faraway targets are tiny but worth 2x points!
+
   // ---------- COMBO ----------
   COMBO_STEP: 2,        // every 2 hits in a row bumps the multiplier
   COMBO_MAX: 5,         // biggest multiplier you can reach (x5)
