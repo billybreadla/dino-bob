@@ -31,12 +31,24 @@ var SPRITES = (function () {
     'char_dinobob_archer', 'char_ninja_archer', 'char_astronaut_archer',
     'char_robot_archer', 'char_bear_archer', 'char_trixie_archer',
     // Dino Bob draw-animation frames (string hand pulls back; 0 relaxed..2 full)
-    'char_dinobob_draw0', 'char_dinobob_draw1', 'char_dinobob_draw2'
+    'char_dinobob_draw0', 'char_dinobob_draw1', 'char_dinobob_draw2',
+    // V6 "Real Objects" art: easel stand, target turntable frames, rendered
+    // pickups, tumbling fruit frames, per-biome foreground strips (all WebP)
+    'target_stand',
+    'target_3d_0', 'target_3d_1', 'target_3d_2', 'target_3d_3', 'target_3d_4', 'target_3d_5',
+    'pickup_arrows', 'pickup_slowmo',
+    'fruit_apple_3d_0', 'fruit_apple_3d_1', 'fruit_apple_3d_2',
+    'fruit_apple_3d_3', 'fruit_apple_3d_4', 'fruit_apple_3d_5',
+    'fruit_watermelon_3d_0', 'fruit_watermelon_3d_1', 'fruit_watermelon_3d_2',
+    'fruit_watermelon_3d_3', 'fruit_watermelon_3d_4', 'fruit_watermelon_3d_5',
+    'fg_meadow', 'fg_mountain', 'fg_sunset_beach', 'fg_starlight', 'fg_underwater', 'fg_moon_cave'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,
     boss_moonstone: 1, boss_moonstone_cracked: 1, boss_moonstone_broken: 1,
     boss_moonstone_3d_0: 1, boss_moonstone_3d_1: 1, boss_moonstone_3d_2: 1, boss_moonstone_3d_3: 1, boss_moonstone_3d_4: 1, boss_moonstone_3d_5: 1 };
+  // every V6 asset shipped as WebP from day one
+  NAMES.slice(NAMES.indexOf('target_stand')).forEach(function (n) { WEBP[n] = 1; });
   var imgs = {};
   NAMES.forEach(function (n) {
     var im = new Image();

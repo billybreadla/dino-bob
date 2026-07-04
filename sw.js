@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v26-pause-trixie';
+var CACHE = 'dinobob-v27-v6-art';
 var FILES = [
   '.',
   'index.html',
@@ -124,6 +124,34 @@ var FILES = [
   'assets/sprites/char_robot_archer.png',
   'assets/sprites/char_bear_archer.png',
   'assets/sprites/char_trixie_archer.png',
+  // V6 'Real Objects' art (all WebP)
+  'assets/sprites/target_stand.webp',
+  'assets/sprites/target_3d_0.webp',
+  'assets/sprites/target_3d_1.webp',
+  'assets/sprites/target_3d_2.webp',
+  'assets/sprites/target_3d_3.webp',
+  'assets/sprites/target_3d_4.webp',
+  'assets/sprites/target_3d_5.webp',
+  'assets/sprites/pickup_arrows.webp',
+  'assets/sprites/pickup_slowmo.webp',
+  'assets/sprites/fruit_apple_3d_0.webp',
+  'assets/sprites/fruit_apple_3d_1.webp',
+  'assets/sprites/fruit_apple_3d_2.webp',
+  'assets/sprites/fruit_apple_3d_3.webp',
+  'assets/sprites/fruit_apple_3d_4.webp',
+  'assets/sprites/fruit_apple_3d_5.webp',
+  'assets/sprites/fruit_watermelon_3d_0.webp',
+  'assets/sprites/fruit_watermelon_3d_1.webp',
+  'assets/sprites/fruit_watermelon_3d_2.webp',
+  'assets/sprites/fruit_watermelon_3d_3.webp',
+  'assets/sprites/fruit_watermelon_3d_4.webp',
+  'assets/sprites/fruit_watermelon_3d_5.webp',
+  'assets/sprites/fg_meadow.webp',
+  'assets/sprites/fg_mountain.webp',
+  'assets/sprites/fg_sunset_beach.webp',
+  'assets/sprites/fg_starlight.webp',
+  'assets/sprites/fg_underwater.webp',
+  'assets/sprites/fg_moon_cave.webp',
   'assets/sprites/char_dinobob_draw0.png',
   'assets/sprites/char_dinobob_draw1.png',
   'assets/sprites/char_dinobob_draw2.png'

@@ -135,13 +135,17 @@ var GAME = (function () {
       t.baseX = rand(880, 1500);
       t.y = rand(470, 580);        // high on screen = far down the valley
       t.x = t.baseX;
+      t.standStyle = 'frames';
       if (kind === 'slide') {
         t.range = rand(55, 110);
         t.speed = rand(1.2, 2.0) * (phase() === 3 ? 1.6 : 1);
       }
     } else {
+      // Near targets stand ON the ground now (V6 art), on one of two stands:
+      // the turntable unit's own short legs, or the tall wooden easel.
+      t.standStyle = Math.random() < 0.4 ? 'easel' : 'frames';
       t.baseX = x;
-      t.y = GROUND - r - rand(0, 150);
+      t.y = t.standStyle === 'easel' ? GROUND - 1.88 * r : GROUND - 1.55 * r;
       t.x = x;
       if (kind === 'slide') {
         t.range = rand(90, 180);
@@ -1187,6 +1191,14 @@ var GAME = (function () {
   }
 
   function drawForegroundDepth() {
+    // V6 painted foreground strip for this biome: drawn in front of the
+    // action so grass/flowers/rocks occlude feet and low objects (depth cue)
+    var fg = SPRITES.get('fg_' + String(st.bgName || '').replace('bg_', ''));
+    if (fg) {
+      var fh = W * fg.height / fg.width;   // strips are 1600-wide masters
+      ctx.drawImage(fg, 0, H - fh, W, fh);
+      return;
+    }
     ctx.save();
     var g = ctx.createLinearGradient(0, GROUND - 12, 0, H);
     g.addColorStop(0, 'rgba(72,138,44,0)');
@@ -1599,6 +1611,25 @@ var GAME = (function () {
 
     if (t.type === 'bullseye') {
       var timg = gradedSprite('target') || SPRITES.get('target');
+      // plain disc (used for swing + easel styles, and as fallback)
+      var drawDisc = function () {
+        if (timg) {
+          var tw = t.r * 2.15;
+          var th = tw * timg.height / timg.width;
+          // a gentle horizontal breathe reads as the disc turning in space
+          var turn = reducedMotion() ? 0 : Math.sin(st.t * 1.1 + t.mt * 0.7) * 0.035;
+          ctx.save();
+          ctx.scale(1 + turn, 1);
+          ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
+          ctx.restore();
+        } else {
+          var rings = [
+            [1, '#f4ead2'], [0.78, '#2a2622'], [0.58, '#3aa0e8'], [0.38, '#e23b3b'], [0.2, '#ffd23a']
+          ];
+          rings.forEach(function (r) { ART.circle(ctx, 0, 0, t.r * r[0], r[1]); });
+        }
+      };
+
       if (t.motion === 'swing') {
         // rope
         ctx.strokeStyle = '#8a5a2b';
@@ -1607,34 +1638,41 @@ var GAME = (function () {
         ctx.moveTo(0, -t.r);
         ctx.lineTo(t.anchor.x - (t.x + wob), t.anchor.y - t.y);
         ctx.stroke();
-      } else {
-        // Far targets rest on distant terrain: short legs, not stilts to the
-        // near ground line.
-        ART.drawTargetStand(ctx, t.r, t.far ? t.r * 1.18 : GROUND - t.y, timg);
-      }
-      if (timg) {
-        var tw = t.r * 2.15;
-        var th = tw * timg.height / timg.width;
-        // a gentle horizontal breathe reads as the disc turning in space
-        var turn = reducedMotion() ? 0 : Math.sin(st.t * 1.1 + t.mt * 0.7) * 0.035;
-        ctx.save();
-        ctx.scale(1 + turn, 1);
-        ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
-        ctx.restore();
-        if (t.far) {
-          // atmospheric veil: distant objects pick up the sky's haze color
-          var amb = ambient();
-          var hz = ctx.createRadialGradient(0, 0, t.r * 0.2, 0, 0, t.r * 1.4);
-          hz.addColorStop(0, 'rgba(' + amb.haze + ',0.18)');
-          hz.addColorStop(1, 'rgba(' + amb.haze + ',0)');
-          ctx.fillStyle = hz;
-          ctx.beginPath(); ctx.arc(0, 0, t.r * 1.4, 0, Math.PI * 2); ctx.fill();
+        drawDisc();
+      } else if (t.standStyle === 'easel' && !t.far) {
+        // tall wooden easel (V6 art), feet on the ground, disc resting on it
+        var easel = gradedSprite('target_stand') || SPRITES.get('target_stand');
+        if (easel) {
+          var ew = t.r * 2.5, eh = ew * easel.height / easel.width;
+          ctx.drawImage(easel, -ew / 2, GROUND - t.y - eh, ew, eh);
+        } else {
+          ART.drawTargetStand(ctx, t.r, GROUND - t.y, timg);
         }
+        drawDisc();
       } else {
-        var rings = [
-          [1, '#f4ead2'], [0.78, '#2a2622'], [0.58, '#3aa0e8'], [0.38, '#e23b3b'], [0.2, '#ffd23a']
-        ];
-        rings.forEach(function (r) { ART.circle(ctx, 0, 0, t.r * r[0], r[1]); });
+        // self-standing turntable unit (V6 art): the frames gently turn in 3D.
+        // Disc center in the frame art sits ~41% down; pin that to the hitbox.
+        // Only frames 0-3: past that the painted disc drifts off the true
+        // hit center and ring scoring would feel unfair.
+        var fi = reducedMotion() ? 0 : Math.round((Math.sin(st.t * 0.8 + (t.mt || 0)) * 0.5 + 0.5) * 3);
+        var unit = gradedSprite('target_3d_' + fi) || SPRITES.get('target_3d_' + fi);
+        if (unit) {
+          var uw = t.r * 2.85, uh = uw * unit.height / unit.width;
+          ctx.drawImage(unit, -uw / 2, -uh * 0.41, uw, uh);
+        } else {
+          ART.drawTargetStand(ctx, t.r, t.far ? t.r * 1.18 : GROUND - t.y, timg);
+          drawDisc();
+        }
+      }
+
+      if (t.far) {
+        // atmospheric veil: distant objects pick up the sky's haze color
+        var amb = ambient();
+        var hz = ctx.createRadialGradient(0, 0, t.r * 0.2, 0, 0, t.r * 1.4);
+        hz.addColorStop(0, 'rgba(' + amb.haze + ',0.18)');
+        hz.addColorStop(1, 'rgba(' + amb.haze + ',0)');
+        ctx.fillStyle = hz;
+        ctx.beginPath(); ctx.arc(0, 0, t.r * 1.4, 0, Math.PI * 2); ctx.fill();
       }
     } else if (t.type === 'balloon') {
       var bimg = gradedSprite('balloon') || SPRITES.get('balloon');
@@ -1666,9 +1704,25 @@ var GAME = (function () {
         ctx.closePath(); ctx.fill();
       }
     } else if (t.type === 'fruit') {
-      ctx.rotate(t.mt * (t.spin || 1));
-      var fimg = gradedSprite('fruit_' + t.kind) || SPRITES.get('fruit_' + t.kind);
-      if (fimg) {
+      // apple + watermelon have V6 tumble frames (real 3D turnaround);
+      // the frames do the spinning, so only a light sway on top
+      var f3d = null;
+      if (t.kind === 'apple' || t.kind === 'watermelon') {
+        var ffi = reducedMotion() ? 0 : Math.floor((t.mt || 0) * 7) % 6;
+        f3d = gradedSprite('fruit_' + t.kind + '_3d_' + ffi) || SPRITES.get('fruit_' + t.kind + '_3d_' + ffi);
+      }
+      var fimg = null;
+      if (f3d) {
+        if (!reducedMotion()) ctx.rotate(Math.sin((t.mt || 0) * 2.2) * 0.22 * (t.spin >= 0 ? 1 : -1));
+        var f3w = t.r * 2.9, f3h = f3w * f3d.height / f3d.width;
+        ctx.drawImage(f3d, -f3w / 2, -f3h / 2, f3w, f3h);
+      } else {
+        ctx.rotate(t.mt * (t.spin || 1));
+        fimg = gradedSprite('fruit_' + t.kind) || SPRITES.get('fruit_' + t.kind);
+      }
+      if (f3d) {
+        // drawn above
+      } else if (fimg) {
         var fw = t.r * 2.6;
         var fh = fw * fimg.height / fimg.width;
         ctx.drawImage(fimg, -fw / 2, -fh / 2, fw, fh);
@@ -1710,6 +1764,19 @@ var GAME = (function () {
         ART.circle(ctx, 0, 0, t.r, '#ffd23a');
       }
     } else if (t.type === 'powerup') {
+      var pimg = gradedSprite(t.kind === 'arrows' ? 'pickup_arrows' : 'pickup_slowmo') ||
+                 SPRITES.get(t.kind === 'arrows' ? 'pickup_arrows' : 'pickup_slowmo');
+      if (pimg) {
+        // rendered pickup art (V6); it carries its own glow
+        var pw = t.r * 2.5, ph = pw * pimg.height / pimg.width;
+        var ppulse = reducedMotion() ? 1 : 1 + Math.sin(st.t * 4 + (t.mt || 0)) * 0.05;
+        ctx.save();
+        ctx.scale(ppulse, ppulse);
+        ctx.drawImage(pimg, -pw / 2, -ph / 2, pw, ph);
+        ctx.restore();
+        ctx.restore();
+        return;
+      }
       var puColors = t.kind === 'arrows' ?
         ['#d4f7a0', '#9fd636', '#527f18'] : ['#c4f2ff', '#62e6ff', '#1f7fa6'];
       ART.circle(ctx, 0, 0, t.r + 3, 'rgba(255,255,255,0.85)');
