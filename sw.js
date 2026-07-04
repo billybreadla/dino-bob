@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v25-depth-light';
+var CACHE = 'dinobob-v26-pause-trixie';
 var FILES = [
   '.',
   'index.html',

@@ -9,6 +9,11 @@ var GAME = (function () {
 
   var canvas, ctx, raf = null, onEnd = null;
   var running = false;
+  var paused = false;
+  var visWired = false;
+  // pause button sits between the timer and the arrow counter
+  var PAUSE_BTN = { x: W / 2 + 130, y: 24, w: 56, h: 56 };
+  var RESUME_R = 74;    // radius of the big resume button on the pause overlay
 
   var st = null;  // per-round state
 
@@ -737,7 +742,8 @@ var GAME = (function () {
       ninja: ['SHADOW SHOT!', '#ff5f5f'],
       astronaut: ['TO THE MOON!', '#8fdcff'],
       robot: ['CALCULATED!', '#62e6ff'],
-      bear: ['BEAR-Y NICE!', '#ffd23a']
+      bear: ['BEAR-Y NICE!', '#ffd23a'],
+      trixie: ['TA-DA!', '#ff8ad4']
     };
     var m = moments[st.char.id] || moments.dinobob;
     st.floaters.push({ x: x, y: y, vy: -55, life: 1.15, text: m[0], big: true, color: m[1] });
@@ -749,6 +755,7 @@ var GAME = (function () {
       snow(x, y + 45);
     }
     if (st.char.id === 'ninja') { st.arrowsLeft++; flame(x, y + 45); }
+    if (st.char.id === 'trixie') { st.targets.push(makeFruit()); ring(x, y + 40, '#ff8ad4'); }
   }
 
   /* ============ particles ============ */
@@ -1953,6 +1960,22 @@ var GAME = (function () {
       ctx.fillText(st.rules.label, W / 2, 108);
     }
 
+    // pause button — right of the timer
+    if (st.countdown <= 0 && !st.over) {
+      hudPanel(PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h);
+      ctx.fillStyle = '#fff';
+      if (paused) {
+        ctx.beginPath();
+        ctx.moveTo(PAUSE_BTN.x + 22, PAUSE_BTN.y + 16);
+        ctx.lineTo(PAUSE_BTN.x + 42, PAUSE_BTN.y + 28);
+        ctx.lineTo(PAUSE_BTN.x + 22, PAUSE_BTN.y + 40);
+        ctx.closePath(); ctx.fill();
+      } else {
+        ART.rr(ctx, PAUSE_BTN.x + 18, PAUSE_BTN.y + 15, 7, 26, 3, '#fff');
+        ART.rr(ctx, PAUSE_BTN.x + 31, PAUSE_BTN.y + 15, 7, 26, 3, '#fff');
+      }
+    }
+
     // arrows — top right
     hudPanel(W - 218, 24, 190, 52);
     ART.drawArrow(ctx, W - 168, 50, -0.5, st.arrowType, 0.62, st.t);
@@ -2072,6 +2095,35 @@ var GAME = (function () {
       ctx.restore();
     }
 
+    // pause overlay
+    if (paused) {
+      ctx.fillStyle = 'rgba(20,18,28,0.55)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ffd23a';
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 10;
+      ctx.font = '900 120px Lilita One, Nunito, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('PAUSED', W / 2, H / 2 - 110);
+      ctx.fillText('PAUSED', W / 2, H / 2 - 110);
+      // big friendly resume button
+      var ry = H / 2 + 70;
+      ctx.beginPath(); ctx.arc(W / 2, ry, RESUME_R + 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(W / 2, ry, RESUME_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#3d964c'; ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 20, ry - 32);
+      ctx.lineTo(W / 2 + 34, ry);
+      ctx.lineTo(W / 2 - 20, ry + 32);
+      ctx.closePath(); ctx.fill();
+      ctx.font = '800 26px Nunito, sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText('Tap to keep playing!', W / 2, ry + RESUME_R + 46);
+    }
+
     // "TIME'S UP"
     if (st.over) {
       ctx.fillStyle = 'rgba(20,18,28,' + Math.min(0.5, st.overTimer) + ')';
@@ -2094,7 +2146,7 @@ var GAME = (function () {
     if (!running) return;
     var dt = Math.min(0.033, (now - (frame.last || now)) / 1000);
     frame.last = now;
-    update(dt);
+    if (!paused) update(dt);   // frozen world still renders (pause overlay)
     render();
     raf = requestAnimationFrame(frame);
   }
@@ -2121,9 +2173,28 @@ var GAME = (function () {
   function onDown(e) {
     e.preventDefault();
     AUDIO.unlock();
-    if (!st || st.over || st.countdown > 0 || st.arrowsLeft <= 0) return;
+    if (!st || st.over || st.countdown > 0) return;
+    var pt = worldPoint(e);
+    if (paused) {
+      // only the big ▶ (or the HUD button) resumes; swallow all other taps
+      if (Math.hypot(pt.x - W / 2, pt.y - (H / 2 + 70)) < RESUME_R + 30 ||
+          (pt.x >= PAUSE_BTN.x && pt.x <= PAUSE_BTN.x + PAUSE_BTN.w &&
+           pt.y >= PAUSE_BTN.y && pt.y <= PAUSE_BTN.y + PAUSE_BTN.h)) {
+        paused = false;
+        AUDIO.click();
+      }
+      return;
+    }
+    if (pt.x >= PAUSE_BTN.x && pt.x <= PAUSE_BTN.x + PAUSE_BTN.w &&
+        pt.y >= PAUSE_BTN.y && pt.y <= PAUSE_BTN.y + PAUSE_BTN.h) {
+      paused = true;
+      st.aiming = false;
+      AUDIO.click();
+      return;
+    }
+    if (st.arrowsLeft <= 0) return;
     st.aiming = true;
-    aimFrom(worldPoint(e));
+    aimFrom(pt);
   }
   function onMove(e) {
     if (!st || !st.aiming) return;
@@ -2147,7 +2218,16 @@ var GAME = (function () {
       onEnd = endCb;
       st = newRound(options);
       running = true;
+      paused = false;
       frame.last = undefined;
+
+      // auto-pause when the iPad switches apps or the tab is hidden
+      if (!visWired) {
+        visWired = true;
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden && running && st && !st.over && st.countdown <= 0) paused = true;
+        });
+      }
 
       canvas.onmousedown = onDown;
       canvas.onmousemove = onMove;
@@ -2165,6 +2245,10 @@ var GAME = (function () {
       window.onmouseup = null;
     },
     isRunning: function () { return running; },
+    togglePause: function () {
+      if (running && st && !st.over && st.countdown <= 0) paused = !paused;
+      return paused;
+    },
     // Inert accessors for automated tests; safe to ignore in normal play.
     debugState: function () { return st; },
     debugStep: function (dt) { if (running && st) { update(dt); render(); } }

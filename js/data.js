@@ -43,7 +43,7 @@ var DATA = {
       id: 'trixie',
       get name() { return TUNING.NAME_TRIXIE; },
       get price() { return TUNING.PRICE_CHARACTER; },
-      perkText: '+15% points on fruit and balloons',
+      perkText: '+15% fruit & balloon points \u00b7 bullseyes toss up a bonus fruit',
       perk: { bonusObjBonus: 0.15 }
     }
   ],
