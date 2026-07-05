@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v27-v6-art';
+var CACHE = 'dinobob-v28-pause-trixie';
 var FILES = [
   '.',
   'index.html',
@@ -140,6 +140,12 @@ var FILES = [
   'assets/sprites/fruit_apple_3d_3.webp',
   'assets/sprites/fruit_apple_3d_4.webp',
   'assets/sprites/fruit_apple_3d_5.webp',
+  'assets/sprites/fruit_banana_3d_0.webp',
+  'assets/sprites/fruit_banana_3d_1.webp',
+  'assets/sprites/fruit_banana_3d_2.webp',
+  'assets/sprites/fruit_banana_3d_3.webp',
+  'assets/sprites/fruit_banana_3d_4.webp',
+  'assets/sprites/fruit_banana_3d_5.webp',
   'assets/sprites/fruit_watermelon_3d_0.webp',
   'assets/sprites/fruit_watermelon_3d_1.webp',
   'assets/sprites/fruit_watermelon_3d_2.webp',

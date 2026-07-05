@@ -39,6 +39,8 @@ var SPRITES = (function () {
     'pickup_arrows', 'pickup_slowmo',
     'fruit_apple_3d_0', 'fruit_apple_3d_1', 'fruit_apple_3d_2',
     'fruit_apple_3d_3', 'fruit_apple_3d_4', 'fruit_apple_3d_5',
+    'fruit_banana_3d_0', 'fruit_banana_3d_1', 'fruit_banana_3d_2',
+    'fruit_banana_3d_3', 'fruit_banana_3d_4', 'fruit_banana_3d_5',
     'fruit_watermelon_3d_0', 'fruit_watermelon_3d_1', 'fruit_watermelon_3d_2',
     'fruit_watermelon_3d_3', 'fruit_watermelon_3d_4', 'fruit_watermelon_3d_5',
     'fg_meadow', 'fg_mountain', 'fg_sunset_beach', 'fg_starlight', 'fg_underwater', 'fg_moon_cave'

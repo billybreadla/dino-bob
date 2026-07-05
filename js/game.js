@@ -17,6 +17,32 @@ var GAME = (function () {
 
   var st = null;  // per-round state
 
+  function requestFrame() {
+    if (!raf && running && !paused) raf = requestAnimationFrame(frame);
+  }
+
+  function cancelFrame() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = null;
+  }
+
+  function setPaused(next) {
+    next = !!next;
+    if (!running || !st || st.over) return paused;
+    if (paused === next) return paused;
+    paused = next;
+    st.aiming = false;
+    frame.last = undefined; // resume from a clean timestamp so physics never jumps
+    if (paused) {
+      cancelFrame();
+      render(); // draw the frozen frame + overlay once; no RAF churn while paused
+    } else {
+      AUDIO.click();
+      requestFrame();
+    }
+    return paused;
+  }
+
   /* ============ round setup ============ */
 
   function newRound(options) {
@@ -178,6 +204,23 @@ var GAME = (function () {
       r: 30, spin: rand(-3, 3),
       kind: kind,
       value: TUNING.FRUIT_VALUES[kind]
+    };
+  }
+
+  function makeBonusFruit(x, y) {
+    var kind = pick(Object.keys(TUNING.FRUIT_VALUES));
+    return {
+      type: 'fruit', dead: false, hp: 1, frozenUntil: 0,
+      // Trixie's bullseye perk should visibly toss fruit from the trick shot,
+      // not call the normal random ground spawner.
+      x: x + rand(-40, 40),
+      y: Math.max(130, y + 35),
+      vx: rand(-130, 130),
+      vy: -rand(520, 700),
+      r: 30, spin: rand(-3, 3),
+      kind: kind,
+      value: TUNING.FRUIT_VALUES[kind],
+      bonusFruit: true
     };
   }
 
@@ -759,7 +802,10 @@ var GAME = (function () {
       snow(x, y + 45);
     }
     if (st.char.id === 'ninja') { st.arrowsLeft++; flame(x, y + 45); }
-    if (st.char.id === 'trixie') { st.targets.push(makeFruit()); ring(x, y + 40, '#ff8ad4'); }
+    if (st.char.id === 'trixie') {
+      st.targets.push(makeBonusFruit(x, y + 40));
+      ring(x, y + 40, '#ff8ad4');
+    }
   }
 
   /* ============ particles ============ */
@@ -2166,6 +2212,8 @@ var GAME = (function () {
     if (paused) {
       ctx.fillStyle = 'rgba(20,18,28,0.55)';
       ctx.fillRect(0, 0, W, H);
+      ART.rr(ctx, W / 2 - 270, H / 2 - 210, 540, 420, 34, 'rgba(34,31,50,0.88)');
+      ART.rr(ctx, W / 2 - 246, H / 2 - 186, 492, 372, 26, 'rgba(255,255,255,0.08)');
       ctx.fillStyle = '#ffd23a';
       ctx.strokeStyle = 'rgba(0,0,0,0.55)';
       ctx.lineWidth = 10;
@@ -2211,11 +2259,13 @@ var GAME = (function () {
 
   function frame(now) {
     if (!running) return;
+    raf = null;
+    if (paused) return;
     var dt = Math.min(0.033, (now - (frame.last || now)) / 1000);
     frame.last = now;
-    if (!paused) update(dt);   // frozen world still renders (pause overlay)
+    update(dt);
     render();
-    raf = requestAnimationFrame(frame);
+    requestFrame();
   }
 
   /* ============ input ============ */
@@ -2240,22 +2290,21 @@ var GAME = (function () {
   function onDown(e) {
     e.preventDefault();
     AUDIO.unlock();
-    if (!st || st.over || st.countdown > 0) return;
+    if (!st || st.over) return;
     var pt = worldPoint(e);
     if (paused) {
       // only the big ▶ (or the HUD button) resumes; swallow all other taps
       if (Math.hypot(pt.x - W / 2, pt.y - (H / 2 + 70)) < RESUME_R + 30 ||
           (pt.x >= PAUSE_BTN.x && pt.x <= PAUSE_BTN.x + PAUSE_BTN.w &&
            pt.y >= PAUSE_BTN.y && pt.y <= PAUSE_BTN.y + PAUSE_BTN.h)) {
-        paused = false;
-        AUDIO.click();
+        setPaused(false);
       }
       return;
     }
+    if (st.countdown > 0) return;
     if (pt.x >= PAUSE_BTN.x && pt.x <= PAUSE_BTN.x + PAUSE_BTN.w &&
         pt.y >= PAUSE_BTN.y && pt.y <= PAUSE_BTN.y + PAUSE_BTN.h) {
-      paused = true;
-      st.aiming = false;
+      setPaused(true);
       AUDIO.click();
       return;
     }
@@ -2286,13 +2335,17 @@ var GAME = (function () {
       st = newRound(options);
       running = true;
       paused = false;
+      cancelFrame();
       frame.last = undefined;
 
       // auto-pause when the iPad switches apps or the tab is hidden
       if (!visWired) {
         visWired = true;
         document.addEventListener('visibilitychange', function () {
-          if (document.hidden && running && st && !st.over && st.countdown <= 0) paused = true;
+          if (document.hidden && running && st && !st.over) setPaused(true);
+        });
+        window.addEventListener('blur', function () {
+          if (running && st && !st.over) setPaused(true);
         });
       }
 
@@ -2303,21 +2356,21 @@ var GAME = (function () {
       canvas.ontouchmove = onMove;
       canvas.ontouchend = onUp;
 
-      raf = requestAnimationFrame(frame);
+      requestFrame();
     },
     stop: function () {
       running = false;
-      if (raf) cancelAnimationFrame(raf);
-      raf = null;
+      cancelFrame();
       window.onmouseup = null;
     },
     isRunning: function () { return running; },
     togglePause: function () {
-      if (running && st && !st.over && st.countdown <= 0) paused = !paused;
+      if (running && st && !st.over) return setPaused(!paused);
       return paused;
     },
     // Inert accessors for automated tests; safe to ignore in normal play.
     debugState: function () { return st; },
+    // Bypasses pause intentionally so tests can advance a frozen scene by hand.
     debugStep: function (dt) { if (running && st) { update(dt); render(); } }
   };
 })();
