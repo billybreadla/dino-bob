@@ -38,6 +38,7 @@
   <symbol id="icon-family" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.4-4.2 2.2-6.3 5.5-6.3s5.1 2.1 5.5 6.3M13.5 15c1-.8 2.1-1.2 3.5-1.2 2.7 0 4.2 1.8 4.5 5.2"/></symbol>
   <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.1M12 18.3v3.1M21.4 12h-3.1M5.7 12H2.6M18.6 5.4l-2.2 2.2M7.6 16.4l-2.2 2.2M18.6 18.6l-2.2-2.2M7.6 7.6 5.4 5.4"/></symbol>
   <symbol id="icon-quests" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4V20.5H6z"/><path d="M14.5 3.5v4h4"/><path d="M8.5 12l1.5 1.5 3-3M9 17h6"/></symbol>
+  <symbol id="icon-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="17.5" cy="5.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/><path d="m8.3 10.8 6.9-4m-6.9 6.4 6.9 4"/></symbol>
 </svg>
 
 <!-- ===================== INTRO (Dino Bob's Opening Adventure) ===================== -->
@@ -74,6 +75,7 @@
     <button id="btn-title-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY</span></button>
   </div>
   <p class="credit">designed by Penny · built with Claude</p>
+  <button id="btn-version" class="version-pill" title="What's New" aria-label="What's New">v29</button>
 </section>
 
 <!-- ===================== PROFILES ===================== -->
@@ -101,6 +103,11 @@
   <canvas id="home-hero" width="420" height="430"></canvas>
   <div class="chip perk-chip" id="home-perk">—</div>
   <button id="btn-quests" class="quest-banner"><svg class="game-icon"><use href="#icon-quests"/></svg><span>Daily Quests</span><span id="home-quests-badge" class="quest-badge hidden">0</span></button>
+  <!-- Daily family challenge: one shared layout per day for the whole device -->
+  <button id="btn-daily" class="daily-banner">
+    <svg class="game-icon"><use href="#icon-target"/></svg><span>DAILY CHALLENGE</span>
+    <span class="daily-best-chip">TODAY'S BEST: <b id="home-daily-best">—</b></span>
+  </button>
   <div class="home-buttons">
     <button id="btn-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-target"/></svg><span>TARGET PRACTICE</span></button>
     <button id="btn-adventure" class="btn btn-big btn-orange"><svg class="game-icon"><use href="#icon-map"/></svg><span>ADVENTURE</span></button>
@@ -144,7 +151,50 @@
     <label><span>Scenery</span><select id="challenge-bg"><option value="random">Surprise me</option><option value="bg_meadow">Enchanted Forest</option><option value="bg_sunset_beach">Sunset Beach</option><option value="bg_mountain">Mountain Kingdom</option><option value="bg_starlight">Starlight Ridge</option><option value="bg_underwater">Bubble Reef</option><option value="cave">Moon Cave</option></select></label>
     <label><span>Special rule</span><select id="challenge-rule"><option value="normal">Everything</option><option value="balloons">Balloon party</option><option value="fruit">Fruit frenzy</option><option value="boss">Boss battle</option></select></label>
   </div>
+  <div class="share-row">
+    <button id="btn-challenge-share" class="btn btn-blue"><svg class="game-icon"><use href="#icon-share"/></svg><span>COPY SHARE LINK</span></button>
+    <span id="challenge-share-msg" class="share-msg hidden">Link copied!</span>
+  </div>
   <button id="btn-challenge-start" class="btn btn-big btn-pink"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY MY CHALLENGE</span></button>
+  <button id="btn-workshop" class="btn btn-big btn-purple"><svg class="game-icon"><use href="#icon-wand"/></svg><span>BOSS WORKSHOP</span></button>
+</section>
+
+<!-- ===================== PENNY'S BOSS WORKSHOP ===================== -->
+<section id="screen-workshop" class="screen maker-bg hidden">
+  <div class="mode-top">
+    <button id="btn-workshop-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <h2 class="panel-header"><svg class="game-icon"><use href="#icon-target"/></svg><span>PENNY'S BOSS WORKSHOP</span></h2>
+    <span class="chip">DESIGNER ZONE</span>
+  </div>
+  <div class="workshop-grid mode-card">
+    <canvas id="boss-preview" width="360" height="290"></canvas>
+    <div class="workshop-controls">
+      <label><span>Name</span><input id="boss-name" type="text" maxlength="16" value="Penny's Boss" autocomplete="off"></label>
+      <label><span>Color <b id="boss-hue-swatch" class="hue-swatch"></b></span><input id="boss-hue" type="range" min="0" max="360" step="10" value="0"></label>
+      <label><span>Size <b id="boss-size-value">Big</b></span><input id="boss-size" type="range" min="1.6" max="3.2" step="0.1" value="2.5"></label>
+      <div class="workshop-stepper"><span>Toughness</span>
+        <div class="stepper-row">
+          <button id="boss-hp-minus" class="btn btn-ghost stepper-btn" type="button">−</button>
+          <b id="boss-hp-value">6</b>
+          <button id="boss-hp-plus" class="btn btn-ghost stepper-btn" type="button">+</button>
+        </div>
+      </div>
+      <div><span class="workshop-choice-label">Weak spot</span>
+        <div class="seg-row" id="boss-weak-row">
+          <button class="btn seg-btn" data-weak="top" type="button">TOP</button>
+          <button class="btn seg-btn selected" data-weak="mid" type="button">MIDDLE</button>
+          <button class="btn seg-btn" data-weak="low" type="button">LOW</button>
+        </div>
+      </div>
+      <label><span>Wobble <b id="boss-wobble-value">Classic</b></span><input id="boss-wobble" type="range" min="0" max="100" step="5" value="50"></label>
+    </div>
+  </div>
+  <div class="results-buttons workshop-actions">
+    <button id="btn-workshop-save" class="btn btn-blue"><span>💾 SAVE MY BOSS</span></button>
+    <button id="btn-workshop-fight" class="btn btn-big btn-pink"><svg class="game-icon"><use href="#icon-play"/></svg><span>FIGHT!</span></button>
+  </div>
+  <h3 class="workshop-saved-title">MY BOSS SHELF</h3>
+  <div id="workshop-saved" class="workshop-saved"></div>
 </section>
 
 <!-- ===================== TWO PLAYER FAMILY MODE ===================== -->
@@ -180,6 +230,8 @@
     <canvas id="results-character" width="170" height="150"></canvas>
     <p id="results-quip" class="results-quip"></p>
     <div id="results-highscore" class="highscore-banner hidden">🎆 NEW HIGH SCORE! 🎆</div>
+    <div id="results-daily" class="highscore-banner daily-record-banner hidden">🏆 NEW FAMILY RECORD!</div>
+    <p id="results-context" class="results-context hidden"></p>
     <div id="results-adventure-row" class="adventure-result hidden">
       <div id="results-adventure-stars" class="adventure-result-stars">★ ★ ★</div>
       <div id="results-adventure-text" class="adventure-result-text">Adventure reward</div>
@@ -291,8 +343,18 @@
   </div>
 </div>
 
+<!-- what's new (Ship Day notes written by Penny) -->
+<div id="whats-new" class="modal hidden">
+  <div class="modal-card whatsnew-card">
+    <h2 class="panel-header">WHAT'S NEW</h2>
+    <div id="whats-new-list" class="whatsnew-list"></div>
+    <button id="whats-new-close" class="btn btn-green">CLOSE</button>
+  </div>
+</div>
+
 <script src="js/tuning.js"></script>
 <script src="js/data.js"></script>
+<script src="js/changelog.js"></script>
 <script src="js/save.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/sprites.js"></script>

@@ -11,14 +11,36 @@ var GAME = (function () {
   var running = false;
   var paused = false;
   var visWired = false;
+  var keysWired = false;
+  // ---- Photo Mode ---- lives on top of pause: world stays frozen, but the
+  // rAF loop keeps running so pan/zoom redraw every frame.
+  var photoMode = false;
+  var photoPan = { x: 0, y: 0 };
+  var photoZoomIdx = 0;
+  var photoDragLast = null;       // pointer pos while panning
+  var photoFlashUntil = 0;        // shutter-flash deadline (performance.now ms)
+  // ---- keyboard / gamepad synthetic aim ----
+  var kbHeld = {};                // held-key map keyed by e.code
+  var synthAngle = -0.25;         // persistent aim angle for keys/stick-free aim
+  var kbRotEase = 0;              // 0..1 ease-in while a rotate key is held
+  var drawSrc = null;             // who owns the current hold-draw: 'key' | 'gp0'
+  var gpPauseTimer = null;        // polls Start-button while the loop is paused
+  var gpPrevStart = false, gpPrevB1 = false, gpB0Prev = false, gpWasDeflected = false;
+  var GP_DEADZONE = 0.25;
+  var KB_ROT_SPEED = 1.35;        // rad/s at full ease (~dt*6-style easing ramp)
   // pause button sits between the timer and the arrow counter
   var PAUSE_BTN = { x: W / 2 + 130, y: 24, w: 56, h: 56 };
   var RESUME_R = 74;    // radius of the big resume button on the pause overlay
-
-  var st = null;  // per-round state
+  // [PHOTO] pill hangs just below the pause card — tertiary action styling
+  var PHOTO_PAUSE_BTN = { x: W / 2 - 110, y: H / 2 + 240, w: 220, h: 56 };
+  // photo bar (bottom center): ZOOM pill · shutter · EXIT pill
+  var PHOTO_ZOOMS = [1, 1.15, 1.3];
+  var PHOTO_ZOOM_BTN = { x: W / 2 - 225, y: H - 98, w: 150, h: 64 };
+  var PHOTO_EXIT_BTN = { x: W / 2 + 75, y: H - 98, w: 150, h: 64 };
+  var PHOTO_SHUTTER = { x: W / 2, y: H - 66, r: 44 };
 
   function requestFrame() {
-    if (!raf && running && !paused) raf = requestAnimationFrame(frame);
+    if (!raf && running && (!paused || photoMode)) raf = requestAnimationFrame(frame);
   }
 
   function cancelFrame() {
@@ -32,11 +54,14 @@ var GAME = (function () {
     if (paused === next) return paused;
     paused = next;
     st.aiming = false;
+    cancelSynthDraw(); // a held Space/A draw must never fire after a pause
     frame.last = undefined; // resume from a clean timestamp so physics never jumps
     if (paused) {
       cancelFrame();
       render(); // draw the frozen frame + overlay once; no RAF churn while paused
+      ensureGpPausePoll(); // keep the Start button able to un-pause
     } else {
+      clearGpPausePoll();
       AUDIO.click();
       requestFrame();
     }
@@ -45,12 +70,29 @@ var GAME = (function () {
 
   /* ============ round setup ============ */
 
+  // mulberry32: a tiny seeded PRNG. Daily-challenge and shared-code rounds
+  // pass a fixed seed so every player sees the same target rolls; normal
+  // rounds just use plain Math.random().
+  function mulberry32(seed) {
+    var t = seed >>> 0;
+    return function () {
+      t = (t + 0x6D2B79F5) | 0;
+      var z = t;
+      z = Math.imul(z ^ (z >>> 15), z | 1);
+      z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+      return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   function newRound(options) {
     options = options || {};
     var p = SAVE.current();
     var char = DATA.characterById(p.equipped.character);
     var arrow = DATA.arrowById(p.equipped.arrow);
     var perk = char.perk || {};
+    // Pinned randomness for daily/shared rounds (options.seed); null keeps
+    // the default unseeded behaviour.
+    var randFn = typeof options.seed === 'number' ? mulberry32(options.seed) : null;
 
     var rules = {
       mode: options.mode || 'practice',
@@ -63,7 +105,11 @@ var GAME = (function () {
       specialRule: options.specialRule || 'normal',
       bossAtStart: !!options.bossAtStart,
       bossId: options.bossId || null,
-      theme: options.theme || null
+      // Penny's Boss Workshop: a saved design rides along in the round rules
+      // so the boss code can build its def without touching STAGES data.
+      customBoss: options.customBoss || null,
+      theme: options.theme || null,
+      challengeFrom: options.challengeFrom || null
     };
     rules.reducedMotion = !!(typeof SAVE !== 'undefined' && SAVE.settings && SAVE.settings().reducedMotion);
     // Accessibility: Easier Mode gives more time, more arrows, slower targets.
@@ -94,6 +140,7 @@ var GAME = (function () {
       bolts: [],              // lightning visuals
       brokenArrows: [],       // snap visuals when an arrow hits armor
       blackholes: [],         // obsidian-arrow black holes
+      planes: [],             // the penguins' crossover flyby (max 1 airborne)
       shake: 0,
       t: 0,                   // elapsed seconds (for animation)
       aiming: false,
@@ -108,10 +155,19 @@ var GAME = (function () {
       slowUntil: 0,           // slow-motion power-up active until this time
       cinematicUntil: 0,
       bossSpawned: false,
-      stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, bossDefeated: false },
+      stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, doodles: 0, planes: 0, bossDefeated: false },
       bgName: options.background && options.background !== 'random' ?
         (options.background === 'cave' ? 'bg_moon_cave' : options.background) :
-        ['bg_meadow', 'bg_mountain', 'bg_sunset_beach', 'bg_starlight', 'bg_underwater'][(Math.random() * 5) | 0]
+        (function () {
+          // Surprise scenery — seeded rounds roll it through the pinned PRNG.
+          var bgs = ['bg_meadow', 'bg_mountain', 'bg_sunset_beach', 'bg_starlight', 'bg_underwater'];
+          return bgs[Math.floor((randFn ? randFn() : Math.random()) * bgs.length)];
+        })(),
+      // Per-round spawn RNG. rand()/pick()/spawner rolls all flow through
+      // st.rand so a seeded round plays out the same layout for everyone;
+      // cosmetic randomness (particles, lightning jitter, audio) deliberately
+      // stays on Math.random and is never seeded.
+      rand: randFn
     };
   }
 
@@ -136,13 +192,18 @@ var GAME = (function () {
     return 3;
   }
 
-  function rand(a, b) { return a + Math.random() * (b - a); }
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  // Spawn-relevant randomness flows through rng(): st.rand is pinned for
+  // daily/shared-code rounds, otherwise plain Math.random().
+  function rng() {
+    return (st && st.rand) ? st.rand() : Math.random();
+  }
+  function rand(a, b) { return a + rng() * (b - a); }
+  function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
 
   function makeBullseye(kind) {
     // Some targets stand far away in the distance: drawn small and hazy,
     // sitting on distant ground, worth FAR_TARGET_MULTIPLIER extra points.
-    var far = kind !== 'swing' && Math.random() < (TUNING.FAR_TARGET_CHANCE || 0);
+    var far = kind !== 'swing' && rng() < (TUNING.FAR_TARGET_CHANCE || 0);
     var r = far ? rand(36, 46) : rand(58, 78);
     var x = rand(750, 1480);
     var t = {
@@ -169,7 +230,7 @@ var GAME = (function () {
     } else {
       // Near targets stand ON the ground now (V6 art), on one of two stands:
       // the turntable unit's own short legs, or the tall wooden easel.
-      t.standStyle = Math.random() < 0.4 ? 'easel' : 'frames';
+      t.standStyle = rng() < 0.4 ? 'easel' : 'frames';
       t.baseX = x;
       t.y = t.standStyle === 'easel' ? GROUND - 1.88 * r : GROUND - 1.55 * r;
       t.x = x;
@@ -193,7 +254,7 @@ var GAME = (function () {
   }
 
   function makeFruit() {
-    var fromRight = Math.random() < 0.5;
+    var fromRight = rng() < 0.5;
     var kind = pick(Object.keys(TUNING.FRUIT_VALUES));
     return {
       type: 'fruit', dead: false, hp: 1, frozenUntil: 0,
@@ -234,7 +295,7 @@ var GAME = (function () {
 
   // The rare Golden Banana — floats up fast and is worth a fortune.
   function makeGolden() {
-    var fromRight = Math.random() < 0.5;
+    var fromRight = rng() < 0.5;
     return {
       type: 'golden', dead: false, hp: 1, frozenUntil: 0,
       x: fromRight ? rand(1250, 1520) : rand(680, 950),
@@ -255,17 +316,89 @@ var GAME = (function () {
     };
   }
 
+  // Penny's Doodle Enemies: her actual drawings, imported with
+  // tools/import_drawing.py, wobble onto the field like paper stickers.
+  function makeDoodle(entry) {
+    var t = {
+      type: 'doodle', dead: false, hp: 1, frozenUntil: 0,
+      sprite: entry.sprite, points: entry.points || 40,
+      baseX: rand(750, 1480),
+      y: GROUND - 52,               // sticker stands just above the ground line
+      r: 44, mt: rand(0, 10),
+      rot: rand(-0.07, 0.07),       // glued on slightly crooked, like real art
+      seed: rand(0, Math.PI * 2),
+      motion: rng() < 0.5 ? 'slide' : 'static'
+    };
+    t.x = t.baseX;
+    if (t.motion === 'slide') {
+      t.range = rand(70, 140);
+      t.speed = rand(1.2, 2.0) * (phase() === 3 ? 1.6 : 1);
+    }
+    return t;
+  }
+
+  // Crossover cameo: the penguins' little blue plane (from "If Penguins Could
+  // Fly") buzzes across the sky above the arena. Purely a bonus target.
+  function makePlane() {
+    var y = rand(160, 300);
+    return {
+      type: 'plane', dead: false, hp: 1, frozenUntil: 0,
+      x: W + 90, y: y, baseY: y,
+      vx: -(W + 260) / 6,           // crosses the whole arena in about 6s
+      vy: 0,
+      r: 46, mt: rand(0, 10), seed: rand(0, Math.PI * 2),
+      tumble: false, rot: 0, vr: 0
+    };
+  }
+
   // End-of-round boss: a giant target that takes several hits. Which boss (art +
   // hit count) comes from the stage's boss config in js/stages.js.
+
+  /* ---- Penny's Boss Workshop ----
+     A workshop round (rules.mode 'workshop') carries its own boss design in
+     rules.customBoss. We turn it into a def with the exact same shape as a
+     STAGES.bossDef entry so every existing boss code path — spawn, damage
+     states, drawing, defeat — works on it unchanged.
+     GUARD: resolveBossDef() only returns this custom def when the round's
+     bossId is literally 'custom'; every normal adventure / challenge / daily
+     boss keeps flowing through STAGES.bossDef exactly as before.
+     Weak spot: expressed as an art lift fraction so the hitbox circle lands
+     on TOP / MIDDLE / LOW of the sprite (lift = fraction - 0.5). */
+  var WORKSHOP_RENDER_FRAMES = ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'];
+
+  function workshopDef() {
+    var c = st.rules.customBoss || {};
+    return {
+      name: c.name || "Penny's Boss",
+      sprite: 'boss_moonstone',
+      damageSprites: ['boss_moonstone', 'boss_moonstone_cracked', 'boss_moonstone_broken'],
+      renderFrames: WORKSHOP_RENDER_FRAMES,
+      hp: c.hp,
+      scale: c.scale,
+      lift: (c.weak === 'top' ? -0.20 : c.weak === 'low' ? 0.20 : 0),
+      hue: c.hue || 0,
+      wobbleAmp: c.wobble / 50          // slider 0..100 -> amplitude x0..x2 (50 = classic)
+    };
+  }
+
+  function resolveBossDef(id) {
+    if (id === 'custom' && st.rules.customBoss) return workshopDef();
+    return STAGES.bossDef(id);
+  }
+
   function makeBoss() {
-    var def = STAGES.bossDef(st.rules.bossId);
+    // Custom bosses scale their hitbox along with their art (the Moonstone's
+    // own r=130 at scale 2.5 stays the baseline).
+    var custom = st.rules.bossId === 'custom' && st.rules.customBoss;
+    var def = resolveBossDef(st.rules.bossId);
+    var hitR = custom ? Math.round(130 * (def.scale / 2.5)) : 130;
     return {
       type: 'boss', bossId: st.rules.bossId || 'moonstone',
       dead: false, hp: def.hp, maxHp: def.hp, frozenUntil: 0,
       // y puts the boss's feet on the ground so he stands in the scene
       // instead of floating in the sky (art bottom lands near GROUND).
       x: W / 2 + 120, baseX: W / 2 + 120, y: 620,
-      r: 130, wobble: 0, mt: 0,
+      r: hitR, wobble: 0, mt: 0,
       motion: 'slide', range: 220, speed: 1.0
     };
   }
@@ -278,12 +411,19 @@ var GAME = (function () {
     var ph = phase();
     var live = liveTargets();
 
+    // The penguins' plane crosses the sky now and then once things get
+    // moving (phase 2+). Only one up there at a time!
+    if (ph >= 2 && st.planes.length === 0 && rng() < 0.08) {
+      st.planes.push(makePlane());
+    }
+
     // The BOSS appears once, when chaos mode begins.
     if ((st.rules.bossAtStart || ph === 3) && !st.bossSpawned) {
       st.targets.push(makeBoss());
       st.bossSpawned = true;
       st.floaters.push({ x: W / 2, y: 210, vy: -40, life: 2, text: 'BOSS!', big: true, color: '#ff5fa2' });
       AUDIO.roundEnd();
+      AUDIO.voice('boss_appear');
       st.spawnCooldown = 0.6;
       return;
     }
@@ -297,6 +437,14 @@ var GAME = (function () {
       var kind = 'static';
       if (ph >= 2) kind = pick(['slide', 'swing', 'slide']);
       if (ph === 3) kind = pick(['slide', 'swing']);
+      // Sometimes one of Penny's drawings takes the bullseye's place --
+      // only from phase 2 on, and never more than two at once.
+      var doodlesLive = live.filter(function (t) { return t.type === 'doodle'; }).length;
+      if (ph >= 2 && doodlesLive < 2 && SPRITES.doodles().length && rng() < 0.1) {
+        st.targets.push(makeDoodle(pick(SPRITES.doodles())));
+        st.spawnCooldown = 0.35;
+        return;
+      }
       st.targets.push(makeBullseye(kind));
       st.spawnCooldown = 0.35;
       return;
@@ -314,17 +462,17 @@ var GAME = (function () {
     }
 
     // rare goodies: the Golden Banana and power-ups
-    if (ph >= 2 && !live.some(function (t) { return t.type === 'golden'; }) && Math.random() < 0.02) {
+    if (ph >= 2 && !live.some(function (t) { return t.type === 'golden'; }) && rng() < 0.02) {
       st.targets.push(makeGolden()); st.spawnCooldown = 3; return;
     }
-    if (!live.some(function (t) { return t.type === 'powerup'; }) && Math.random() < 0.015) {
+    if (!live.some(function (t) { return t.type === 'powerup'; }) && rng() < 0.015) {
       st.targets.push(makePowerup()); st.spawnCooldown = 3; return;
     }
 
     // bonus objects
     var balloons = live.filter(function (t) { return t.type === 'balloon'; }).length;
     var chests = live.filter(function (t) { return t.type === 'chest'; }).length;
-    var roll = Math.random();
+    var roll = rng();
 
     if (ph === 1) {
       if (balloons < 1 && roll < 0.4) { st.targets.push(makeBalloon()); st.spawnCooldown = 2.5; }
@@ -350,7 +498,7 @@ var GAME = (function () {
     t.wobble = Math.max(0, (t.wobble || 0) - dt * 4);
     t.hitFlash = Math.max(0, (t.hitFlash || 0) - dt * 4.5);
 
-    if (t.type === 'bullseye' || t.type === 'boss') {
+    if (t.type === 'bullseye' || t.type === 'boss' || t.type === 'doodle') {
       if (t.motion === 'slide' && !frozen) {
         t.x = t.baseX + Math.sin(t.mt * t.speed) * t.range;
       } else if (t.motion === 'swing') {
@@ -377,6 +525,21 @@ var GAME = (function () {
         t.x += Math.sin(t.mt * 1.6 + t.sway) * 26 * dt;
       }
       if (t.y < -70) t.dead = true; // floated away
+    } else if (t.type === 'plane') {
+      if (t.tumble) {
+        // shot down: nose-dive off the side of the world
+        t.vy += 900 * dt;
+        t.x += t.vx * dt; t.y += t.vy * dt;
+        t.rot += t.vr * dt;
+        if (t.y > H + 150) t.dead = true;
+      } else {
+        t.x += t.vx * dt;
+        // gentle sine bob + a little rocking, like riding a breeze
+        var bob = reducedMotion() ? 0 : Math.sin(t.mt * 2.1 + t.seed) * 26;
+        t.y = t.baseY + bob;
+        t.rot = reducedMotion() ? 0 : Math.sin(t.mt * 2.1 + t.seed + Math.PI / 2) * 0.09;
+        if (t.x < -120) t.dead = true; // flew offscreen
+      }
     } else if (t.type === 'chest' && t.opened) {
       t.openTimer -= dt;
       if (t.openTimer <= 0) t.dead = true; // fully-open reveal finished
@@ -441,14 +604,27 @@ var GAME = (function () {
           ar.hitSomething = true;
           onHit(t, hit, ar);
           // Soft targets pop and let the arrow keep flying; it only stops on
-          // real targets (bullseyes, chests, boss).
+          // real targets (bullseyes, chests, boss). Doodles are paper: soft.
           var soft = (t.type === 'balloon' || t.type === 'fruit' ||
-                      t.type === 'golden' || t.type === 'powerup');
+                      t.type === 'golden' || t.type === 'powerup' ||
+                      t.type === 'doodle');
           if (!soft) {
             if (ar.pierceLeft > 0) { ar.pierceLeft--; flame(hit.x, hit.y); }
             else { ar.dead = true; }
             if (ar.dead) break;
           }
+        }
+      }
+
+      // The penguins' plane flies above everything: hit it for bonus points,
+      // but arrows never stop for it (it's a soft, friendly target).
+      for (var pj = 0; pj < st.planes.length; pj++) {
+        var pl = st.planes[pj];
+        if (pl.dead || pl.tumble) continue;
+        var phit = segCircle(ox, oy, ar.x, ar.y, pl.x, pl.y, pl.r);
+        if (phit) {
+          ar.hitSomething = true;
+          onHit(pl, phit, ar);
         }
       }
 
@@ -566,6 +742,8 @@ var GAME = (function () {
     } else if (o.type === 'chest') {
       award(TUNING.SCORE_CHEST, o.x, o.y, { bonusObj: true }); spawnCoins(TUNING.COINS_FROM_CHEST, o.x, o.y);
       o.dead = true; track('chests', 'chests_10', 10);
+    } else if (o.type === 'doodle') {
+      award(o.points || 40, o.x, o.y, { bonusObj: true }); burst(o.x, o.y, '#9fd636'); o.dead = true;
     } else if (o.type === 'powerup') {
       applyPowerup(o); // trigger its effect (no recursive black hole)
     }
@@ -652,6 +830,16 @@ var GAME = (function () {
       burst(t.x, t.y, t.color);
       spawnCoins(TUNING.COINS_FROM_BALLOON, t.x, t.y);
       track('balloons', 'balloons_50', 50);
+    } else if (t.type === 'doodle') {
+      // Same scoring path as a balloon: award() handles the combo multiplier
+      // and the floating "+N" text; we just add the pop and the confetti.
+      st.stats.doodles++;
+      award(t.points || 40, t.x, t.y - 10, { bonusObj: true });
+      t.dead = true;
+      AUDIO.pop();
+      burst(t.x, t.y, '#9fd636');
+      ring(t.x, t.y, '#9fd636');
+      st.floaters.push({ x: t.x, y: t.y - t.r - 34, vy: -60, life: 1.2, text: "PENNY'S DOODLE!", big: true, color: '#9fd636' });
     } else if (t.type === 'fruit') {
       st.stats.fruits++;
       award(t.value, t.x, t.y, { bonusObj: true });
@@ -671,6 +859,20 @@ var GAME = (function () {
       earn('golden');
     } else if (t.type === 'powerup') {
       applyPowerup(t);
+    } else if (t.type === 'plane') {
+      // Sky hit! The plane tumbles away with a confetti burst.
+      st.stats.planes = (st.stats.planes || 0) + 1;
+      award(75, t.x, t.y - 30, { bonusObj: true });
+      t.tumble = true;
+      t.vx *= 0.4;
+      t.vy = -220;
+      t.vr = rand(-11, -7);          // spins nose-down as it falls
+      AUDIO.coin();
+      ring(t.x, t.y, '#62e6ff');
+      burst(t.x, t.y, '#9fdcff');
+      burst(t.x, t.y, '#ffd23a');
+      addShake(0.18);
+      st.floaters.push({ x: t.x, y: t.y - 60, vy: -60, life: 1.3, text: 'SKY HIT!', big: true, color: '#62e6ff' });
     } else if (t.type === 'boss') {
       t.hp--;
       t.wobble = 1;
@@ -690,6 +892,7 @@ var GAME = (function () {
         spawnCoins(20, t.x, t.y);
         st.floaters.push({ x: t.x, y: t.y - t.r, vy: -50, life: 1.8, text: 'BOSS DOWN!', big: true, color: '#ffd23a' });
         earn('boss');
+        AUDIO.voice('boss_down');
       } else {
         if (AUDIO.bossHit) AUDIO.bossHit(); else AUDIO.thunk();
         addShake(0.24);
@@ -760,6 +963,9 @@ var GAME = (function () {
           award(TUNING.SCORE_BALLOON, best.x, best.y, { half: true, bonusObj: true });
           best.dead = true; AUDIO.pop(); burst(best.x, best.y, best.color);
           track('balloons', 'balloons_50', 50);
+        } else if (best.type === 'doodle') {
+          award(best.points || 40, best.x, best.y, { half: true, bonusObj: true });
+          best.dead = true; AUDIO.pop(); burst(best.x, best.y, '#9fd636');
         } else if (best.type === 'fruit') {
           award(best.value, best.x, best.y, { half: true, bonusObj: true });
           best.dead = true; fruitSplat(best);
@@ -975,14 +1181,17 @@ var GAME = (function () {
     var worldDt = st.t < st.cinematicUntil ? dt * 0.18 : dt;
     spawner(worldDt);
     st.targets.forEach(function (t) { updateTarget(t, worldDt); });
+    st.planes.forEach(function (pl) { updateTarget(pl, worldDt); });
     updateBlackholes(worldDt);
     st.targets = st.targets.filter(function (t) { return !t.dead; });
+    st.planes = st.planes.filter(function (pl) { return !pl.dead; });
     updateArrows(worldDt);
     updateParticles(worldDt);
   }
 
   function finish() {
     running = false;
+    clearGpPausePoll();
     if (raf) cancelAnimationFrame(raf);
     raf = null;
     var coinsFromScore = Math.round(st.score / TUNING.SCORE_PER_COIN);
@@ -1003,7 +1212,209 @@ var GAME = (function () {
       , stats: st.stats
       , mode: st.rules.mode
       , label: st.rules.label
+      , challengeFrom: st.rules.challengeFrom || null
     });
+  }
+
+  /* ============ photo mode + share card ============
+     Entered from the pause overlay's [PHOTO] pill. The world stays frozen
+     (update() gated off) but the loop keeps running so drag-to-pan and the
+     ZOOM cycle redraw every frame through a transform around all world layers.
+     HUD and overlays hide; only the minimal photo bar shows at the bottom. */
+
+  function enterPhotoMode() {
+    if (!running || !st || st.over || photoMode) return;
+    photoMode = true;
+    photoPan.x = 0; photoPan.y = 0;
+    photoZoomIdx = 0;
+    photoDragLast = null;
+    st.aiming = false;
+    cancelSynthDraw();
+    AUDIO.click();
+    frame.last = undefined;
+    requestFrame(); // bring the loop back while paused to serve pan/zoom frames
+  }
+
+  function exitPhotoMode() {
+    if (!photoMode) return;
+    photoMode = false;
+    photoDragLast = null;
+    photoPan.x = 0; photoPan.y = 0;
+    photoZoomIdx = 0;
+    AUDIO.click();
+    if (paused) {
+      // restore the frozen pause overlay exactly as it was
+      cancelFrame();
+      render();
+    } else {
+      requestFrame();
+    }
+  }
+
+  var PHOTO_MODE_NAMES = {
+    practice: 'TARGET PRACTICE',
+    adventure: 'ADVENTURE',
+    daily: 'DAILY CHALLENGE',
+    challenge: "PENNY'S CHALLENGE",
+    family: 'FAMILY MATCH',
+    workshop: 'BOSS WORKSHOP'
+  };
+
+  // Small DOM toast — the only feedback that works while the canvas is paused
+  // (in-round floaters live in update(), which photo mode gates off).
+  var photoToastEl = null;
+  function photoToast(text) {
+    try {
+      if (photoToastEl) photoToastEl.remove();
+      var el = document.createElement('div');
+      el.textContent = text;
+      el.style.cssText =
+        'position:absolute;left:50%;bottom:130px;transform:translateX(-50%);' +
+        'background:rgba(26,24,34,0.92);color:#ffd23a;font:800 20px Nunito,sans-serif;' +
+        'padding:12px 26px;border-radius:999px;border:2px solid rgba(255,210,58,0.7);' +
+        'z-index:30;pointer-events:none;';
+      var host = document.getElementById('screen-game') || document.body;
+      host.appendChild(el);
+      photoToastEl = el;
+      setTimeout(function () { el.remove(); if (photoToastEl === el) photoToastEl = null; }, 1700);
+    } catch (err) { /* cosmetic only */ }
+  }
+
+  // SHUTTER: snapshot the main canvas (fixed 1600×900 backing store — no DPR
+  // math here), frame it in a HUD-toned card with a caption strip, then hand
+  // it to the share sheet or a download fallback.
+  function takePhoto() {
+    try {
+      var snap = document.createElement('canvas');
+      snap.width = W;
+      snap.height = H;
+      snap.getContext('2d').drawImage(canvas, 0, 0);
+      composeShareCard(snap);
+      if (!reducedMotion()) photoFlashUntil = performance.now() + 170;
+      AUDIO.shoot(); // little pluck doubles as the camera chirp
+    } catch (err) {
+      photoToast('Photo failed — try again!');
+    }
+  }
+
+  function composeShareCard(snap) {
+    var PAD = 34, CAP_H = 176;
+    var outW = W + PAD * 2, outH = PAD + H + CAP_H;
+    var out = document.createElement('canvas');
+    out.width = outW;
+    out.height = outH;
+    var c = out.getContext('2d');
+
+    // dark navy card + warm gold hairline, matching hudPanel / theme tones
+    ART.rr(c, 0, 0, outW, outH, 40, '#201d2c');
+    c.strokeStyle = 'rgba(255,210,58,0.85)';
+    c.lineWidth = 4;
+    c.beginPath();
+    c.roundRect(14, 14, outW - 28, outH - 28, 30);
+    c.stroke();
+
+    // the frozen world snapshot
+    c.drawImage(snap, PAD, PAD);
+
+    // caption strip
+    var label = st.rules.label || PHOTO_MODE_NAMES[st.rules.mode] || 'TARGET PRACTICE';
+    var dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+    var cy = PAD + H;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillStyle = '#ffd23a';
+    c.font = '900 46px Lilita One, Nunito, sans-serif';
+    c.fillText('DINO BOB', outW / 2, cy + 52);
+    c.fillStyle = '#fff';
+    c.font = '800 27px Nunito, sans-serif';
+    c.fillText('⭐ ' + st.score + '   ·   🪙 +' + st.coinsDirect + '   ·   ' + label + '   ·   ' + dateStr,
+      outW / 2, cy + 100);
+    c.fillStyle = 'rgba(255,255,255,0.55)';
+    c.font = 'italic 600 21px Nunito, sans-serif';
+    c.fillText('designed by Penny', outW / 2, cy + 140);
+
+    if (out.toBlob) {
+      out.toBlob(deliverPhotoBlob, 'image/png');
+    } else {
+      // ancient fallback: dataURL straight to download
+      deliverPhotoBlob(dataURLToBlob(out.toDataURL('image/png')));
+    }
+  }
+
+  function dataURLToBlob(dataURL) {
+    try {
+      var parts = dataURL.split(',');
+      var bin = atob(parts[1]);
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new Blob([arr], { type: 'image/png' });
+    } catch (err) { return null; }
+  }
+
+  function deliverPhotoBlob(blob) {
+    if (!blob) { photoToast('Photo failed — try again!'); return; }
+    var file = null;
+    try { file = new File([blob], 'dino-bob-photo.png', { type: 'image/png' }); } catch (err) { file = null; }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Dino Bob' }).then(function () {
+        photoToast('Shared! 📸');
+      }, function () { /* share sheet dismissed — not an error */ });
+    } else {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'dino-bob-photo.png'; // synthetic click → downloads like any file
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+      photoToast('Saved! 📸');
+    }
+  }
+
+  function drawPhotoBar() {
+    ctx.textBaseline = 'middle';
+    // white shutter flash (skipped under reduced motion)
+    if (photoFlashUntil && !reducedMotion()) {
+      var age = (performance.now() - (photoFlashUntil - 170)) / 170;
+      if (age >= 0 && age < 1) {
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.8 * (1 - age)).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+      } else if (age >= 1) {
+        photoFlashUntil = 0;
+      }
+    }
+    // hint line
+    ctx.font = '800 24px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText('📷 PHOTO MODE — drag anywhere to pan', W / 2, 40);
+
+    // ZOOM pill (cycles 1 → 1.15 → 1.3)
+    hudPanel(PHOTO_ZOOM_BTN.x, PHOTO_ZOOM_BTN.y, PHOTO_ZOOM_BTN.w, PHOTO_ZOOM_BTN.h);
+    ctx.fillStyle = '#ffd23a';
+    ctx.font = '900 30px Lilita One, Nunito, sans-serif';
+    ctx.fillText(PHOTO_ZOOMS[photoZoomIdx] + '×',
+      PHOTO_ZOOM_BTN.x + PHOTO_ZOOM_BTN.w / 2, PHOTO_ZOOM_BTN.y + PHOTO_ZOOM_BTN.h / 2 + 1);
+
+    // SHUTTER circle
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.beginPath(); ctx.arc(PHOTO_SHUTTER.x, PHOTO_SHUTTER.y, PHOTO_SHUTTER.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1822'; ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath(); ctx.arc(PHOTO_SHUTTER.x, PHOTO_SHUTTER.y, PHOTO_SHUTTER.r - 5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(PHOTO_SHUTTER.x, PHOTO_SHUTTER.y, PHOTO_SHUTTER.r - 16, 0, Math.PI * 2);
+    ctx.fillStyle = '#3d964c'; ctx.fill();
+    ctx.restore();
+
+    // EXIT pill
+    hudPanel(PHOTO_EXIT_BTN.x, PHOTO_EXIT_BTN.y, PHOTO_EXIT_BTN.w, PHOTO_EXIT_BTN.h);
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 26px Nunito, sans-serif';
+    ctx.fillText('✕ EXIT', PHOTO_EXIT_BTN.x + PHOTO_EXIT_BTN.w / 2, PHOTO_EXIT_BTN.y + PHOTO_EXIT_BTN.h / 2 + 1);
   }
 
   /* ============ rendering ============ */
@@ -1050,6 +1461,37 @@ var GAME = (function () {
     c.fillRect(0, 0, cv.width, cv.height);
     c.globalCompositeOperation = 'source-over';
     gradeCache[key] = cv;
+    return cv;
+  }
+
+  /* ---- Penny's Boss Workshop: cached hue-shifted sprites ----
+     Same ctx.filter='hue-rotate(...)' trick the balloons use, but baked into
+     an offscreen canvas once per (sprite,hue) pair instead of every frame.
+     The cache is deliberately small and FIFO: oldest entry evicted when it
+     passes HUE_CACHE_MAX, so recoloring can never grow unbounded. */
+  var HUE_CACHE_MAX = 24;
+  var hueCache = {};      // 'name|hue' -> canvas
+  var hueCacheOrder = []; // insertion order for oldest-first eviction
+  function hueShiftedSprite(name, hue) {
+    hue = ((Math.round(hue || 0)) % 360 + 360) % 360;
+    if (!hue) return null;                 // 0 = classic look, no copy needed
+    var key = name + '|' + hue;
+    if (hueCache[key]) return hueCache[key];
+    var img = SPRITES.get(name);
+    if (!img) return null;
+    var cv = document.createElement('canvas');
+    cv.width = img.naturalWidth;
+    cv.height = img.naturalHeight;
+    var c = cv.getContext('2d');
+    c.filter = 'hue-rotate(' + hue + 'deg)';
+    c.drawImage(img, 0, 0);
+    c.filter = 'none';
+    while (hueCacheOrder.length >= HUE_CACHE_MAX) {
+      var oldest = hueCacheOrder.shift();
+      delete hueCache[oldest];
+    }
+    hueCache[key] = cv;
+    hueCacheOrder.push(key);
     return cv;
   }
 
@@ -1420,6 +1862,44 @@ var GAME = (function () {
     });
   }
 
+  // The penguins' plane: drawn ABOVE the targets layer (it flies overhead),
+  // with a running ground shadow using the same trick as flying arrows.
+  function drawPlanes() {
+    st.planes.forEach(function (pl) {
+      var k = Math.max(0, 1 - (GROUND - pl.y) / 900);
+      ctx.save();
+      ctx.globalAlpha = 0.05 + 0.13 * k;
+      ART.ellipse(ctx, pl.x, GROUND + 4, 40 + 46 * k, 9 + 4 * k, 'rgba(20,16,20,1)');
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(pl.x, pl.y);
+      ctx.rotate(pl.rot || 0);
+      var pimg = gradedSprite('plane_flyby') || SPRITES.get('plane_flyby');
+      var size = pl.r * 2.5;
+      if (pimg) {
+        ctx.drawImage(pimg, -size / 2, -size / 2, size, size);
+      } else {
+        // Fallback: a simple folded paper plane so it still reads as "friend
+        // from another game flying by".
+        var R = pl.r;
+        ctx.fillStyle = '#bfe3ff';
+        ctx.beginPath();
+        ctx.moveTo(R, 0); ctx.lineTo(-R, -R * 0.62); ctx.lineTo(-R * 0.45, R * 0.18);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#62a8f0';
+        ctx.beginPath();
+        ctx.moveTo(R, 0); ctx.lineTo(-R, -R * 0.62); ctx.lineTo(-R * 0.2, -R * 0.05);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e8f4ff';
+        ctx.beginPath();
+        ctx.moveTo(R, 0); ctx.lineTo(-R * 0.45, R * 0.18); ctx.lineTo(-R * 0.2, -R * 0.05);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    });
+  }
+
   function bossDamageSprite(bdef, t) {
     if (bdef.renderFrames && bdef.renderFrames.length) {
       var healthDamage = t.maxHp ? 1 - Math.max(0, t.hp) / t.maxHp : 0;
@@ -1491,12 +1971,15 @@ var GAME = (function () {
     ctx.restore();
   }
 
-  function drawBoss2p5D(t, bdef, bossImg) {
+  function drawBoss2p5D(t, bdef, bossImg, wobbleAmp) {
     var img = bossImg || SPRITES.get('target');
     if (!img) {
       ART.circle(ctx, 0, 0, t.r, '#e23b3b');
       return { bh: t.r * 2, byoff: 0, bossImg: null };
     }
+    // Limb-wobble intensity: 1 = classic Moonstone King idle. Workshop bosses
+    // pass their slider here; everything else keeps the default untouched.
+    var amp = typeof wobbleAmp === 'number' ? wobbleAmp : 1;
 
     var bw = t.r * (bossImg ? bdef.scale : 2.15);
     var bh = bw * img.height / img.width;
@@ -1521,10 +2004,10 @@ var GAME = (function () {
     ctx.drawImage(img, -bw / 2, -bh / 2 - byoff, bw, bh);
 
     if (bossImg && !reducedMotion()) {
-      var armSwing = Math.sin(st.t * 2.7 + t.mt) * 0.018 + recoil * 0.05;
+      var armSwing = Math.sin(st.t * 2.7 + t.mt) * 0.018 * amp + recoil * 0.05;
       drawBossCrop(img, 0.02, 0.28, 0.29, 0.50, bw, bh, byoff, -recoil * 8, recoil * 7, -armSwing - recoil * 0.03, 1);
       drawBossCrop(img, 0.69, 0.28, 0.29, 0.50, bw, bh, byoff, recoil * 8, recoil * 7, armSwing + recoil * 0.03, 1);
-      drawBossCrop(img, 0.27, 0.03, 0.46, 0.29, bw, bh, byoff, side * recoil * 10, -recoil * 8, side * recoil * 0.06 + Math.sin(st.t * 4.2) * 0.008, 1);
+      drawBossCrop(img, 0.27, 0.03, 0.46, 0.29, bw, bh, byoff, side * recoil * 10, -recoil * 8, side * recoil * 0.06 + Math.sin(st.t * 4.2) * 0.008 * amp, 1);
     }
 
     drawMoonstoneCrackLines(t, bw, bh, byoff);
@@ -1749,6 +2232,43 @@ var GAME = (function () {
         ctx.moveTo(-6, t.r - 2); ctx.lineTo(6, t.r - 2); ctx.lineTo(0, t.r + 8);
         ctx.closePath(); ctx.fill();
       }
+    } else if (t.type === 'doodle') {
+      // One of Penny's drawings, presented like a paper sticker: white
+      // backing sheet first, then the drawing swaying gently on top.
+      var side = t.r * 2.3;
+      ctx.save();
+      ctx.rotate(t.rot);
+      ART.rr(ctx, -side / 2 - 4, -side / 2 - 4, side + 8, side + 8, side * 0.14, '#e8e4d8'); // sticker edge
+      ART.rr(ctx, -side / 2, -side / 2, side, side, side * 0.12, '#fdfbf2');                 // paper sheet
+      var dWob = reducedMotion() ? 0 : Math.sin(st.t * 2.2 + t.seed) * 0.1;   // ±0.1 rad sway
+      var dBreathe = reducedMotion() ? 1 : 1 + Math.sin(st.t * 1.7 + t.seed) * 0.05; // 0.95..1.05
+      ctx.rotate(dWob);
+      ctx.scale(1, dBreathe);
+      var dimg = SPRITES.get(t.sprite);
+      var inner = side * 0.84;
+      if (dimg) {
+        ctx.drawImage(dimg, -inner / 2, -inner / 2, inner, inner);
+      } else {
+        // Fallback: a green crayon scribble blob so it still reads as art.
+        ctx.strokeStyle = '#5aa02c';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (var ds = 0; ds < 16; ds++) {
+          var da = t.seed + ds * 0.62;
+          var dr = inner * 0.14 + (ds % 4) * inner * 0.055;
+          var dxp = Math.cos(da) * dr * 1.15, dyp = Math.sin(da) * dr;
+          if (ds === 0) ctx.moveTo(dxp, dyp);
+          else ctx.quadraticCurveTo(Math.cos(da + 0.3) * dr * 1.7, Math.sin(da + 0.3) * dr * 1.4, dxp, dyp);
+        }
+        ctx.stroke();
+        // two quick googly eyes make even a scribble feel alive
+        ART.circle(ctx, -inner * 0.13, -inner * 0.08, inner * 0.075, '#ffffff');
+        ART.circle(ctx, inner * 0.13, -inner * 0.08, inner * 0.075, '#ffffff');
+        ART.circle(ctx, -inner * 0.11, -inner * 0.06, inner * 0.034, '#20242c');
+        ART.circle(ctx, inner * 0.15, -inner * 0.06, inner * 0.034, '#20242c');
+      }
+      ctx.restore();
     } else if (t.type === 'fruit') {
       // apple + watermelon have V6 tumble frames (real 3D turnaround);
       // the frames do the spinning, so only a light sway on top
@@ -1839,10 +2359,13 @@ var GAME = (function () {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(t.kind === 'arrows' ? '+3' : '⏱', 0, 2);
     } else if (t.type === 'boss') {
-      var bdef = STAGES.bossDef(t.bossId);
+      var bdef = resolveBossDef(t.bossId);
       var bossSprite = bossDamageSprite(bdef, t);
-      var bossImg = gradedSprite(bossSprite) || gradedSprite(bdef.sprite) || SPRITES.get(bossSprite) || SPRITES.get(bdef.sprite);
-      var bossDraw = drawBoss2p5D(t, bdef, bossImg);
+      // Workshop bosses get their hue-shifted recolor first; normal bosses
+      // (bdef.hue falsy) take the exact same graded-sprite path as always.
+      var bossImg = (bdef.hue ? hueShiftedSprite(bossSprite, bdef.hue) : null) ||
+        gradedSprite(bossSprite) || gradedSprite(bdef.sprite) || SPRITES.get(bossSprite) || SPRITES.get(bdef.sprite);
+      var bossDraw = drawBoss2p5D(t, bdef, bossImg, bdef.wobbleAmp);
       if (!bossImg) {   // the Moonstone art already wears its crown
         ctx.font = Math.round(t.r * 0.7) + 'px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -2117,6 +2640,17 @@ var GAME = (function () {
       ctx.translate(rand(-1, 1) * st.shake * 22, rand(-1, 1) * st.shake * 22);
     }
 
+    // Photo Mode wraps ALL world layers in one pan/zoom transform.
+    ctx.save();
+    if (photoMode) {
+      ctx.fillStyle = '#14121c'; // letterbox tone behind any pan gaps at 1×
+      ctx.fillRect(-240, -240, W + 480, H + 480);
+      var pz = PHOTO_ZOOMS[photoZoomIdx];
+      ctx.translate(W / 2 + photoPan.x, H / 2 + photoPan.y);
+      ctx.scale(pz, pz);
+      ctx.translate(-W / 2, -H / 2);
+    }
+
     drawBackground();
     drawStageAtmosphere();
     drawDepthHaze();
@@ -2146,6 +2680,9 @@ var GAME = (function () {
         reducedMotion: reducedMotion()
       });
     });
+
+    // the penguins' crossover flyby (above targets/arrows, below particles)
+    drawPlanes();
 
     // lightning bolts
     st.bolts.forEach(function (b) {
@@ -2185,6 +2722,15 @@ var GAME = (function () {
     st.coins.forEach(function (c) { ART.drawCoin(ctx, c.x, c.y, 13, c.t); });
 
     drawForegroundDepth();
+    ctx.restore(); // end the photo pan/zoom world block
+
+    if (photoMode) {
+      // HUD and overlays stay hidden; only the minimal photo bar shows
+      drawPhotoBar();
+      ctx.restore();
+      return;
+    }
+
     drawHUD();
 
     // countdown
@@ -2237,6 +2783,16 @@ var GAME = (function () {
       ctx.font = '800 26px Nunito, sans-serif';
       ctx.fillStyle = '#fff';
       ctx.fillText('Tap to keep playing!', W / 2, ry + RESUME_R + 46);
+      // [PHOTO] pill — opens the snapshot camera (same styling family as the HUD)
+      ART.rr(ctx, PHOTO_PAUSE_BTN.x, PHOTO_PAUSE_BTN.y, PHOTO_PAUSE_BTN.w, PHOTO_PAUSE_BTN.h, 28, 'rgba(26,24,34,0.95)');
+      ctx.strokeStyle = '#ffd23a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(PHOTO_PAUSE_BTN.x + 1.5, PHOTO_PAUSE_BTN.y + 1.5, PHOTO_PAUSE_BTN.w - 3, PHOTO_PAUSE_BTN.h - 3, 26.5);
+      ctx.stroke();
+      ctx.fillStyle = '#ffd23a';
+      ctx.font = '800 26px Nunito, sans-serif';
+      ctx.fillText('📷 PHOTO', W / 2, PHOTO_PAUSE_BTN.y + PHOTO_PAUSE_BTN.h / 2 + 1);
     }
 
     // "TIME'S UP"
@@ -2260,10 +2816,12 @@ var GAME = (function () {
   function frame(now) {
     if (!running) return;
     raf = null;
-    if (paused) return;
+    if (paused && !photoMode) return;
     var dt = Math.min(0.033, (now - (frame.last || now)) / 1000);
     frame.last = now;
-    update(dt);
+    updateHeldKeys(dt); // keyboard aim/draw synthesis (same state the pointer uses)
+    pollGamepad(dt);    // left-stick aim + A draw + Start/B edges
+    if (!paused && !photoMode) update(dt); // photo mode: world frozen, render only
     render();
     requestFrame();
   }
@@ -2287,17 +2845,38 @@ var GAME = (function () {
     if (Math.abs(st.aim.power - lastPower) > 0.06) AUDIO.stretch(st.aim.power);
   }
 
+  function inRect(pt, r) {
+    return pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
+  }
+
   function onDown(e) {
     e.preventDefault();
     AUDIO.unlock();
     if (!st || st.over) return;
     var pt = worldPoint(e);
+    if (photoMode) {
+      // pointer routes to photo controls instead of aiming
+      if (Math.hypot(pt.x - PHOTO_SHUTTER.x, pt.y - PHOTO_SHUTTER.y) <= PHOTO_SHUTTER.r + 12) {
+        takePhoto();
+      } else if (inRect(pt, PHOTO_ZOOM_BTN)) {
+        photoZoomIdx = (photoZoomIdx + 1) % PHOTO_ZOOMS.length;
+        AUDIO.click();
+      } else if (inRect(pt, PHOTO_EXIT_BTN)) {
+        exitPhotoMode();
+      } else {
+        photoDragLast = pt; // begin a pan drag
+      }
+      return;
+    }
     if (paused) {
       // only the big ▶ (or the HUD button) resumes; swallow all other taps
       if (Math.hypot(pt.x - W / 2, pt.y - (H / 2 + 70)) < RESUME_R + 30 ||
           (pt.x >= PAUSE_BTN.x && pt.x <= PAUSE_BTN.x + PAUSE_BTN.w &&
            pt.y >= PAUSE_BTN.y && pt.y <= PAUSE_BTN.y + PAUSE_BTN.h)) {
         setPaused(false);
+      } else if (inRect(pt, PHOTO_PAUSE_BTN)) {
+        AUDIO.click();
+        enterPhotoMode();
       }
       return;
     }
@@ -2313,14 +2892,207 @@ var GAME = (function () {
     aimFrom(pt);
   }
   function onMove(e) {
+    if (photoMode) {
+      e.preventDefault();
+      if (!photoDragLast) return;
+      var ppt = worldPoint(e);
+      photoPan.x = Math.max(-80, Math.min(80, photoPan.x + (ppt.x - photoDragLast.x)));
+      photoPan.y = Math.max(-80, Math.min(80, photoPan.y + (ppt.y - photoDragLast.y)));
+      photoDragLast = ppt;
+      return;
+    }
     if (!st || !st.aiming) return;
     e.preventDefault();
     aimFrom(worldPoint(e));
   }
   function onUp(e) {
+    if (photoMode) { photoDragLast = null; return; }
     if (!st || !st.aiming) return;
     e.preventDefault();
     fireArrow();
+  }
+
+  /* ============ keyboard + gamepad ============
+     Both inputs route through the SAME aim state the pointer uses
+     (st.aiming flag + st.aim {angle, power}), so trajectory dots, bow pose,
+     and fireArrow physics behave identically no matter which input drives it.
+     "Last active input wins" falls out naturally: every writer sets the same
+     fields, and an idle stick (inside the deadzone) writes nothing. */
+
+  function roundLive() {
+    return !!(running && st && !paused && !photoMode && !st.over && st.countdown <= 0);
+  }
+
+  // Hold-draw ownership: Space and pad-button A both ramp power over ~0.9s,
+  // then release fires through the normal fireArrow path (<0.12 cancels).
+  function startSynthDraw(src) {
+    if (drawSrc || !roundLive() || st.arrowsLeft <= 0) return;
+    drawSrc = src;
+    st.aiming = true;
+    st.aim.angle = synthAngle;
+    if (!(st.aim.power > 0)) st.aim.power = 0;
+  }
+  function releaseSynthDraw() {
+    var src = drawSrc;
+    drawSrc = null;
+    if (!src) return;
+    if (st && st.aiming && !st.over) fireArrow();
+  }
+  function cancelSynthDraw() {
+    drawSrc = null;
+    kbHeld = {};
+    kbRotEase = 0;
+  }
+
+  function clampAimAngle(a) { return Math.max(-1.45, Math.min(0.75, a)); }
+
+  // Runs once per frame from frame(). Rotates the keyboard aim and ramps any
+  // active hold-draw. ArrowLeft/A raise the shot (screen-y is down, so angle
+  // decreases); Right/D lower it; Up/W + Down/S fine-tune at half speed.
+  function updateHeldKeys(dt) {
+    if (!roundLive()) { kbRotEase = 0; return; }
+    if (drawSrc) {
+      var before = st.aim.power;
+      st.aim.power = Math.min(1, st.aim.power + dt / 0.9);
+      if (Math.abs(st.aim.power - before) > 0.06) AUDIO.stretch(st.aim.power);
+    }
+    var fast = (kbHeld.ArrowRight ? 1 : 0) - (kbHeld.ArrowLeft ? 1 : 0) +
+               (kbHeld.KeyD ? 1 : 0) - (kbHeld.KeyA ? 1 : 0);
+    fast = Math.max(-1, Math.min(1, fast));
+    var fine = (kbHeld.ArrowDown ? 1 : 0) - (kbHeld.ArrowUp ? 1 : 0) +
+               (kbHeld.KeyS ? 1 : 0) - (kbHeld.KeyW ? 1 : 0);
+    fine = Math.max(-1, Math.min(1, fine));
+    if (fast !== 0 || fine !== 0) {
+      kbRotEase = Math.min(1, kbRotEase + dt * 4); // gentle ease-in while held
+      var turn = KB_ROT_SPEED * kbRotEase * dt * (fast + 0.5 * fine);
+      if (turn !== 0) {
+        synthAngle = clampAimAngle(synthAngle + turn);
+        st.aiming = true;
+        st.aim.angle = synthAngle;
+        if (!(st.aim.power > 0)) st.aim.power = 0;
+      }
+    } else {
+      kbRotEase = 0;
+    }
+  }
+
+  var KEY_AIM_CODES = { ArrowLeft: 1, ArrowRight: 1, ArrowUp: 1, ArrowDown: 1, KeyA: 1, KeyD: 1, KeyW: 1, KeyS: 1 };
+
+  function onKeyDown(e) {
+    var c = e.code;
+    if (c === 'Escape') {
+      if (photoMode) { e.preventDefault(); exitPhotoMode(); }
+      return;
+    }
+    if (!(c === 'Space' || KEY_AIM_CODES[c])) return;
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName || '')) return;
+    e.preventDefault(); // stop arrow-key scrolling / space page-jumps mid-round
+    if (e.repeat) return;
+    if (!roundLive()) return;
+    kbHeld[c] = true;
+    if (KEY_AIM_CODES[c] && !st.aiming && !drawSrc) {
+      // fresh key aim: reuse the last angle, zero power until Space draws
+      synthAngle = clampAimAngle(st.aim.angle ? st.aim.angle : synthAngle);
+      st.aiming = true;
+      st.aim.angle = synthAngle;
+      st.aim.power = 0;
+    }
+    if (c === 'Space') startSynthDraw('key');
+  }
+  function onKeyUp(e) {
+    var c = e.code;
+    if (kbHeld[c]) kbHeld[c] = false;
+    if (c === 'Space' && drawSrc === 'key') releaseSynthDraw();
+  }
+
+  // Pad button helper: pressed OR analog value past half travel.
+  function gpBtn(gp, n) {
+    return !!(gp.buttons[n] && (gp.buttons[n].pressed || gp.buttons[n].value > 0.5));
+  }
+
+  // Called from frame() while the loop is alive. While fully paused the rAF
+  // loop is stopped, so ensureGpPausePoll()'s interval watches Start instead.
+  function pollGamepad(dt) {
+    var pads = null, gp = null, i;
+    try { pads = navigator.getGamepads ? navigator.getGamepads() : null; } catch (err) { pads = null; }
+    for (i = 0; pads && i < pads.length; i++) {
+      if (pads[i] && pads[i].connected) { gp = pads[i]; break; }
+    }
+    if (!gp) { gpWasDeflected = false; return; }
+
+    // Button 9 (Start): pause toggle edge / photo-mode exit
+    var start = gpBtn(gp, 9);
+    if (start && !gpPrevStart) {
+      if (photoMode) exitPhotoMode();
+      else if (running && st && !st.over && !paused) { setPaused(true); AUDIO.click(); }
+    }
+    gpPrevStart = start;
+
+    // Button 1 (B): opens the quit-round flow, which already modal-confirms
+    // ("End this round early?") — the tap on Yes stays a screen tap.
+    var b1 = gpBtn(gp, 1);
+    if (b1 && !gpPrevB1 && running && st && !st.over && !paused && !photoMode) {
+      var modalEl = document.getElementById('modal');
+      if (modalEl && modalEl.classList.contains('hidden')) {
+        var quitBtn = document.getElementById('btn-quit-round');
+        if (quitBtn) quitBtn.click();
+      }
+    }
+    gpPrevB1 = b1;
+
+    var canAim = roundLive() && st.arrowsLeft > 0;
+    var b0 = gpBtn(gp, 0);
+    if (!canAim) {
+      gpWasDeflected = false;
+      if (gpB0Prev && drawSrc === 'gp0') releaseSynthDraw();
+      gpB0Prev = b0;
+      return;
+    }
+
+    // Button 0 (A): hold-to-draw, identical path to Space
+    if (b0 && !gpB0Prev) startSynthDraw('gp0');
+    else if (!b0 && gpB0Prev && drawSrc === 'gp0') releaseSynthDraw();
+    gpB0Prev = b0;
+
+    // Left stick: direct aim vector from the bow anchor. Only applied when the
+    // stick is actually deflected, so a resting stick never overrides mouse aim.
+    if (drawSrc) { gpWasDeflected = false; return; } // a hold-draw owns the shot
+    var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    var len = Math.hypot(ax, ay);
+    if (len > GP_DEADZONE) {
+      gpWasDeflected = true;
+      st.aiming = true;
+      st.aim.angle = Math.atan2(ay, ax);
+      st.aim.power = Math.min(1, (len - GP_DEADZONE) / (1 - GP_DEADZONE));
+    } else if (gpWasDeflected) {
+      // edge-detect: was-deflected → now-neutral releases the shot
+      gpWasDeflected = false;
+      fireArrow(); // fires above 0.12 power, cancels quietly below
+    }
+  }
+
+  // While paused the rAF loop is cancelled, so a tiny interval keeps watching
+  // the Start button to allow un-pausing from the couch. Cleared on resume.
+  function ensureGpPausePoll() {
+    if (gpPauseTimer) return;
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+    gpPauseTimer = setInterval(function () {
+      var pads = null, gp = null, i;
+      try { pads = navigator.getGamepads(); } catch (err) { pads = null; }
+      for (i = 0; pads && i < pads.length; i++) {
+        if (pads[i] && pads[i].connected) { gp = pads[i]; break; }
+      }
+      var start = !!(gp && gp.buttons[9] && (gp.buttons[9].pressed || gp.buttons[9].value > 0.5));
+      if (start && !gpPrevStart && !photoMode) {
+        gpPrevStart = true;
+        setPaused(false);
+        return;
+      }
+      gpPrevStart = start;
+    }, 140);
+  }
+  function clearGpPausePoll() {
+    if (gpPauseTimer) { clearInterval(gpPauseTimer); gpPauseTimer = null; }
   }
 
   /* ============ public ============ */
@@ -2342,10 +3114,29 @@ var GAME = (function () {
       if (!visWired) {
         visWired = true;
         document.addEventListener('visibilitychange', function () {
-          if (document.hidden && running && st && !st.over) setPaused(true);
+          if (document.hidden && running && st && !st.over) {
+            if (photoMode) exitPhotoMode(); // leave photo mode gracefully
+            setPaused(true);
+          }
         });
         window.addEventListener('blur', function () {
-          if (running && st && !st.over) setPaused(true);
+          if (running && st && !st.over) {
+            if (photoMode) exitPhotoMode();
+            setPaused(true);
+          }
+        });
+      }
+
+      // keyboard + gamepad plug-in notice, wired exactly once
+      if (!keysWired) {
+        keysWired = true;
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('gamepadconnected', function () {
+          if (running && st && !paused && !photoMode && !reducedMotion()) {
+            st.floaters.push({ x: W / 2, y: 190, vy: -32, life: 2,
+              text: 'Controller connected!', big: true, color: '#8fdcff' });
+          }
         });
       }
 
@@ -2360,6 +3151,9 @@ var GAME = (function () {
     },
     stop: function () {
       running = false;
+      photoMode = false;
+      cancelSynthDraw();
+      clearGpPausePoll();
       cancelFrame();
       window.onmouseup = null;
     },
@@ -2371,6 +3165,42 @@ var GAME = (function () {
     // Inert accessors for automated tests; safe to ignore in normal play.
     debugState: function () { return st; },
     // Bypasses pause intentionally so tests can advance a frozen scene by hand.
-    debugStep: function (dt) { if (running && st) { update(dt); render(); } }
+    debugStep: function (dt) { if (running && st) { update(dt); render(); } },
+    /* ---- Penny's Boss Workshop live preview ----
+       Draws one frame of the workshop boss onto `canvasEl` using the REAL
+       drawBoss2p5D path: we briefly swap the module canvas/state for a tiny
+       fake boss, paint, then restore. Synchronous, so it can never collide
+       with a running round's rAF loop. `timeSec` drives breathe/wobble;
+       callers pass a frozen time under reduced motion. */
+    previewBoss: function (canvasEl, cfg, timeSec) {
+      if (!canvasEl || !cfg) return;
+      var savedCtx = ctx, savedSt = st, savedRunning = running;
+      var img = SPRITES.get('boss_moonstone_3d_0') || SPRITES.get('boss_moonstone');
+      st = {
+        t: timeSec || 0,
+        rules: {
+          reducedMotion: !!(typeof SAVE !== 'undefined' && SAVE.settings && SAVE.settings().reducedMotion),
+          customBoss: cfg,
+          bossId: 'custom'
+        }
+      };
+      var def = workshopDef();
+      var t = {
+        type: 'boss', r: Math.round(130 * (def.scale / 2.5)),
+        hp: def.hp, maxHp: def.hp,
+        wobble: 0, hitFlash: 0, hitSide: 1, mt: 0
+      };
+      try {
+        ctx = canvasEl.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        ctx.save();
+        ctx.translate(canvasEl.width / 2, canvasEl.height * 0.56);
+        var bossImg = def.hue ? hueShiftedSprite(def.sprite, def.hue) : null;
+        drawBoss2p5D(t, def, bossImg || img, def.wobbleAmp);
+        ctx.restore();
+      } catch (e) { /* preview is cosmetic — never break the editor */ }
+      ctx = savedCtx; st = savedSt; running = savedRunning;
+    }
   };
 })();

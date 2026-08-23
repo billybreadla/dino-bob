@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v28-pause-trixie';
+var CACHE = 'dinobob-v29-penny-studio';
 var FILES = [
   '.',
   'index.html',
@@ -14,6 +14,7 @@ var FILES = [
   'js/stages.js',
   'js/game.js',
   'js/ui.js',
+  'js/changelog.js',
   'js/main.js',
   'intro/intro.dc.html',
   'intro/support.js',
@@ -57,6 +58,7 @@ var FILES = [
   'assets/sprites/arrow_obsidian.png',
   'assets/sprites/bow.png',
   'assets/sprites/balloon.png',
+  'assets/sprites/plane_flyby.webp',
   'assets/sprites/bg_meadow.webp',
   'assets/sprites/bg_mountain.webp',
   'assets/sprites/target.png',

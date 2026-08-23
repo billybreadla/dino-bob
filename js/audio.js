@@ -7,6 +7,9 @@ var AUDIO = (function () {
   var sfxOn = true;
   var sfxGain, musicGain;
   var musicTimer = null;
+  var voiceEls = {};      // one HTMLAudio per line name
+  var voiceMissing = {};  // names whose mp3 AND m4a both failed: silent forever
+  var voiceLast = {};     // name -> timestamp of last play (throttle)
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -103,6 +106,38 @@ var AUDIO = (function () {
     /* ----- sound effects on/off (master SFX gain) ----- */
     setSfx: function (on) { sfxOn = on; if (sfxGain) sfxGain.gain.value = on ? 0.5 : 0; },
     sfxEnabled: function () { return sfxOn; },
+
+    /* ----- kids' voice acting -----
+       Real recordings (Penny!) live in audio/<name>.mp3, with .m4a probed as
+       a fallback (Voice Memos records m4a). Fire-and-forget: if both files
+       are missing we remember and stay silent forever -- never an error.
+       Voice files can't ride the WebAudio sfx gain, so they honor the SFX
+       toggle themselves. Same line is throttled to once per 4 seconds. */
+    voice: function (name) {
+      if (!sfxOn) return;
+      var now = Date.now();
+      if (voiceLast[name] && now - voiceLast[name] < 4000) return;
+      voiceLast[name] = now;
+      if (voiceMissing[name]) return;
+      var el = voiceEls[name];
+      if (!el) {
+        el = new Audio('audio/' + name + '.mp3');
+        el._triedM4a = false;
+        el.addEventListener('error', function () {
+          // first failure: probe .m4a once; second failure: give up quietly
+          if (!el._triedM4a && el.src.indexOf('.m4a') === -1) {
+            el._triedM4a = true;
+            el.src = 'audio/' + name + '.m4a';
+          } else {
+            voiceMissing[name] = true;
+          }
+        });
+        voiceEls[name] = el;
+      }
+      try { el.currentTime = 0; } catch (e) { /* not loaded yet: fine */ }
+      var p = el.play();
+      if (p && p.catch) p.catch(function () { /* autoplay rules: drop it */ });
+    },
 
     /* ----- game sfx ----- */
     shoot: function () { noise({ freq: 2400, slide: 300, dur: 0.18, vol: 0.35 }); },

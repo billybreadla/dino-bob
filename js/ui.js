@@ -4,7 +4,7 @@
 var UI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
-  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'family', 'settings', 'quests'];
+  var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'workshop', 'family', 'settings', 'quests'];
   var activeMode = { type: 'practice', options: null };
   var familySession = null;
 
@@ -77,6 +77,28 @@ var UI = (function () {
       AUDIO.click();
       $('modal').classList.add('hidden');
     };
+  }
+
+  /* ============ what's new (Ship Day notes from js/changelog.js) ============ */
+
+  function renderWhatsNew() {
+    var list = $('whats-new-list');
+    list.innerHTML = '';
+    (typeof CHANGELOG === 'undefined' ? [] : CHANGELOG).forEach(function (entry) {
+      var wrap = document.createElement('div');
+      var head = document.createElement('div');
+      head.innerHTML = '<span class="whatsnew-version">v' + entry.v + '</span>' +
+        '<span class="whatsnew-date">' + entry.date + '</span>';
+      var ul = document.createElement('ul');
+      entry.notes.forEach(function (note) {
+        var li = document.createElement('li');
+        li.textContent = note;
+        ul.appendChild(li);
+      });
+      wrap.appendChild(head);
+      wrap.appendChild(ul);
+      list.appendChild(wrap);
+    });
   }
 
   /* ============ fx overlay: confetti + fireworks ============ */
@@ -278,9 +300,14 @@ var UI = (function () {
     var char = DATA.characterById(p.equipped.character);
     var arrow = DATA.arrowById(p.equipped.arrow);
     $('home-perk').textContent = char.name + ': ' + char.perkText + ' · ' + arrow.name;
+    var dailyBest = SAVE.dailyBest();
+    $('home-daily-best').textContent = dailyBest > 0 ? dailyBest : '—';
     renderQuestBanner();
     show('home');
     animateHome();
+    // A shared challenge link (#c=...) waits until we're home with a profile
+    // loaded, then offers to play it once.
+    checkSharedChallenge();
   }
 
   /* ============ game ============ */
@@ -295,6 +322,8 @@ var UI = (function () {
       else {
         creditQuests(results);
         if (activeMode.type === 'adventure') finishAdventureRound(results);
+        if (activeMode.type === 'daily') applyDailyResult(results);
+        if (activeMode.type === 'workshop') finishWorkshopRound(results);
         showResults(results);
       }
     }, options || activeMode.options || {});
@@ -398,6 +427,18 @@ var UI = (function () {
     var banner = $('results-highscore');
     banner.classList.toggle('hidden', !r.isHighScore);
     $('results-header').textContent = r.adventureWon ? 'STAGE COMPLETE!' : (r.isHighScore ? 'AMAZING!' : 'ROUND OVER!');
+    if (activeMode.type === 'workshop' && r.workshopWon) $('results-header').textContent = 'BOSS DEFEATED!';
+    // context line: who sent a shared challenge, or the daily challenge tag
+    var ctx = $('results-context');
+    if (ctx) {
+      if (r.challengeFrom) ctx.textContent = '🎁 Challenge from ' + r.challengeFrom + '!';
+      else if (activeMode.type === 'daily') ctx.textContent = "📅 Today's family challenge";
+      else if (activeMode.type === 'workshop' && r.workshopWon && r.workshopBoss) ctx.textContent = '👑 ' + r.workshopBoss + ' has fallen!';
+      else ctx.textContent = '';
+      ctx.classList.toggle('hidden', !ctx.textContent);
+    }
+    var dailyBanner = $('results-daily');
+    if (dailyBanner) dailyBanner.classList.toggle('hidden', !(activeMode.type === 'daily' && r.dailyRecord));
     var adventureRow = $('results-adventure-row');
     if (adventureRow) {
       if (activeMode.type === 'adventure' && r.adventureWon) {
@@ -412,8 +453,13 @@ var UI = (function () {
         adventureRow.classList.add('hidden');
       }
     }
+    // Workshop win: the +50 boss bonus is already banked, fold it into the total.
+    if (activeMode.type === 'workshop' && r.workshopBonus) {
+      $('results-coins').textContent = '+' + ((r.coins || 0) + r.workshopBonus);
+    }
     animateResultCharacter(r);
     if (r.isHighScore && r.score > 0) {
+      AUDIO.voice('new_best');
       fx.fireworks();
     }
   }
@@ -577,29 +623,148 @@ var UI = (function () {
       r.adventureReward = reward;
       r.adventureRewardCoins = reward.reward;
       $('results-header').textContent = 'STAGE COMPLETE!';
+      AUDIO.voice('stage_clear');
       fx.confetti();
     }
   }
 
   /* ============ Penny's Challenge Maker ============ */
 
-  function challengeFromControls() {
-    var chaos = $('challenge-chaos').value;
-    var rule = $('challenge-rule').value;
-    var seconds = Number($('challenge-time').value);
+  // One builder for challenge configs, used by the maker controls, shared
+  // links and the daily challenge so all three produce identical shapes.
+  function challengeFromValues(seconds, arrows, speedPct, chaos, bg, rule, author) {
+    seconds = Math.max(20, Math.min(120, Math.round(seconds)));
+    arrows = Math.max(5, Math.min(40, Math.round(arrows)));
+    speedPct = Math.max(60, Math.min(180, Math.round(speedPct)));
     return {
-      mode: 'challenge', label: "PENNY'S CUSTOM CHALLENGE",
+      mode: 'challenge',
+      label: author ? 'CHALLENGE FROM ' + String(author).toUpperCase() : "PENNY'S CUSTOM CHALLENGE",
       roundSeconds: seconds,
-      arrows: Number($('challenge-arrows').value),
-      targetSpeed: Number($('challenge-speed').value) / 100,
+      arrows: arrows,
+      targetSpeed: speedPct / 100,
       moversAt: chaos === 'calm' ? seconds + 1 : (chaos === 'wild' ? 0 : Math.round(seconds * 0.28)),
       chaosAt: chaos === 'calm' ? seconds + 2 : (chaos === 'wild' ? 1 : Math.round(seconds * 0.68)),
-      background: $('challenge-bg').value,
-      theme: $('challenge-bg').value === 'cave' ? 'cave' : null,
+      background: bg,
+      theme: bg === 'cave' ? 'cave' : null,
       specialRule: rule,
       bossAtStart: rule === 'boss',
-      maker: { chaos: chaos, bg: $('challenge-bg').value, rule: rule }
+      maker: { chaos: chaos, bg: bg, rule: rule },
+      from: author || null
     };
+  }
+
+  function challengeFromControls() {
+    return challengeFromValues(
+      Number($('challenge-time').value),
+      Number($('challenge-arrows').value),
+      Number($('challenge-speed').value),
+      $('challenge-chaos').value,
+      $('challenge-bg').value,
+      $('challenge-rule').value,
+      SAVE.current() ? SAVE.current().name : null
+    );
+  }
+
+  /* ---- shareable challenge codes (#c=... in the page URL) ----
+     share-codes:start  (pure string math below: no DOM, safe to unit-test)
+     Config → tiny JSON (v1, defaults dropped) → base64url → "#c=<body.check>"
+     where check is the char-code sum of body mod 97, so smudged or mistyped
+     codes are rejected before we ever try to play one. */
+  function b64uEncode(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64uDecode(str) {
+    var b = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    return decodeURIComponent(escape(atob(b)));
+  }
+  function challengeChecksum(s) {
+    var sum = 0;
+    for (var i = 0; i < s.length; i++) sum = (sum + s.charCodeAt(i)) % 97;
+    return sum;
+  }
+  // Compact schema: v=version, t=time(s), a=arrows, s=speed(%), c=chaos,
+  // b=scenery, r=special rule, n=author name. Defaults are omitted to keep
+  // the link short.
+  function challengeCodeEncode(cfg) {
+    var o = { v: 1 };
+    if (cfg.roundSeconds !== 45) o.t = cfg.roundSeconds;
+    if (cfg.arrows !== 18) o.a = cfg.arrows;
+    if (cfg.targetSpeed !== 1) o.s = Math.round(cfg.targetSpeed * 100);
+    if (cfg.maker && cfg.maker.chaos !== 'mixed') o.c = cfg.maker.chaos;
+    if (cfg.maker && cfg.maker.bg !== 'random') o.b = cfg.maker.bg;
+    if (cfg.maker && cfg.maker.rule !== 'normal') o.r = cfg.maker.rule;
+    if (cfg.from && String(cfg.from).length <= 12) o.n = String(cfg.from);
+    var body = b64uEncode(JSON.stringify(o));
+    return body + '.' + challengeChecksum(body);
+  }
+  function clampNum(v, lo, hi, dflt) {
+    v = Number(v);
+    return isNaN(v) ? dflt : Math.round(Math.max(lo, Math.min(hi, v)));
+  }
+  // Returns a full round config, or null for any tampered/garbage code.
+  function challengeConfigFromCode(code) {
+    try {
+      if (typeof code !== 'string') return null;
+      var dot = code.lastIndexOf('.');
+      if (dot < 1) return null;
+      var body = code.slice(0, dot);
+      if (Number(code.slice(dot + 1)) !== challengeChecksum(body)) return null;
+      var o = JSON.parse(b64uDecode(body));
+      if (!o || o.v !== 1) return null;
+      var chaos = ['calm', 'mixed', 'wild'].indexOf(o.c) !== -1 ? o.c : 'mixed';
+      var bg = ['random', 'bg_meadow', 'bg_sunset_beach', 'bg_mountain', 'bg_starlight', 'bg_underwater', 'cave']
+        .indexOf(o.b) !== -1 ? o.b : 'random';
+      var rule = ['normal', 'balloons', 'fruit', 'boss'].indexOf(o.r) !== -1 ? o.r : 'normal';
+      return challengeFromValues(
+        o.t === undefined ? 45 : clampNum(o.t, 20, 120, 45),
+        o.a === undefined ? 18 : clampNum(o.a, 5, 40, 18),
+        o.s === undefined ? 100 : clampNum(o.s, 60, 180, 100),
+        chaos, bg, rule,
+        typeof o.n === 'string' ? o.n.slice(0, 12) : null
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+  /* share-codes:end */
+
+  // Old-school clipboard fallback for browsers/settings where the async
+  // clipboard API is unavailable (e.g. plain http on some iPads).
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  /* ---- incoming challenges: offer shared codes after boot/home ---- */
+  function clearChallengeHash() {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  }
+  // Called from goHome(): by then a profile always exists, so GAME.start is
+  // safe. "No" (and bad codes) wipe the hash so it never nags again.
+  function checkSharedChallenge() {
+    var match = /^#c=([A-Za-z0-9_\-.]+)$/.exec(location.hash);
+    if (!match) return;
+    var code = match[1];
+    clearChallengeHash();
+    var cfg = challengeConfigFromCode(code);
+    if (!cfg) {
+      modal("That challenge link got smudged on its way here and won't open. Ask for a fresh one!", function () {});
+      return;
+    }
+    modal((cfg.from || 'Someone') + ' sent you a challenge! Play it?', function () {
+      startRound(cfg, 'challenge');
+    });
   }
 
   function openChallenge() {
@@ -621,6 +786,208 @@ var UI = (function () {
     $('challenge-arrows-value').textContent = $('challenge-arrows').value;
     var n = Number($('challenge-speed').value);
     $('challenge-speed-value').textContent = n < 90 ? 'Gentle' : n > 120 ? 'Zoomy!' : 'Normal';
+  }
+
+  /* ============ daily family challenge ============ */
+
+  // Same PRNG flavor as game.js so a seed means the same thing everywhere.
+  function mulberry32ui(seed) {
+    var t = seed >>> 0;
+    return function () {
+      t = (t + 0x6D2B79F5) | 0;
+      var z = t;
+      z = Math.imul(z ^ (z >>> 15), z | 1);
+      z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+      return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Seed from the calendar date, so every device on Earth gets the same
+  // layout that day — zero network required.
+  function todaySeed() {
+    var d = new Date();
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  }
+
+  // Deterministic per-day config: scenery, action style, special rule,
+  // timing, arrows and target speed all roll off one seeded stream. Boss is
+  // excluded — a whole round of just boss is a bit much before breakfast.
+  function dailyChallengeFor(seed) {
+    var rnd = mulberry32ui(seed);
+    function pickOne(arr) { return arr[Math.floor(rnd() * arr.length)]; }
+    var cfg = challengeFromValues(
+      pickOne([40, 45, 50]),
+      16 + Math.floor(rnd() * 5),                       // 16..20 arrows
+      90 + Math.floor(rnd() * 5) * 10,                  // 90%..130% speed
+      pickOne(['calm', 'mixed', 'wild']),
+      pickOne(['bg_meadow', 'bg_sunset_beach', 'bg_mountain', 'bg_starlight', 'bg_underwater', 'cave']),
+      pickOne(['normal', 'balloons', 'fruit']),
+      null
+    );
+    cfg.mode = 'daily';
+    cfg.daily = true;
+    cfg.seed = seed;
+    cfg.label = "TODAY'S FAMILY CHALLENGE";
+    return cfg;
+  }
+
+  function startDailyChallenge() {
+    var seed = todaySeed();
+    startRound(dailyChallengeFor(seed), 'daily');
+  }
+
+  // Device-wide family record: returns true when today's best was beaten.
+  function applyDailyResult(r) {
+    r.dailyRecord = SAVE.recordDailyBest(r.score);
+  }
+
+  /* ============ Penny's Boss Workshop ============ */
+
+  // Design a Moonstone-King-style boss, watch it idle in the live preview,
+  // save up to four designs per player, then fight it in the moon cave.
+  var previewToken = 0;
+
+  function workshopCfg() {
+    var weakBtn = document.querySelector('#boss-weak-row .seg-btn.selected');
+    var name = ($('boss-name').value || '').trim().slice(0, 16);
+    return {
+      id: 'wb' + Date.now() + Math.floor(Math.random() * 1000),
+      name: name || "Penny's Boss",
+      hue: Number($('boss-hue').value) || 0,
+      scale: Number($('boss-size').value) || 2.5,
+      hp: Number($('boss-hp-value').textContent) || 6,
+      weak: weakBtn ? weakBtn.dataset.weak : 'mid',
+      wobble: Number($('boss-wobble').value) || 50,
+      created: Date.now()
+    };
+  }
+
+  function updateWorkshopLabels() {
+    var hue = Number($('boss-hue').value) || 0;
+    var swatch = $('boss-hue-swatch');
+    swatch.style.background = 'hsl(' + hue + ', 78%, 60%)';
+    var size = Number($('boss-size').value);
+    $('boss-size-value').textContent = size < 2.1 ? 'Small-ish' : size < 2.9 ? 'Big' : 'GIANT!';
+    var wobble = Number($('boss-wobble').value);
+    $('boss-wobble-value').textContent = wobble === 0 ? 'Stone still' : wobble <= 40 ? 'Gentle' : wobble <= 60 ? 'Classic' : 'Wobbly!!';
+  }
+
+  // Live preview: one frame of the boss per tick through GAME.previewBoss —
+  // the real game draw path with a minimal fake boss state. Under reduced
+  // motion we paint a single static pose instead of looping.
+  function animateBossPreview() {
+    var token = ++previewToken;
+    var reduced = SAVE.settings().reducedMotion;
+    var t0 = performance.now();
+    function frame() {
+      if (token !== previewToken || $('screen-workshop').classList.contains('hidden')) return;
+      GAME.previewBoss($('boss-preview'), workshopCfg(), reduced ? 1.3 : (performance.now() - t0) / 1000);
+      if (!reduced) requestAnimationFrame(frame);
+    }
+    frame();
+  }
+
+  function renderSavedBosses() {
+    var wrap = $('workshop-saved');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    SAVE.customBosses().forEach(function (b) {
+      var chip = document.createElement('div');
+      chip.className = 'saved-boss-chip';
+      chip.innerHTML =
+        '<span class="saved-boss-dot" style="background:hsl(' + (b.hue || 0) + ',78%,60%)"></span>' +
+        '<span class="saved-boss-name"></span>';
+      chip.querySelector('.saved-boss-name').textContent = b.name;   // textContent: no HTML injection
+      var fight = document.createElement('button');
+      fight.className = 'btn btn-pink';
+      fight.textContent = 'FIGHT';
+      fight.onclick = function () { AUDIO.click(); startRound(workshopRoundOptions(b), 'workshop'); };
+      var del = document.createElement('button');
+      del.className = 'btn btn-ghost';
+      del.textContent = '✕';
+      del.onclick = function () {
+        AUDIO.click();
+        modal('Send "' + b.name + '" away forever?', function () {
+          modal('Are you REALLY sure? This cannot be undone!', function () {
+            SAVE.deleteCustomBoss(b.id);
+            renderSavedBosses();
+          });
+        });
+      };
+      chip.appendChild(fight);
+      chip.appendChild(del);
+      wrap.appendChild(chip);
+    });
+    if (!SAVE.customBosses().length) {
+      var empty = document.createElement('span');
+      empty.className = 'saved-boss-name';
+      empty.style.opacity = '0.6';
+      empty.textContent = 'No bosses saved yet — design one above!';
+      wrap.appendChild(empty);
+    }
+  }
+
+  function openWorkshop() {
+    updateWorkshopLabels();
+    renderSavedBosses();
+    show('workshop');
+    animateBossPreview();
+  }
+
+  function saveWorkshopBoss() {
+    var shelf = SAVE.customBosses();
+    var doSave = function () {
+      SAVE.saveCustomBoss(workshopCfg());
+      AUDIO.fanfare();
+      fx.confetti();
+      renderSavedBosses();
+    };
+    if (shelf.length >= 4) {
+      // Destructive: saving a 5th evicts the oldest, so confirm it twice.
+      modal('Your boss shelf is full! Saving this one will replace "' + shelf[0].name + '".', function () {
+        modal('Really replace your oldest boss?', doSave);
+      });
+    } else {
+      doSave();
+    }
+  }
+
+  // Standalone boss encounter: mirrors the adventure's moon-cave boss stage
+  // (STAGES.optionsFor for win.type 'boss') but marks mode 'workshop' and
+  // carries the custom design in the round options. Normal adventure /
+  // challenge / daily rounds never set customBoss, so their paths are
+  // untouched.
+  function workshopRoundOptions(cfg) {
+    return {
+      mode: 'workshop',
+      label: 'BOSS WORKSHOP · ' + String(cfg.name || "Penny's Boss").toUpperCase(),
+      roundSeconds: 50,
+      arrows: 22,
+      moversAt: 0,
+      chaosAt: 0,
+      targetSpeed: 1.08,
+      background: 'bg_moon_cave',
+      theme: 'cave',
+      specialRule: 'boss',
+      bossAtStart: true,
+      bossId: 'custom',
+      customBoss: cfg
+    };
+  }
+
+  function fightWorkshopBoss() {
+    startRound(workshopRoundOptions(workshopCfg()), 'workshop');
+  }
+
+  function finishWorkshopRound(r) {
+    if (!(r.stats && r.stats.bossDefeated)) return;
+    var cfg = activeMode.options && activeMode.options.customBoss;
+    r.workshopWon = true;
+    r.workshopBoss = cfg ? cfg.name : null;
+    r.workshopBonus = 50;   // banked here, shown on the results card
+    SAVE.addCoins(50);
+    AUDIO.voice('stage_clear');
+    fx.confetti();
   }
 
   /* ============ two-player family mode ============ */
@@ -1190,6 +1557,7 @@ var UI = (function () {
     };
 
     $('btn-play').onclick = function () { AUDIO.click(); startRound({}, 'practice'); };
+    $('btn-daily').onclick = function () { AUDIO.click(); startDailyChallenge(); };
     $('btn-adventure').onclick = function () { AUDIO.click(); openAdventure(); };
     $('btn-challenge').onclick = function () { AUDIO.click(); openChallenge(); };
     $('btn-family').onclick = function () { AUDIO.click(); openFamily(); };
@@ -1208,6 +1576,19 @@ var UI = (function () {
     };
     $('btn-settings').onclick = function () { AUDIO.click(); openSettings(); };
     $('btn-settings-back').onclick = function () { AUDIO.click(); goHome(); };
+    $('btn-version').textContent = 'v' + (typeof CHANGELOG !== 'undefined' ? CHANGELOG[0].v : '?');
+    $('btn-version').onclick = function () {
+      AUDIO.click();
+      renderWhatsNew();
+      $('whats-new').classList.remove('hidden');
+    };
+    $('whats-new-close').onclick = function () {
+      AUDIO.click();
+      $('whats-new').classList.add('hidden');
+    };
+    $('whats-new').addEventListener('click', function (e) {
+      if (e.target === this) this.classList.add('hidden');
+    });
     $('set-music').onclick = function () { AUDIO.unlock(); setMusicPref(!SAVE.settings().music); };
     $('set-sfx').onclick = function () {
       var on = !SAVE.settings().sfx;
@@ -1271,7 +1652,63 @@ var UI = (function () {
       SAVE.saveChallenge(challenge);
       startRound(challenge, 'challenge');
     };
+    $('btn-challenge-share').onclick = function () {
+      AUDIO.click();
+      var msg = $('challenge-share-msg');
+      var OK = 'Link copied!';
+      var FAIL = 'Could not copy — long-press the address bar to share it!';
+      var showMsg = function (text) {
+        msg.textContent = text;
+        msg.classList.remove('hidden');
+        setTimeout(function () { msg.classList.add('hidden'); }, 2600);
+      };
+      try {
+        var url = location.origin + location.pathname + '#c=' + challengeCodeEncode(challengeFromControls());
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(
+            function () { showMsg(OK); },
+            function () { showMsg(legacyCopy(url) ? OK : FAIL); }
+          );
+        } else {
+          showMsg(legacyCopy(url) ? OK : FAIL);
+        }
+      } catch (e) {
+        showMsg(FAIL);
+      }
+    };
     $('btn-family-start').onclick = function () { AUDIO.click(); beginFamilyMatch(); };
+
+    /* ---- Penny's Boss Workshop ---- */
+    $('btn-workshop').onclick = function () { AUDIO.click(); openWorkshop(); };
+    $('btn-workshop-back').onclick = function () { AUDIO.click(); goHome(); };
+    ['boss-hue', 'boss-size', 'boss-wobble'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        updateWorkshopLabels();
+        animateBossPreview();
+      });
+    });
+    $('boss-hp-minus').onclick = function () {
+      AUDIO.click();
+      var v = Number($('boss-hp-value').textContent);
+      $('boss-hp-value').textContent = Math.max(3, v - 1);
+      animateBossPreview();
+    };
+    $('boss-hp-plus').onclick = function () {
+      AUDIO.click();
+      var v = Number($('boss-hp-value').textContent);
+      $('boss-hp-value').textContent = Math.min(9, v + 1);
+      animateBossPreview();
+    };
+    $('boss-weak-row').addEventListener('click', function (e) {
+      var btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      AUDIO.click();
+      this.querySelectorAll('.seg-btn').forEach(function (b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      animateBossPreview();
+    });
+    $('btn-workshop-save').onclick = function () { AUDIO.click(); saveWorkshopBoss(); };
+    $('btn-workshop-fight').onclick = function () { AUDIO.click(); fightWorkshopBoss(); };
     $('btn-family-next').onclick = function () { AUDIO.click(); familyNextTurn(); };
     $('btn-family-again').onclick = function () { AUDIO.click(); openFamily(); };
     $('btn-family-home').onclick = function () { AUDIO.click(); goHome(); };

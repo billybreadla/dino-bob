@@ -57,6 +57,7 @@ var SAVE = (function () {
         if (!p.adventureStarRatings[idx]) p.adventureStarRatings[idx] = 1;
       });
       if (!p.customChallenge) p.customChallenge = null;
+      if (!Array.isArray(p.customBosses)) p.customBosses = [];   // Penny's Boss Workshop
     });
     // device-wide settings (audio + accessibility), not per-profile
     if (!state.settings) state.settings = {};
@@ -66,6 +67,9 @@ var SAVE = (function () {
     if (typeof state.settings.reducedMotion !== 'boolean') {
       state.settings.reducedMotion = !!(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     }
+    // family daily-challenge best: { date:'YYYY-M-D', score } — shared by the
+    // whole device, wiped naturally when a new day begins (see dailyBest).
+    if (!state.dailyBest || typeof state.dailyBest.score !== 'number') state.dailyBest = null;
     return state;
   }
 
@@ -143,6 +147,32 @@ var SAVE = (function () {
       persist();
     },
 
+    /* ----- family daily challenge best (device-wide, per calendar day) -----
+       Everyone playing on this device shares one "TODAY'S BEST" for the
+       deterministic daily layout. A new day starts fresh automatically. */
+    dailyBest: function () {
+      if (!state) load();
+      return (state.dailyBest && state.dailyBest.date === todayStr()) ? state.dailyBest.score : 0;
+    },
+    // Record a finished daily round; true only when the family record fell.
+    recordDailyBest: function (score) {
+      if (!state) load();
+      score = Math.max(0, Math.round(score || 0));
+      if (score <= 0) return false;
+      var today = todayStr();
+      if (!state.dailyBest || state.dailyBest.date !== today) {
+        state.dailyBest = { date: today, score: score };
+        persist();
+        return true;
+      }
+      if (score > state.dailyBest.score) {
+        state.dailyBest.score = score;
+        persist();
+        return true;
+      }
+      return false;
+    },
+
     // Wipe the CURRENT player's progress (coins, unlocks, adventure, stats,
     // badges, high score) but keep their name/avatar so they stay logged in.
     resetProgress: function () {
@@ -193,6 +223,31 @@ var SAVE = (function () {
       var p = current();
       if (!p) return;
       p.customChallenge = challenge;
+      persist();
+    },
+
+    /* ----- Penny's Boss Workshop -----
+       Each player keeps up to 4 of their own boss designs, saved per-profile
+       like everything else. Saving a 5th evicts the oldest (the workshop asks
+        before it lets that happen). Schema:
+       { id, name, hue, scale, hp, weak:'top'|'mid'|'low', wobble, created } */
+    customBosses: function () {
+      var p = current();
+      return (p && Array.isArray(p.customBosses)) ? p.customBosses : [];
+    },
+    saveCustomBoss: function (boss) {
+      var p = current();
+      if (!p || !boss) return null;
+      if (!Array.isArray(p.customBosses)) p.customBosses = [];
+      p.customBosses.push(boss);
+      while (p.customBosses.length > 4) p.customBosses.shift();   // oldest out
+      persist();
+      return boss;
+    },
+    deleteCustomBoss: function (id) {
+      var p = current();
+      if (!p) return;
+      p.customBosses = (p.customBosses || []).filter(function (b) { return b.id !== id; });
       persist();
     },
 

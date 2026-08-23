@@ -168,10 +168,35 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
 Always: masters to `assets/source/art-v6/` (or v7 dir), cutouts named
 exactly as specced, transparent PNG; Claude converts to WebP + wires + ships.
 
+## ✏️ Penny's Doodle Enemies — how to use (shipped 2026-08-22)
+
+1. Draw a creature on white paper (or any app), photograph/save it.
+2. From the repo root run:
+   `python3 tools/import_drawing.py path/to/drawing.png --name mymonster`
+   (add `--points 60` for a rarer one; background is removed automatically —
+   rembg if installed, corner flood-fill otherwise).
+3. Reload the game. During phases 2-3, ~10% of bullseye slots become doodles
+   (max 2 alive, soft targets, worth the entry's `points`, default 40).
+4. Remove one: delete its block from `assets/sprites/doodles.json` + the
+   `assets/sprites/doodle_<name>.png` file. Manifest empty = feature dormant.
+
+Kids' voice lines work the same way: drop MP3/M4A files named per
+`tools/VOICE_LINES.md` into `audio/`. Missing files are silent no-ops.
+
 ---
 
 ## ✅ Shipped (recent, newest first)
 
+- 2026-08-22 — **v29 "Penny Studio" wave** (uncommitted, one commit pending):
+  Boss Workshop (design + fight custom bosses, SAVE.customBosses); Doodle
+  Enemies pipeline (tools/import_drawing.py + doodles.json manifest, dormant
+  until Penny adds a drawing); Daily Challenge (seeded YYYYMMDD) +
+  shareable challenge codes (#c= URL hash, checksummed); Photo Mode with
+  share card; keyboard + gamepad aiming/firing; kids' voice-line system
+  (audio/, see tools/VOICE_LINES.md); crossover plane flyby from the
+  penguins game; What's New screen (js/changelog.js — Penny writes notes);
+  Blender turntable/toy tooling (tools/render_turntable.py,
+  bake_frames.py, TOY_PIPELINE.md). SW v29.
 - 2026-07-04 `db2d5cd` — V6 art wired: ground stands (turntable/easel), rendered
   pickups, apple/watermelon 3D tumbles, per-biome foreground occlusion strips;
   27 assets WebP'd 10.5MB→1.8MB. SW v27.

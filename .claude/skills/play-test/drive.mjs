@@ -1,6 +1,7 @@
 // Play-test driver for Dino Bob. See SKILL.md.
-//   node drive.mjs         -> drive the LOCAL working tree (file://)
-//   node drive.mjs --live  -> drive the deployed site
+//   node drive.mjs              -> drive the LOCAL working tree (file://)
+//   node drive.mjs --url=http://127.0.0.1:8769/ -> drive any URL (e.g. local server)
+//   node drive.mjs --live       -> drive the deployed site
 import { createRequire } from 'module';
 import fs from 'fs';
 import os from 'os';
@@ -18,9 +19,10 @@ function loadPuppeteer() {
 const puppeteer = loadPuppeteer();
 
 const LIVE = process.argv.includes('--live');
+const urlArg = process.argv.map(a => a.match(/^--url=(.+)$/)).filter(Boolean)[0];
 const skillDir = path.dirname(new URL(import.meta.url).pathname);
 const REPO = path.resolve(skillDir, '../../..');            // <repo>/.claude/skills/play-test -> <repo>
-const TARGET = LIVE ? 'https://dino-bob-penny.netlify.app/' : 'file://' + REPO + '/index.html';
+const TARGET = urlArg ? urlArg[1] : LIVE ? 'https://dino-bob-penny.netlify.app/' : 'file://' + REPO + '/index.html';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHOTS = '/tmp/dino-shots';
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -44,7 +46,14 @@ const errors = [];
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--mute-audio', '--allow-file-access-from-files'] });
 const page = await browser.newPage();
 await page.setViewport({ width: 1280, height: 800 });
-page.on('console', m => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  // audio/<name>.mp3/.m4a are optional kid recordings (audio/ may be empty);
+  // their 404 probes are the designed silent no-op, not a game error.
+  const url = (m.location() && m.location().url) || '';
+  if (/\/audio\/[^/]+\.(mp3|m4a)$/.test(url)) return;
+  errors.push('console.error: ' + m.text());
+});
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 await page.evaluateOnNewDocument((s) => localStorage.setItem('dinobob_save_v1', s), save);
 

@@ -43,7 +43,9 @@ var SPRITES = (function () {
     'fruit_banana_3d_3', 'fruit_banana_3d_4', 'fruit_banana_3d_5',
     'fruit_watermelon_3d_0', 'fruit_watermelon_3d_1', 'fruit_watermelon_3d_2',
     'fruit_watermelon_3d_3', 'fruit_watermelon_3d_4', 'fruit_watermelon_3d_5',
-    'fg_meadow', 'fg_mountain', 'fg_sunset_beach', 'fg_starlight', 'fg_underwater', 'fg_moon_cave'
+    'fg_meadow', 'fg_mountain', 'fg_sunset_beach', 'fg_starlight', 'fg_underwater', 'fg_moon_cave',
+    // crossover flyby: the penguins' plane (from "If Penguins Could Fly")
+    'plane_flyby'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,
@@ -52,19 +54,45 @@ var SPRITES = (function () {
   // every V6 asset shipped as WebP from day one
   NAMES.slice(NAMES.indexOf('target_stand')).forEach(function (n) { WEBP[n] = 1; });
   var imgs = {};
-  NAMES.forEach(function (n) {
+  function load(name) {
     var im = new Image();
     im._ok = false;
     im.onload = function () { im._ok = im.naturalWidth > 0; };
     im.onerror = function () { im._ok = false; };
-    im.src = 'assets/sprites/' + n + (WEBP[n] ? '.webp' : '.png');
-    imgs[n] = im;
-  });
+    im.src = 'assets/sprites/' + name + (WEBP[name] ? '.webp' : '.png');
+    imgs[name] = im;
+  }
+  NAMES.forEach(load);
+
+  /* ----- Penny's Doodle Enemies -----
+     tools/import_drawing.py turns a kid's drawing into doodle_<name>.png and
+     lists it in assets/sprites/doodles.json. We fetch that manifest fresh on
+     every boot (no-store) so new drawings appear after a simple page reload.
+     If anything goes wrong -- no manifest, offline, file:// -- the game just
+     runs with zero doodles: the feature is fully absent, never broken. */
+  var doodles = [];
+  function loadDoodles() {
+    fetch('assets/sprites/doodles.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !data.doodles || !data.doodles.length) return;
+        data.doodles.forEach(function (d) {
+          if (!d || !/^doodle_[a-z0-9_]+$/.test(d.sprite)) return; // only safe names
+          if (imgs[d.sprite]) return;                              // already loaded
+          load(d.sprite);
+          doodles.push({ name: d.name || d.sprite, sprite: d.sprite, points: d.points || 40 });
+        });
+      })
+      .catch(function () { /* zero doodles is a valid state */ });
+  }
+  try { loadDoodles(); } catch (e) { /* very old browser without fetch */ }
 
   return {
     get: function (name) {
       var im = imgs[name];
       return (im && im._ok) ? im : null;
-    }
+    },
+    // live list of imported kid drawings [{name, sprite, points}]
+    doodles: function () { return doodles.slice(); }
   };
 })();
