@@ -72,7 +72,10 @@ var SPRITES = (function () {
     // the Crab King: procedural Blender mini-boss (tools/model_toys.py),
     // 6 frames = 3 damage states x 2 hit-flash yaws
     'crab_3d_0', 'crab_3d_1', 'crab_3d_2',
-    'crab_3d_3', 'crab_3d_4', 'crab_3d_5'
+    'crab_3d_3', 'crab_3d_4', 'crab_3d_5',
+    // the Angler Golem: same pipeline, guards Bubble Reef
+    'angler_3d_0', 'angler_3d_1', 'angler_3d_2',
+    'angler_3d_3', 'angler_3d_4', 'angler_3d_5'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,

@@ -883,10 +883,12 @@ var UI = (function () {
 
   function workshopCfg() {
     var weakBtn = document.querySelector('#boss-weak-row .seg-btn.selected');
+    var bodyBtn = document.querySelector('#boss-body-row .seg-btn.selected');
     var name = ($('boss-name').value || '').trim().slice(0, 16);
     return {
       id: 'wb' + Date.now() + Math.floor(Math.random() * 1000),
       name: name || "Penny's Boss",
+      body: bodyBtn ? bodyBtn.dataset.body : 'moonstone',
       hue: Number($('boss-hue').value) || 0,
       scale: Number($('boss-size').value) || 2.5,
       hp: Number($('boss-hp-value').textContent) || 6,
@@ -1734,6 +1736,14 @@ var UI = (function () {
       animateBossPreview();
     };
     $('boss-weak-row').addEventListener('click', function (e) {
+      var btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      AUDIO.click();
+      this.querySelectorAll('.seg-btn').forEach(function (b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      animateBossPreview();
+    });
+    $('boss-body-row').addEventListener('click', function (e) {
       var btn = e.target.closest('.seg-btn');
       if (!btn) return;
       AUDIO.click();

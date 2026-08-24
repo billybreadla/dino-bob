@@ -5,9 +5,11 @@
 
 var CHANGELOG = [
   {
-    v: "33",
+    v: "34",
     date: "2026-08-23",
     notes: [
+      "THE ANGLER GOLEM! A fang-faced stone fish lurks in Bubble Reef!",
+      "Boss Workshop: build your boss on a STONE, CRAB or ANGLER body!",
       "THE CRAB KING! A real 3D boss guards Sunset Beach - crack his shell!",
       "Bosses now RAGE at half health - and stomp the ground!",
       "MUSIC! Every world plays its own tune, and bosses get battle music!",

@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v33-bossking';
+var CACHE = 'dinobob-v34-angler';
 var FILES = [
   '.',
   'index.html',
@@ -207,7 +207,11 @@ var FILES = [
   // the Crab King: procedural Blender mini-boss frames
   'assets/sprites/crab_3d_0.webp', 'assets/sprites/crab_3d_1.webp',
   'assets/sprites/crab_3d_2.webp', 'assets/sprites/crab_3d_3.webp',
-  'assets/sprites/crab_3d_4.webp', 'assets/sprites/crab_3d_5.webp'
+  'assets/sprites/crab_3d_4.webp', 'assets/sprites/crab_3d_5.webp',
+  // the Angler Golem: same pipeline, guards Bubble Reef
+  'assets/sprites/angler_3d_0.webp', 'assets/sprites/angler_3d_1.webp',
+  'assets/sprites/angler_3d_2.webp', 'assets/sprites/angler_3d_3.webp',
+  'assets/sprites/angler_3d_4.webp', 'assets/sprites/angler_3d_5.webp'
 ];
 
 self.addEventListener('install', function (e) {

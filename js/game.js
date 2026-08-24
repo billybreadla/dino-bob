@@ -148,7 +148,6 @@ var GAME = (function () {
     if ((biomeKey === 'grass' || biomeKey === 'beach') && wsky < TUNING.WEATHER_RAIN_CHANCE) wkind = 'rain';
     else if (biomeKey === 'starlight' && wsky < TUNING.WEATHER_METEOR_CHANCE) wkind = 'meteor';
     else if (biomeKey === 'cave' && wsky < TUNING.WEATHER_EMBER_CHANCE) wkind = 'embers';
-    bgName = 'bg_meadow'; biomeKey = 'grass'; wkind = 'rain'; // TEMP TEST HACK — REVERT ME
     // underwater always stays clear: its bubbles already live in the atmosphere
     var wf = Math.min(1, Math.abs(rules.wind) / TUNING.WIND_MAX);
     var weather = {
@@ -412,15 +411,20 @@ var GAME = (function () {
      boss keeps flowing through STAGES.bossDef exactly as before.
      Weak spot: expressed as an art lift fraction so the hitbox circle lands
      on TOP / MIDDLE / LOW of the sprite (lift = fraction - 0.5). */
-  var WORKSHOP_RENDER_FRAMES = ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'];
+  var WORKSHOP_BODIES = {
+    moonstone: ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'],
+    crab: ['crab_3d_0', 'crab_3d_1', 'crab_3d_2', 'crab_3d_3', 'crab_3d_4', 'crab_3d_5'],
+    angler: ['angler_3d_0', 'angler_3d_1', 'angler_3d_2', 'angler_3d_3', 'angler_3d_4', 'angler_3d_5']
+  };
 
   function workshopDef() {
     var c = st.rules.customBoss || {};
+    var frames = WORKSHOP_BODIES[c.body] || WORKSHOP_BODIES.moonstone;
     return {
       name: c.name || "Penny's Boss",
-      sprite: 'boss_moonstone',
-      damageSprites: ['boss_moonstone', 'boss_moonstone_cracked', 'boss_moonstone_broken'],
-      renderFrames: WORKSHOP_RENDER_FRAMES,
+      sprite: frames[0],
+      damageSprites: [frames[0], frames[2], frames[4]],
+      renderFrames: frames,
       hp: c.hp,
       scale: c.scale,
       lift: (c.weak === 'top' ? -0.20 : c.weak === 'low' ? 0.20 : 0),

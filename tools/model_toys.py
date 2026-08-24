@@ -537,6 +537,144 @@ def build_crab(damage=0, yaw=0.0):
     return root
 
 
+# ------------------------------------------------------------- anglerfish --
+# The Angler Golem: deep-sea stone fish with a glowing lantern lure whose
+# target-ring IS the weak spot. Same 6-frame damage pipeline as the crab.
+ANGLER_ORTHO = 4.6
+
+
+def build_angler(damage=0, yaw=0.0):
+    root = bpy.data.objects.new('angler_root', None)
+    bpy.context.collection.objects.link(root)
+
+    stone = mat('ang_stone', srgb('#465064'), 0.6)
+    stone_dk = mat('ang_stone_dk', srgb('#2c3342'), 0.7)
+    cream = mat('ang_cream', srgb('#e8ddc0'), 0.5)
+    red = mat('ang_red', srgb('#d85a3a'), 0.4)
+    glow = mat('ang_glow', srgb('#ffd23a'), 0.3)
+    gb = glow.node_tree.nodes.get('Principled BSDF')
+    gb.inputs['Emission Color'].default_value = (*srgb('#ffd23a'), 1.0)
+    gb.inputs['Emission Strength'].default_value = 2.6
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1)):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        return ob
+
+    # body: big round stone head-body, tilted so the face fronts the camera
+    part('body', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=36, ring_count=22, radius=0.95, location=(0, 0, 0)),
+        stone, (0, 0.12, 0.85), scale=(1.12, 0.95, 1.0))
+    # wide-open mouth: upper maw cut + big dropped lower jaw, pushed FORWARD
+    part('maw', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=24, ring_count=14, radius=0.55, location=(0, 0, 0)),
+        stone_dk, (0, -0.62, 0.62), scale=(0.85, 0.6, 0.5))
+    part('jaw', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.6, location=(0, 0, 0)),
+        stone, (0, -0.55, 0.18), scale=(1.0, 0.85, 0.5))
+    # teeth: big ragged cones ringing the maw
+    for i in range(6):
+        fx = -0.5 + i * 0.2
+        part('tooth', lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=8, radius1=0.085, radius2=0, depth=0.34,
+            location=(0, 0, 0)),
+            cream, (fx, -0.88, 0.78), rot=(math.radians(196), 0, 0))
+        part('tooth', lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=8, radius1=0.075, radius2=0, depth=0.3,
+            location=(0, 0, 0)),
+            cream, (fx + 0.1, -0.86, 0.3))
+    # glowing eyes under the lure light, on the face front
+    for side in (-1, 1):
+        part('eye', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.13, location=(0, 0, 0)),
+            glow, (side * 0.38, -0.86, 1.22))
+        part('lid', lambda: bpy.ops.mesh.primitive_cube_add(
+            size=1, location=(0, 0, 0)),
+            stone_dk, (side * 0.38, -0.88, 1.35), rot=(0, 0, side * 0.4),
+            scale=(0.32, 0.09, 0.06))
+
+    # the lantern lure: arcing stalk from the brow, glowing ring-bulb tip.
+    # The ring around the bulb is the aim target.
+    part('stalk', lambda: bpy.ops.mesh.primitive_cylinder_add(
+        vertices=10, radius=0.05, depth=0.85, location=(0, 0, 0)),
+        stone_dk, (0, -0.4, 2.0), rot=(math.radians(18), 0, 0))
+    part('bulb', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=20, ring_count=14, radius=0.3, location=(0, 0, 0)),
+        glow, (0, -0.72, 2.42))
+    part('lure_ring', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.42, minor_radius=0.06, location=(0, 0, 0)),
+        red, (0, -0.72, 2.42), rot=(math.radians(12), 0, 0))
+    part('lure_ring2', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.26, minor_radius=0.05, location=(0, 0, 0)),
+        cream, (0, -0.74, 2.42), rot=(math.radians(12), 0, 0))
+
+    # side fins + tail
+    for side in (-1, 1):
+        part('fin', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=16, ring_count=10, radius=0.3, location=(0, 0, 0)),
+            stone_dk, (side * 1.08, 0.1, 0.6), rot=(0, math.radians(28 * side), 0),
+            scale=(0.35, 1.0, 0.75))
+    part('tailfin', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=16, ring_count=10, radius=0.42, location=(0, 0, 0)),
+        stone_dk, (0, 0.95, 0.85), rot=(math.radians(76), 0, 0),
+        scale=(1.0, 0.3, 1.0))
+
+    # barnacle bumps on the stone hide
+    barn = [(0.6, 0.35, 1.3, 0.09), (-0.65, 0.3, 1.25, 0.08),
+            (0.85, -0.1, 1.0, 0.07), (-0.85, -0.05, 0.95, 0.075),
+            (0.2, 0.55, 1.45, 0.06)]
+    for i, (bx, by, bz, br) in enumerate(barn):
+        part('barn%d' % i, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=12, ring_count=8, radius=br, location=(0, 0, 0)),
+            cream, (bx, by, bz))
+
+    # legs/fins at the base: three stubby stone pairs to stand on
+    for side in (-1, 1):
+        for i in range(3):
+            part('foot', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+                segments=12, ring_count=8, radius=0.13, location=(0, 0, 0)),
+                stone_dk, (side * (0.6 + i * 0.28), 0.05, 0.12),
+                scale=(1.5, 1, 0.55))
+
+    # DAMAGE: 1 = cracks + dim lure; 2 = heavy cracks, snapped lure (bent +
+    # dimmer), broken tooth, missing foot
+    crack_m = mat('ang_crack', srgb('#10141c'), 0.75)
+    if damage >= 1:
+        spots = [(0.5, -0.3, 1.35, 0.5, 0.65), (-0.55, 0.2, 1.15, -0.7, 0.6)]
+        if damage >= 2:
+            spots += [(0.0, -0.6, 0.9, 0.15, 0.7), (0.35, 0.4, 1.5, 1.0, 0.6)]
+        for i, (cx, cy, cz, rz, cs) in enumerate(spots):
+            part('crack%d' % i, lambda: bpy.ops.mesh.primitive_cube_add(
+                size=1, location=(0, 0, 0)),
+                crack_m, (cx, cy, cz), rot=(0, rz, rz * 1.3),
+                scale=(cs, 0.06, 0.08))
+    if damage >= 1:
+        gb2 = glow.node_tree.nodes.get('Principled BSDF')
+        gb2.inputs['Emission Strength'].default_value = 1.4 if damage == 1 else 0.7
+    if damage >= 2:
+        stalk = bpy.data.objects.get('stalk')
+        if stalk:
+            stalk.rotation_euler = (math.radians(24), math.radians(26), 0)
+            stalk.location = (0.12, -0.3, 1.85)
+        teeth = [ob for ob in bpy.data.objects if ob.name.startswith('tooth')]
+        if teeth:
+            bpy.data.objects.remove(teeth[-1], do_unlink=True)
+        feet = [ob for ob in bpy.data.objects if ob.name.startswith('foot')]
+        if feet:
+            bpy.data.objects.remove(feet[-1], do_unlink=True)
+
+    root.rotation_euler = (0, 0, yaw)
+    root.location = (0, 0, -0.5)  # sit lower in the ortho frame
+    return root
+
+
 # ----------------------------------------------------------------- render --
 def render_turntable(root, prefix, outdir, frames, ortho_scale, world_strength):
     setup_camera(ortho_scale)
@@ -571,10 +709,11 @@ def main():
     jobs = ['balloon_3d', 'coin_3d'] if prefix == 'all' else \
         ['bow'] if prefix == 'bow' else \
         list(ARROW_TYPES) if prefix == 'arrows' else \
-        ['crab_3d'] if prefix == 'crab' else [prefix]
-    # crab: 6 frames = 3 damage states x 2 yaws (bossDamageSprite indexes
-    # frame 0 healthy, 2 light, 4 heavy; odd frames are the hit-flash poses)
-    crab_specs = [(0, 0.0), (0, 0.16), (1, 0.0), (1, 0.16), (2, 0.0), (2, 0.16)]
+        ['crab_3d'] if prefix == 'crab' else \
+        ['angler_3d'] if prefix == 'angler' else [prefix]
+    # crab/angler: 6 frames = 3 damage states x 2 yaws (bossDamageSprite
+    # indexes frame 0 healthy, 2 light, 4 heavy; odd frames = hit-flash poses)
+    boss_specs = [(0, 0.0), (0, 0.16), (1, 0.0), (1, 0.16), (2, 0.0), (2, 0.16)]
     for which in jobs:
         if which.startswith('balloon'):
             root, scale, wstr = build_balloon(), BALLOON_ORTHO, 0.18
@@ -586,18 +725,21 @@ def main():
             root, scale, wstr = build_arrow(which), ARROW_ORTHO, 0.3
         elif which == 'crab_3d':
             root, scale, wstr = build_crab(), CRAB_ORTHO, 0.3
+        elif which == 'angler_3d':
+            root, scale, wstr = build_angler(), ANGLER_ORTHO, 0.3
         else:
             raise SystemExit('unknown prefix: ' + which)
         name = 'bow' if which == 'bow' else \
             ('arrow_%s_3d' % which) if which in ARROW_TYPES else which
-        if which == 'crab_3d':
+        if which in ('crab_3d', 'angler_3d'):
             # inline render: render_turntable would overwrite the yaw
             sc = bpy.context.scene
             setup_camera(scale)
-            for i, (dmg, yaw) in enumerate(crab_specs):
-                r = build_crab(dmg, yaw)
+            for i, (dmg, yaw) in enumerate(boss_specs):
+                r = build_crab(dmg, yaw) if which == 'crab_3d' \
+                    else build_angler(dmg, yaw)
                 sc.render.filepath = os.path.join(
-                    outdir, 'crab_3d_%d.png' % i)
+                    outdir, '%s_%d.png' % (which, i))
                 bpy.ops.render.render(write_still=True)
                 print('rendered', sc.render.filepath)
                 doomed = [ob.name for ob in bpy.data.objects

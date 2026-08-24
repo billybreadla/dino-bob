@@ -48,6 +48,14 @@ var STAGES = (function () {
       hp: 6,
       scale: 2.4,
       lift: -0.06
+    },
+    angler: {
+      name: 'Angler Golem',
+      sprite: 'angler_3d_0',
+      renderFrames: ['angler_3d_0', 'angler_3d_1', 'angler_3d_2', 'angler_3d_3', 'angler_3d_4', 'angler_3d_5'],
+      hp: 7,
+      scale: 2.4,
+      lift: 0.05
     }
   };
 
@@ -96,10 +104,10 @@ var STAGES = (function () {
       id: 'bubble-reef',
       name: 'Bubble Reef',
       shortName: 'Reef',
-      blurb: 'Balloon currents drift underwater before the final cave.',
+      blurb: 'The Angler Golem lurks in the glowing reef — shoot the light!',
       background: 'bg_underwater',
-      round: { roundSeconds: 48, arrows: 20, moversAt: 7, chaosAt: 28, targetSpeed: 1.10, specialRule: 'balloons' },
-      win: { type: 'score', goal: 1700 },
+      round: { roundSeconds: 48, arrows: 22, moversAt: 7, chaosAt: 28, targetSpeed: 1.10 },
+      win: { type: 'boss', boss: 'angler' },
       node: { x: '72%', y: '43%', color: '#23aaa2', accent: '#8cf2ff', sigil: 'bubble' }
     },
     {

@@ -187,6 +187,13 @@ Kids' voice lines work the same way: drop MP3/M4A files named per
 
 ## ✅ Shipped (recent, newest first)
 
+- 2026-08-24 — **v34 "Angler" wave**: THE ANGLER GOLEM — second procedural
+  Blender boss (stone body, glowing lure target-ring, big fangs; 6 damage
+  frames) now guards Bubble Reef (stage 5 flipped to boss, hp 7); Boss
+  Workshop body picker (STONE / CRAB / ANGLER frames for custom bosses);
+  removed a leftover weather test hack that forced every round to rainy
+  meadow (found via the angler probe — the agent that wrote it said it
+  reverted it; lesson: grep for 'TEMP TEST' after agent batches).
 - 2026-08-24 — **v33 "Boss King" wave** (uncommitted, one commit pending):
   THE CRAB KING — procedural Blender mini-boss (tools/model_toys.py
   build_crab: hermit crab + brass diving helmet + glowing belly weak-spot;
