@@ -187,6 +187,44 @@ Kids' voice lines work the same way: drop MP3/M4A files named per
 
 ## ✅ Shipped (recent, newest first)
 
+- 2026-08-24 — **v33 "Boss King" wave** (uncommitted, one commit pending):
+  THE CRAB KING — procedural Blender mini-boss (tools/model_toys.py
+  build_crab: hermit crab + brass diving helmet + glowing belly weak-spot;
+  6 frames = 3 damage states x 2 yaws; ~16KB webp each) now guards Sunset
+  Beach (stage 2 win flipped to boss per ART_ASSET_HANDOFF_V7 — art built
+  in-house, handoff doc now covers the anglerfish only); boss spectacle
+  (rage phase at half HP: floater + shake + camKick + faster spawns; stomp
+  rumble on a 3.4s cadence; death slow-mo shatter + zoom); procedural MUSIC
+  engine (js/audio.js: lookahead scheduler, meadow/tense/sea loops as note
+  data, crossfade switching, mute+unlock wired; boss rounds switch to
+  'tense', round end reverts).
+- 2026-08-23 — **v32 "Cinematic" wave** (uncommitted, one commit pending):
+  ALL of the v31 "Alive" items below PLUS: 3D title screen (tools/
+  title_scene.py + title_post.py — Blender dusk vista, 15KB webp, ken-burns
+  CSS drift, flat hero art composited on the ridge; canvas hero retired);
+  per-biome weather (rain + lightning + thunder + splashes, wind-driven
+  leaves, cave embers, starlight meteors; rolled beside wind, TUNING.
+  WEATHER_*); cinematic camera (aim-lean drift, release zoom-punch, bullseye
+  zoom on the existing slow-mo, last-arrow slow-send, boss entrance zoom;
+  st.camZoom/X/Y, photoMode + reducedMotion pin it).
+- 2026-08-23 — **v31 "Alive" wave** (folded into the same pending commit): perf/DPR
+  polish (backing store at min(dpr,2), cached gradients/glows/tints, FIFO
+  caches capped); first Blender toy bakes (balloon_3d + coin_3d via
+  tools/model_toys.py — NOTE: Base Color sockets are LINEAR, feed them
+  srgb()-converted colors); 2x super-resolution art pass (EDSR_x2 via
+  tools/upscale_x2.py: 6 biomes + adventure_map + fg strips, planes re-sliced,
+  originals backed up in assets/source/backup-1600/); depth pass
+  (tools/slice_bg.py far/mid planes all 6 biomes, idle camera sway,
+  differential shake via shared st.shakeX/Y, fg2_ nearest strips); wind system
+  (TUNING.WIND_MAX/CHANCE, gusts bend arrows, aim preview shows true path,
+  HUD wind flag); MARATHON endless mode (3 hearts, ∞ arrows, 30s waves,
+  per-profile marathonBest); adventure stage 7 Crystal Pool; impact juice
+  (balloon shreds + string, bullseye shockwave/sparks/flash, coin sparkle
+  trails — new particle types shred/string/line/star/flash); living skies
+  (god-rays/pollen, cloud shadows/wind streaks, water shimmer, twinkles +
+  shooting star, caustics/bubbles, crystal pulses/fireflies); 3D gear (glossy
+  toy bow replaces bow.png, arrow_<type>_3d roll frames cycle in flight);
+  hero idle breathing. ART_ASSET_HANDOFF_V7 (crab + anglerfish). SW v31.
 - 2026-08-22 — **v29 "Penny Studio" wave** (uncommitted, one commit pending):
   Boss Workshop (design + fight custom bosses, SAVE.customBosses); Doodle
   Enemies pipeline (tools/import_drawing.py + doodles.json manifest, dormant

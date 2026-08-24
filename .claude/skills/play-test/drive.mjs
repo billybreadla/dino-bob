@@ -88,8 +88,8 @@ try {
   await click('btn-title-play'); await sleep(1200);
   if (await screen() === 'profiles') { await click('btn-play'); await sleep(800); }
   await shot('02-home');
-  const homeBtns = await page.evaluate(() => ['btn-play','btn-adventure','btn-challenge','btn-family','btn-arcade','btn-closet'].filter(id => document.getElementById(id)).length);
-  check('home shows all 6 mode buttons', homeBtns === 6, homeBtns + '/6');
+  const homeBtns = await page.evaluate(() => ['btn-play','btn-adventure','btn-challenge','btn-family','btn-arcade','btn-closet','btn-marathon'].filter(id => document.getElementById(id)).length);
+  check('home shows all 7 mode buttons', homeBtns === 7, homeBtns + '/7');
 
   await click('btn-adventure'); await sleep(900); await shot('03-adventure');
   const nodes = await page.evaluate(() => document.querySelectorAll('#adventure-map .stage-node').length);

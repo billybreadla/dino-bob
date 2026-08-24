@@ -4,6 +4,23 @@
 var UI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
+  var menuDpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  // Sizes a menu canvas to logical CSS pixels × devicePixelRatio so the small
+  // hero/portrait canvases render sharp on retina; drawing code keeps using
+  // logical coordinates through the returned context's transform.
+  function hidpi(canvas, w, h) {
+    var bw = Math.round(w * menuDpr), bh = Math.round(h * menuDpr);
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+    var c = canvas.getContext('2d');
+    c.setTransform(menuDpr, 0, 0, menuDpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    return c;
+  }
+
   var screens = ['title', 'profiles', 'home', 'game', 'results', 'arcade', 'closet', 'adventure', 'challenge', 'workshop', 'family', 'settings', 'quests'];
   var activeMode = { type: 'practice', options: null };
   var familySession = null;
@@ -17,9 +34,7 @@ var UI = (function () {
   /* ============ tiny character portrait renderer ============ */
 
   function portrait(canvas, charId, opts) {
-    var c = canvas.getContext('2d');
-    canvas.width = 150; canvas.height = 160;
-    c.clearRect(0, 0, 150, 160);
+    var c = hidpi(canvas, 150, 160);
     ART.drawCharacter(c, charId, 75, 150, 0.92, opts || {});
   }
 
@@ -35,16 +50,12 @@ var UI = (function () {
   }
 
   function previewCharacter(canvas, charId, opts, t) {
-    var c = canvas.getContext('2d');
-    canvas.width = 260; canvas.height = 220;
-    c.clearRect(0, 0, 260, 220);
+    var c = hidpi(canvas, 260, 220);
     ART.drawCharacter(c, charId, 130, 210, 1.3, Object.assign({ t: t || 1 }, opts || {}));
   }
 
   function previewArrow(canvas, arrow, t) {
-    var c = canvas.getContext('2d');
-    canvas.width = 260; canvas.height = 220;
-    c.clearRect(0, 0, 260, 220);
+    var c = hidpi(canvas, 260, 220);
     c.save();
     c.translate(130, 110);
     var pulse = wantsReducedMotion() ? 1 : 1 + Math.sin((t || 0) * 5) * 0.06;
@@ -192,17 +203,8 @@ var UI = (function () {
 
   /* ============ title ============ */
 
-  var titleT = 0;
-  function animateTitle() {
-    if ($('screen-title').classList.contains('hidden')) return;
-    titleT += 0.016;
-    var cv = $('title-hero');
-    var c = cv.getContext('2d');
-    c.clearRect(0, 0, cv.width, cv.height);
-    ART.drawCharacter(c, 'dinobob', 175, 320, 2.0, { t: titleT, look: 0 });
-    ART.drawBow(c, 255, 200, -0.3, 0.15 + Math.sin(titleT * 2) * 0.1, 1.7);
-    requestAnimationFrame(animateTitle);
-  }
+  // The cinematic title scene (tools/title_scene.py) carries the visuals
+  // now; the little canvas hero was retired with it.
 
   /* ============ profiles ============ */
 
@@ -281,8 +283,7 @@ var UI = (function () {
     var p = SAVE.current();
     if (!p) return;
     var cv = $('home-hero');
-    var c = cv.getContext('2d');
-    c.clearRect(0, 0, cv.width, cv.height);
+    var c = hidpi(cv, 420, 430);
     ART.drawCharacter(c, p.equipped.character, 210, 410, 2.4, equippedOpts(p, homeT));
     requestAnimationFrame(animateHome);
   }
@@ -302,6 +303,12 @@ var UI = (function () {
     $('home-perk').textContent = char.name + ': ' + char.perkText + ' · ' + arrow.name;
     var dailyBest = SAVE.dailyBest();
     $('home-daily-best').textContent = dailyBest > 0 ? dailyBest : '—';
+    var mBest = SAVE.marathonBest();
+    var mChip = $('home-marathon-best');
+    if (mChip) {
+      mChip.textContent = 'BEST ' + mBest;
+      mChip.classList.toggle('hidden', !(mBest > 0));
+    }
     renderQuestBanner();
     show('home');
     animateHome();
@@ -407,6 +414,11 @@ var UI = (function () {
   function showResults(r) {
     show('results');
     if (AUDIO.musicPlaying() || musicWanted) AUDIO.startMusic();
+    // Marathon: bank the per-profile best before drawing the results card.
+    if (activeMode.type === 'marathon') {
+      r.marathonRecord = SAVE.recordMarathonBest(r.score);
+      r.marathonBest = SAVE.marathonBest();
+    }
     $('results-score').textContent = r.score;
     var s = r.stats || {};
     $('results-accuracy').textContent = (s.shots ? Math.min(100, Math.round(100 * s.hits / s.shots)) : 0) + '%';
@@ -428,11 +440,16 @@ var UI = (function () {
     banner.classList.toggle('hidden', !r.isHighScore);
     $('results-header').textContent = r.adventureWon ? 'STAGE COMPLETE!' : (r.isHighScore ? 'AMAZING!' : 'ROUND OVER!');
     if (activeMode.type === 'workshop' && r.workshopWon) $('results-header').textContent = 'BOSS DEFEATED!';
+    if (activeMode.type === 'marathon') $('results-header').textContent = r.marathonRecord ? 'NEW MARATHON BEST!' : 'MARATHON OVER!';
     // context line: who sent a shared challenge, or the daily challenge tag
     var ctx = $('results-context');
     if (ctx) {
       if (r.challengeFrom) ctx.textContent = '🎁 Challenge from ' + r.challengeFrom + '!';
       else if (activeMode.type === 'daily') ctx.textContent = "📅 Today's family challenge";
+      else if (activeMode.type === 'marathon') {
+        ctx.textContent = r.marathonRecord ? '🏆 Waves survived: ' + (r.waves || 1) :
+          '🏃 Waves survived: ' + (r.waves || 1) + ' · Best: ' + r.marathonBest;
+      }
       else if (activeMode.type === 'workshop' && r.workshopWon && r.workshopBoss) ctx.textContent = '👑 ' + r.workshopBoss + ' has fallen!';
       else ctx.textContent = '';
       ctx.classList.toggle('hidden', !ctx.textContent);
@@ -483,8 +500,7 @@ var UI = (function () {
     function dance() {
       if (token !== resultAnim || $('screen-results').classList.contains('hidden')) return;
       t += 0.045;
-      var cv = $('results-character'), c = cv.getContext('2d');
-      c.clearRect(0, 0, cv.width, cv.height);
+      var cv = $('results-character'), c = hidpi(cv, 170, 150);
       c.save();
       var bounce = Math.abs(Math.sin(t * (char.id === 'robot' ? 5 : 3))) * 8;
       c.translate(0, -bounce);
@@ -786,6 +802,24 @@ var UI = (function () {
     $('challenge-arrows-value').textContent = $('challenge-arrows').value;
     var n = Number($('challenge-speed').value);
     $('challenge-speed-value').textContent = n < 90 ? 'Gentle' : n > 120 ? 'Zoomy!' : 'Normal';
+  }
+
+  /* ============ Marathon endless mode ============ */
+
+  // Endless score attack: no clock, no arrow limit. Three targets escaping
+  // ends the run; every 30s wave pushes speed past the normal phase-3 cap.
+  function marathonOptions() {
+    return {
+      mode: 'marathon',
+      label: 'MARATHON',
+      roundSeconds: 3600,          // never counts down — rules.endless turns the clock off
+      arrows: 99999,               // endless arrows (∞ on the HUD)
+      moversAt: TUNING.MARATHON_MOVERS_AT,
+      chaosAt: TUNING.MARATHON_CHAOS_AT,
+      targetSpeed: 1,
+      background: 'random',
+      endless: true
+    };
   }
 
   /* ============ daily family challenge ============ */
@@ -1343,8 +1377,7 @@ var UI = (function () {
     closetT += 0.016;
     var p = SAVE.current();
     var cv = $('closet-preview');
-    var c = cv.getContext('2d');
-    c.clearRect(0, 0, cv.width, cv.height);
+    var c = hidpi(cv, 170, 180);
     ART.drawCharacter(c, p.equipped.character, 85, 168, 1.05, equippedOpts(p, closetT));
     requestAnimationFrame(animateClosetPreview);
   }
@@ -1552,11 +1585,12 @@ var UI = (function () {
     });
     $('btn-profile-cancel').onclick = function () {
       AUDIO.click();
-      if (SAVE.profiles().length === 0) { show('title'); animateTitle(); }
+      if (SAVE.profiles().length === 0) show('title');
       else renderProfiles();
     };
 
     $('btn-play').onclick = function () { AUDIO.click(); startRound({}, 'practice'); };
+    $('btn-marathon').onclick = function () { AUDIO.click(); startRound(marathonOptions(), 'marathon'); };
     $('btn-daily').onclick = function () { AUDIO.click(); startDailyChallenge(); };
     $('btn-adventure').onclick = function () { AUDIO.click(); openAdventure(); };
     $('btn-challenge').onclick = function () { AUDIO.click(); openChallenge(); };
@@ -1731,7 +1765,6 @@ var UI = (function () {
       bind();
       applySettings();
       show('title');
-      animateTitle();
     },
     show: show,
     goHome: goHome

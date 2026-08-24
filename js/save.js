@@ -58,6 +58,7 @@ var SAVE = (function () {
       });
       if (!p.customChallenge) p.customChallenge = null;
       if (!Array.isArray(p.customBosses)) p.customBosses = [];   // Penny's Boss Workshop
+      if (typeof p.marathonBest !== 'number') p.marathonBest = 0; // Marathon endless best
     });
     // device-wide settings (audio + accessibility), not per-profile
     if (!state.settings) state.settings = {};
@@ -167,6 +168,24 @@ var SAVE = (function () {
       }
       if (score > state.dailyBest.score) {
         state.dailyBest.score = score;
+        persist();
+        return true;
+      }
+      return false;
+    },
+
+    // ----- Marathon endless best (per-profile, like highScore) -----
+    marathonBest: function () {
+      var p = current();
+      return p ? (p.marathonBest || 0) : 0;
+    },
+    // Record a finished Marathon run; true only when this player's best fell.
+    recordMarathonBest: function (score) {
+      var p = current();
+      if (!p) return false;
+      score = Math.max(0, Math.round(score || 0));
+      if (score > (p.marathonBest || 0)) {
+        p.marathonBest = score;
         persist();
         return true;
       }

@@ -169,6 +169,7 @@ html, body {
 .btn-orange { background: #f28a32; box-shadow: 0 5px 0 #b95b18, 0 10px 20px rgba(0,0,0,0.25); }
 .btn-pink   { background: #ec4f98; box-shadow: 0 5px 0 #ae2d68, 0 10px 20px rgba(0,0,0,0.25); }
 .btn-teal   { background: #23aaa2; box-shadow: 0 5px 0 #13766f, 0 10px 20px rgba(0,0,0,0.25); }
+.btn-marathon { background: #ff7a1a; box-shadow: 0 5px 0 #b34f00, 0 10px 20px rgba(0,0,0,0.25); }
 .btn-ghost  { background: rgba(255,255,255,0.14); box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
 
 .btn-green:active, .btn-blue:active, .btn-purple:active, .btn-red:active, .btn-ghost:active { box-shadow: none; }
@@ -198,17 +199,41 @@ html, body {
 
 /* ============ title ============ */
 
+/* cinematic 3D backdrop (tools/title_scene.py) with a slow ken-burns drift */
+.title-scene { overflow: hidden; background: #2a1e42; }
+.title-scene-layer {
+  position: absolute; inset: -3%;
+  background: url('../assets/sprites/title_scene.webp') center/cover no-repeat;
+  animation: title-drift 26s ease-in-out infinite alternate;
+}
+@keyframes title-drift {
+  from { transform: scale(1) translateY(0); }
+  to { transform: scale(1.07) translateY(-1.2%); }
+}
+/* Dino Bob stands on the dark ridge, gently bobbing, lit by the scene */
+#title-hero-art {
+  position: absolute;
+  bottom: 4%;
+  left: 5%;
+  width: min(210px, 26vw);
+  height: auto;
+  filter: drop-shadow(0 18px 22px rgba(20, 10, 40, 0.55))
+          drop-shadow(0 0 34px rgba(255, 170, 80, 0.28));
+  animation: bob 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
 .title-stack {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  margin: auto;
   animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   padding: 18px 34px 24px;
   border-radius: 38px;
   background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.30), rgba(255,255,255,0.08) 62%, transparent 63%);
 }
-#title-hero { width: min(300px, 56vw); height: auto; animation: bob 2.6s ease-in-out infinite; }
 #btn-title-play { margin-top: 10px; animation: pulse 1.6s ease-in-out infinite; }
 #btn-title-play .game-icon { fill: currentColor; }
 
@@ -318,6 +343,16 @@ html, body {
   align-items: center;
 }
 .home-buttons .btn-big { min-width: 0; font-size: clamp(17px, 2.3vw, 23px); padding: 12px 20px; }
+/* Marathon is the 7th (odd) button: it takes the full row below the grid */
+.home-buttons #btn-marathon { grid-column: 1 / -1; }
+.marathon-best-chip {
+  font-family: var(--font-display);
+  font-size: 13px;
+  background: rgba(26,24,34,0.55);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
 .perk-chip { background: rgba(26,24,34,0.65); font-size: 14px; }
 .best-chip { background: rgba(26,24,34,0.65); }
 
@@ -1085,7 +1120,6 @@ html, body {
 
 /* ============ what's new (Ship Day) ============ */
 
-#screen-title { position: relative; }
 .version-pill {
   position: absolute;
   left: 14px;
@@ -1123,7 +1157,7 @@ html, body {
   #home-hero { width: 24vh; }
   .home-buttons { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
   .btn-big { font-size: 18px; padding: 10px 18px; min-width: 0; }
-  #title-hero { width: 30vh; }
+  #title-hero-art { width: 24vh; }
   .logo { font-size: 52px; }
   .arcade-preview-panel { grid-template-columns: 1fr; gap: 8px; padding: 10px; }
   .arcade-preview-stage { min-height: 128px; }

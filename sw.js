@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v29-penny-studio';
+var CACHE = 'dinobob-v33-bossking';
 var FILES = [
   '.',
   'index.html',
@@ -162,7 +162,52 @@ var FILES = [
   'assets/sprites/fg_moon_cave.webp',
   'assets/sprites/char_dinobob_draw0.png',
   'assets/sprites/char_dinobob_draw1.png',
-  'assets/sprites/char_dinobob_draw2.png'
+  'assets/sprites/char_dinobob_draw2.png',
+  // baked-toy turntables: procedural Blender balloon + coin (WebP)
+  'assets/sprites/balloon_3d_0.webp',
+  'assets/sprites/balloon_3d_1.webp',
+  'assets/sprites/balloon_3d_2.webp',
+  'assets/sprites/balloon_3d_3.webp',
+  'assets/sprites/balloon_3d_4.webp',
+  'assets/sprites/balloon_3d_5.webp',
+  'assets/sprites/coin_3d_0.webp',
+  'assets/sprites/coin_3d_1.webp',
+  'assets/sprites/coin_3d_2.webp',
+  'assets/sprites/coin_3d_3.webp',
+  'assets/sprites/coin_3d_4.webp',
+  'assets/sprites/coin_3d_5.webp',
+  // depth pass: sliced background planes + nearest foreground twin strips
+  'assets/sprites/bg_meadow_far.webp', 'assets/sprites/bg_meadow_mid.webp',
+  'assets/sprites/bg_mountain_far.webp', 'assets/sprites/bg_mountain_mid.webp',
+  'assets/sprites/bg_sunset_beach_far.webp', 'assets/sprites/bg_sunset_beach_mid.webp',
+  'assets/sprites/bg_starlight_far.webp', 'assets/sprites/bg_starlight_mid.webp',
+  'assets/sprites/bg_underwater_far.webp', 'assets/sprites/bg_underwater_mid.webp',
+  'assets/sprites/bg_moon_cave_far.webp', 'assets/sprites/bg_moon_cave_mid.webp',
+  'assets/sprites/fg2_meadow.webp', 'assets/sprites/fg2_mountain.webp',
+  'assets/sprites/fg2_sunset_beach.webp', 'assets/sprites/fg2_starlight.webp',
+  'assets/sprites/fg2_underwater.webp', 'assets/sprites/fg2_moon_cave.webp',
+  // baked 3D gear: rolling arrow turntables per type
+  'assets/sprites/arrow_wooden_3d_0.webp', 'assets/sprites/arrow_wooden_3d_1.webp',
+  'assets/sprites/arrow_wooden_3d_2.webp', 'assets/sprites/arrow_wooden_3d_3.webp',
+  'assets/sprites/arrow_wooden_3d_4.webp', 'assets/sprites/arrow_wooden_3d_5.webp',
+  'assets/sprites/arrow_fire_3d_0.webp', 'assets/sprites/arrow_fire_3d_1.webp',
+  'assets/sprites/arrow_fire_3d_2.webp', 'assets/sprites/arrow_fire_3d_3.webp',
+  'assets/sprites/arrow_fire_3d_4.webp', 'assets/sprites/arrow_fire_3d_5.webp',
+  'assets/sprites/arrow_ice_3d_0.webp', 'assets/sprites/arrow_ice_3d_1.webp',
+  'assets/sprites/arrow_ice_3d_2.webp', 'assets/sprites/arrow_ice_3d_3.webp',
+  'assets/sprites/arrow_ice_3d_4.webp', 'assets/sprites/arrow_ice_3d_5.webp',
+  'assets/sprites/arrow_lightning_3d_0.webp', 'assets/sprites/arrow_lightning_3d_1.webp',
+  'assets/sprites/arrow_lightning_3d_2.webp', 'assets/sprites/arrow_lightning_3d_3.webp',
+  'assets/sprites/arrow_lightning_3d_4.webp', 'assets/sprites/arrow_lightning_3d_5.webp',
+  'assets/sprites/arrow_obsidian_3d_0.webp', 'assets/sprites/arrow_obsidian_3d_1.webp',
+  'assets/sprites/arrow_obsidian_3d_2.webp', 'assets/sprites/arrow_obsidian_3d_3.webp',
+  'assets/sprites/arrow_obsidian_3d_4.webp', 'assets/sprites/arrow_obsidian_3d_5.webp',
+  // cinematic title backdrop (tools/title_scene.py, CSS-referenced)
+  'assets/sprites/title_scene.webp',
+  // the Crab King: procedural Blender mini-boss frames
+  'assets/sprites/crab_3d_0.webp', 'assets/sprites/crab_3d_1.webp',
+  'assets/sprites/crab_3d_2.webp', 'assets/sprites/crab_3d_3.webp',
+  'assets/sprites/crab_3d_4.webp', 'assets/sprites/crab_3d_5.webp'
 ];
 
 self.addEventListener('install', function (e) {

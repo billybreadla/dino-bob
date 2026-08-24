@@ -67,9 +67,10 @@
 </script>
 
 <!-- ===================== TITLE ===================== -->
-<section id="screen-title" class="screen sky-bg">
+<section id="screen-title" class="screen title-scene">
+  <div class="title-scene-layer" aria-hidden="true"></div>
+  <img id="title-hero-art" src="assets/sprites/char_dinobob.png" alt="" aria-hidden="true">
   <div class="title-stack">
-    <canvas id="title-hero" width="360" height="340"></canvas>
     <h1 class="logo"><span class="logo-dino">DINO</span> <span class="logo-bob">BOB</span></h1>
     <p class="tagline">Arrow Blast!</p>
     <button id="btn-title-play" class="btn btn-big btn-green"><svg class="game-icon"><use href="#icon-play"/></svg><span>PLAY</span></button>
@@ -115,6 +116,7 @@
     <button id="btn-family" class="btn btn-big btn-teal"><svg class="game-icon"><use href="#icon-family"/></svg><span>FAMILY MODE</span></button>
     <button id="btn-arcade" class="btn btn-big btn-purple"><svg class="game-icon"><use href="#icon-arcade"/></svg><span>ARCADE</span></button>
     <button id="btn-closet" class="btn btn-big btn-blue"><svg class="game-icon"><use href="#icon-closet"/></svg><span>CLOSET</span></button>
+    <button id="btn-marathon" class="btn btn-big btn-marathon"><svg class="game-icon"><use href="#icon-replay"/></svg><span>MARATHON</span><b id="home-marathon-best" class="marathon-best-chip hidden">BEST 0</b></button>
   </div>
   <div class="chip best-chip">⭐ Best: <span id="home-best">0</span></div>
 </section>

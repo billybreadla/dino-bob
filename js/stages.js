@@ -40,6 +40,14 @@ var STAGES = (function () {
       hp: 6,
       scale: 2.5,
       lift: 0.06
+    },
+    crab: {
+      name: 'Crab King',
+      sprite: 'crab_3d_0',
+      renderFrames: ['crab_3d_0', 'crab_3d_1', 'crab_3d_2', 'crab_3d_3', 'crab_3d_4', 'crab_3d_5'],
+      hp: 6,
+      scale: 2.4,
+      lift: -0.06
     }
   };
 
@@ -58,10 +66,10 @@ var STAGES = (function () {
       id: 'sunset-beach',
       name: 'Sunset Beach',
       shortName: 'Beach',
-      blurb: 'Fruit targets bounce through warm gold-and-pink seaside air.',
+      blurb: 'Face the Crab King on the golden shore — aim for the glow!',
       background: 'bg_sunset_beach',
-      round: { roundSeconds: 42, arrows: 17, moversAt: 14, chaosAt: 32, targetSpeed: 0.95, specialRule: 'fruit' },
-      win: { type: 'score', goal: 950 },
+      round: { roundSeconds: 45, arrows: 20, moversAt: 14, chaosAt: 32, targetSpeed: 0.95 },
+      win: { type: 'boss', boss: 'crab' },
       node: { x: '22%', y: '57%', color: '#f28a32', accent: '#ffd23a', sigil: 'sun' }
     },
     {
@@ -103,6 +111,16 @@ var STAGES = (function () {
       round: { roundSeconds: 50, arrows: 22, moversAt: 0, chaosAt: 0, targetSpeed: 1.08 },
       win: { type: 'boss', boss: 'moonstone' },
       node: { x: '84%', y: '18%', color: '#3e255f', accent: '#ffe27a', sigil: 'crown' }
+    },
+    {
+      id: 'crystal-pool',
+      name: 'Crystal Pool',
+      shortName: 'Pool',
+      blurb: 'A hidden master stage: balloon currents over the glowing pool.',
+      background: 'bg_underwater',
+      round: { roundSeconds: 50, arrows: 22, moversAt: 5, chaosAt: 24, targetSpeed: 1.15, specialRule: 'balloons' },
+      win: { type: 'score', goal: 2000 },
+      node: { x: '62%', y: '79%', color: '#1a7fb8', accent: '#bff5ff', sigil: 'bubble' }
     }
   ];
 

@@ -62,46 +62,234 @@ var AUDIO = (function () {
     src.start(t);
   }
 
-  /* ----- a gentle, cheerful pentatonic music loop ----- */
-  var SCALE = [262, 294, 330, 392, 440, 523, 587, 659]; // C major pentatonic-ish
-  var step = 0;
-  function musicTick() {
-    if (!musicOn || !ctx) return;
-    var beat = 0.28;
-    // melody: wander the scale, mostly small steps
-    var idx = Math.max(0, Math.min(SCALE.length - 1,
-      (musicTick.last || 3) + [-1, -1, 0, 1, 1, 2, -2][Math.floor(Math.random() * 7)]));
-    musicTick.last = idx;
-    if (step % 2 === 0) {
-      tone({ freq: SCALE[idx], type: 'triangle', dur: beat * 1.8, vol: 0.5, music: true });
+  /* ----- procedural music engine -----
+     Each loop is DATA (note-name bars, '.'=rest, '-'=hold). One lookahead
+     scheduler (25ms interval, ~0.12s horizon) turns steps into cheap osc
+     nodes ahead of time; nothing runs per-frame. A per-kind bus gain under
+     musicGain gives instant stop/mute and a gentle 0.8s crossfade when the
+     kind switches mid-session. Music always sits UNDER sfx. */
+  var NOTE_BASE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+  var NOTE_RE = /^([a-g])([#b]?)(\d)$/;
+  var LOOPS = {
+    // bouncy C-major plink-tune with an oom-pah bass bounce
+    meadow: {
+      bpm: 112, spb: 2, melType: 'triangle', melVol: 0.34,
+      bassType: 'square', bassVol: 0.15, attack: 0.008,
+      mel: [
+        'e5 . g5 . c6 . g5 .',
+        'a5 g5 e5 . d5 . c5 .',
+        'f5 . a5 . c6 . a5 f5',
+        'g5 - e5 . d5 . . .',
+        'e5 . g5 . c6 . e6 .',
+        'd6 c6 a5 . g5 . a5 c6',
+        'f5 a5 c6 - d6 . c6 .',
+        'c6 - g5 e5 c5 . . .'
+      ],
+      bass: [
+        'c3 . g2 . c3 . g2 .',
+        'a2 . e3 . a2 . e3 .',
+        'f2 . c3 . f2 . c3 .',
+        'g2 . d3 . g2 . b2 .',
+        'c3 . g2 . c3 . g2 .',
+        'a2 . e3 . a2 . e3 .',
+        'f2 . c3 . f2 . c3 .',
+        'g2 . d3 . g2 b2 . .'
+      ],
+      hats: '.x.x.x.x', hatVol: 0.05
+    },
+    // minor + driving, lower-octave pulse (boss / mountain)
+    tense: {
+      bpm: 126, spb: 2, melType: 'square', melVol: 0.24,
+      bassType: 'square', bassVol: 0.17, attack: 0.006,
+      mel: [
+        'a4 . c5 . e5 - c5 .',
+        'a4 . c5 . f5 - e5 .',
+        'd5 . c5 . a4 . f4 .',
+        'e4 . gs4 . b4 . e5 .'
+      ],
+      bass: [
+        'a2 a2 a3 a2 a2 a3 a2 a3',
+        'a2 a2 a3 a2 a2 a3 a2 a3',
+        'f2 f2 f3 f2 f2 f3 f2 f3',
+        'e2 e2 e3 e2 e2 e3 e2 e3'
+      ],
+      hats: 'x.x.xxxx', hatVol: 0.04
+    },
+    // dreamy 6/8 waltz lilt, soft attacks (underwater / starlight)
+    sea: {
+      bpm: 100, spb: 3, melType: 'sine', melVol: 0.36,
+      bassType: 'sine', bassVol: 0.3, attack: 0.09,
+      mel: [
+        '. a4 . c5 . f5',
+        '. a4 . d5 . f5',
+        '. bb4 . d5 . f5',
+        '. g4 . c5 . e5'
+      ],
+      bass: [
+        'f2 . . c3 . .',
+        'd2 . . a2 . .',
+        'bb2 . . f2 . .',
+        'c3 . . g2 . .'
+      ]
     }
-    // soft bass on the downbeat
-    if (step % 4 === 0) {
-      tone({ freq: SCALE[0] / 2, type: 'sine', dur: beat * 3, vol: 0.5, music: true });
+  };
+
+  var seq = { kind: null, ambient: 'meadow', timer: null, next: 0, idx: 0,
+              count: 0, bus: null, fading: [], parsed: {} };
+  var hatBuf = null;
+
+  function parseTrack(kind) {
+    if (seq.parsed[kind]) return seq.parsed[kind];
+    var L = LOOPS[kind];
+    function track(bars) {
+      var toks = bars.join(' ').trim().split(/\s+/);
+      var map = {};
+      for (var i = 0; i < toks.length; i++) {
+        var m = NOTE_RE.exec(toks[i]);
+        if (!m) continue;
+        var len = 1;
+        while (i + len < toks.length && toks[i + len] === '-') len++;
+        var semi = NOTE_BASE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+        map[i] = { midi: 12 * (+m[3] + 1) + semi, len: len };
+      }
+      return map;
     }
-    step++;
-    musicTimer = setTimeout(musicTick, beat * 1000);
+    var p = {
+      stepDur: 60 / L.bpm / L.spb,
+      total: L.mel.join(' ').trim().split(/\s+/).length,
+      mel: track(L.mel), bass: track(L.bass)
+    };
+    seq.parsed[kind] = p;
+    return p;
+  }
+
+  function mNote(freq, at, dur, vol, type, attack) {
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = type || 'triangle';
+    o.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(vol, at + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g);
+    g.connect(seq.bus);
+    o.start(at);
+    o.stop(at + dur + 0.05);
+  }
+
+  function hat(at, vol) {
+    if (!hatBuf || hatBuf.sampleRate !== ctx.sampleRate) {
+      hatBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.07), ctx.sampleRate);
+      var d = hatBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    var src = ctx.createBufferSource();
+    src.buffer = hatBuf;
+    var f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 6500;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(vol, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+    src.connect(f); f.connect(g); g.connect(seq.bus);
+    src.start(at);
+  }
+
+  function scheduleStep(L, P, s, at) {
+    var me = P.mel[s % P.total];
+    if (me) mNote(440 * Math.pow(2, (me.midi - 69) / 12), at, me.len * P.stepDur * 0.92,
+                  L.melVol, L.melType, L.attack);
+    var be = P.bass[s % P.total];
+    if (be) mNote(440 * Math.pow(2, (be.midi - 69) / 12), at, be.len * P.stepDur * 0.95,
+                  L.bassVol, L.bassType, Math.min(L.attack, 0.02));
+    if (L.hats && L.hats.charAt(s % L.hats.length) === 'x') hat(at, L.hatVol);
+    seq.count++;
+  }
+
+  function schedTick() {
+    if (!musicOn || !ctx || !seq.kind) return;
+    var now = ctx.currentTime;
+    seq.fading = seq.fading.filter(function (f) {
+      if (now > f.until) { try { f.g.disconnect(); } catch (e) {} return false; }
+      return true;
+    });
+    if (ctx.state !== 'running') { seq.next = Math.max(seq.next, now + 0.08); return; }
+    var L = LOOPS[seq.kind], P = parseTrack(seq.kind);
+    var horizon = now + 0.12;
+    while (seq.next < horizon) {
+      scheduleStep(L, P, seq.idx % P.total, seq.next);
+      seq.idx++;
+      seq.next += P.stepDur;
+    }
+  }
+
+  function makeBus() {
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.8); // fade-in
+    g.connect(musicGain);
+    return g;
+  }
+
+  function startMusicKind(kind) {
+    kind = LOOPS[kind] ? kind : seq.ambient;
+    if (!LOOPS[kind]) return false;
+    if (kind !== 'tense') seq.ambient = kind;   // remember the round default
+    if (seq.timer && seq.kind === kind) return true; // already playing it
+    if (!ensure()) return false;
+    if (seq.bus) {                               // crossfade out the old kind
+      var old = seq.bus;
+      try {
+        old.gain.cancelScheduledValues(ctx.currentTime);
+        old.gain.setValueAtTime(old.gain.value, ctx.currentTime);
+        old.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+      } catch (e) {}
+      seq.fading.push({ g: old, until: ctx.currentTime + 0.9 });
+    }
+    seq.kind = kind;
+    seq.bus = makeBus();
+    seq.idx = 0;
+    seq.next = ctx.currentTime + 0.06;
+    if (!musicTimer) { musicTimer = setInterval(schedTick, 25); }
+    return true;
+  }
+
+  function stopMusicKind() {
+    musicOn = false;
+    seq.kind = null;
+    if (seq.bus) {
+      var b = seq.bus;
+      try {   // instant silence, even for notes already scheduled ahead
+        b.gain.cancelScheduledValues(ctx.currentTime);
+        b.gain.setValueAtTime(0.0001, ctx.currentTime);
+      } catch (e) {}
+      seq.fading.push({ g: b, until: ctx.currentTime + 0.05 });
+      seq.bus = null;
+    }
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   }
 
   return {
     unlock: function () { ensure(); },
 
-    startMusic: function () {
-      if (!ensure()) return;
-      if (musicTimer) return;
-      musicOn = true;
-      musicTick();
-    },
-    stopMusic: function () {
-      musicOn = false;
-      if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
-    },
+    /* legacy one-call API kept for ui.js (header chip + settings) */
+    startMusic: function () { musicOn = true; startMusicKind(); },
+    stopMusic: stopMusicKind,
     toggleMusic: function () {
-      if (musicTimer) { this.stopMusic(); return false; }
-      this.startMusic(); return true;
+      if (musicTimer) { stopMusicKind(); return false; }
+      musicOn = true; startMusicKind(); return true;
     },
-    setMusic: function (on) { if (on) this.startMusic(); else this.stopMusic(); },
+    setMusic: function (on) { if (on) { musicOn = true; startMusicKind(); } else stopMusicKind(); },
     musicPlaying: function () { return !!musicTimer; },
+
+    /* new engine: AUDIO.music.start('meadow'|'sky'.../'tense'|'sea') */
+    music: {
+      kinds: Object.keys(LOOPS),
+      start: function (k) { musicOn = true; return startMusicKind(k); },
+      stop: stopMusicKind,
+      current: function () { return seq.kind; },
+      notes: function () { return seq.count; }   // test probe: scheduled notes
+    },
 
     /* ----- sound effects on/off (master SFX gain) ----- */
     setSfx: function (on) { sfxOn = on; if (sfxGain) sfxGain.gain.value = on ? 0.5 : 0; },
@@ -194,6 +382,12 @@ var AUDIO = (function () {
     firework: function () {
       noise({ freq: 1500, slide: 200, dur: 0.4, vol: 0.3 });
       tone({ freq: 900 + Math.random() * 600, slide: 300, dur: 0.3, vol: 0.15 });
+    },
+    thunder: function () {
+      // deep rolling rumble: lowpass noise bursts decaying ~0.8s + a sub thump
+      noise({ freq: 380, slide: 65, dur: 0.8, vol: 0.45 });
+      noise({ freq: 150, slide: 45, dur: 1.05, vol: 0.32, delay: 0.07 });
+      tone({ freq: 64, slide: 34, type: 'sine', dur: 0.85, vol: 0.2 });
     }
   };
 })();

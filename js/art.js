@@ -32,6 +32,8 @@ var ART = (function () {
   };
 
   var archerSpriteCache = {};
+  var archerSpriteCacheOrder = [];
+  var ARCHER_CACHE_MAX = 24;
   var targetBarkTile = null;
 
   function eyes(ctx, x, y, s, look) {
@@ -304,7 +306,11 @@ var ART = (function () {
       g.fill();
     });
     g.globalCompositeOperation = 'source-over';
+    while (archerSpriteCacheOrder.length >= ARCHER_CACHE_MAX) {
+      delete archerSpriteCache[archerSpriteCacheOrder.shift()];
+    }
     archerSpriteCache[id] = c;
+    archerSpriteCacheOrder.push(id);
     return c;
   }
 
@@ -505,6 +511,8 @@ var ART = (function () {
     ctx.restore();
   }
 
+  var trailGradCache = {};
+
   /* An arrow, drawn pointing right from its tail. */
   function drawArrow(ctx, x, y, angle, type, scale, t, motion) {
     var s = scale || 1;
@@ -518,12 +526,18 @@ var ART = (function () {
 
     if (flying) {
       var trailLength = (reduced ? Math.min(45, 20 + (motion.speed || 0) * 0.008) : Math.min(105, 42 + (motion.speed || 0) * 0.025)) * s;
-      var grad = ctx.createLinearGradient(-trailLength, 0, -8 * s, 0);
+      trailLength = Math.max(8, Math.round(trailLength / 8) * 8);   // quantized so the gradient can be cached
       var trailColor = type.id === 'fire' ? '255,122,26' :
         type.id === 'ice' ? '146,225,255' :
         type.id === 'lightning' ? '255,227,58' : '255,255,255';
-      grad.addColorStop(0, 'rgba(' + trailColor + ',0)');
-      grad.addColorStop(1, 'rgba(' + trailColor + ',0.48)');
+      var ck = type.id + '|' + trailLength + '|' + s + '|' + (reduced ? 'r' : 'f');
+      var grad = trailGradCache[ck];
+      if (!grad) {
+        grad = ctx.createLinearGradient(-trailLength, 0, -8 * s, 0);
+        grad.addColorStop(0, 'rgba(' + trailColor + ',0)');
+        grad.addColorStop(1, 'rgba(' + trailColor + ',0.48)');
+        trailGradCache[ck] = grad;
+      }
       ctx.strokeStyle = grad;
       ctx.lineWidth = (reduced ? 3 : (type.id === 'fire' ? 10 : 5)) * s;
       ctx.lineCap = 'round';
@@ -554,15 +568,18 @@ var ART = (function () {
       }
     }
 
-    var img = typeof SPRITES !== 'undefined' && SPRITES.get('arrow_' + type.id);
+    // baked 3D arrows: a 6-frame roll around the shaft while in flight —
+    // the tumble is what sells the arrow as a real object. Frame 0 rests
+    // when not flying or under reduced motion. Falls back to the flat
+    // arrow_<type> sprite if the 3D frames haven't loaded.
+    var roll = flying ? (reduced ? 0 : Math.floor((t || 0) * 14) % 6) : 0;
+    var img = typeof SPRITES !== 'undefined' &&
+      (SPRITES.get('arrow_' + type.id + '_3d_' + roll) || SPRITES.get('arrow_' + type.id));
     if (img) {
-      // sprite points right (+x) with the tip leading; flame/ice/spark baked in
+      // sprite points right (+x) with the tip leading; magic glow baked in
       var w = 92 * s;
       var h = w * img.height / img.width;
-      ctx.save();
-      if (flying && !reduced) ctx.scale(1, 0.9 + Math.abs(Math.cos(phase)) * 0.1);
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
-      ctx.restore();
       ctx.restore();
       return;
     }
@@ -615,7 +632,18 @@ var ART = (function () {
 
   /* Gold coin for HUD + pickups */
   function drawCoin(ctx, x, y, r, t) {
-    var squish = t !== undefined ? Math.abs(Math.cos(t * 4)) * 0.6 + 0.4 : 1;
+    var spinning = t !== undefined;
+    // baked 3D spin frames (procedural Blender turntable); the caller passes
+    // no t under reduced motion so the coin rests on frame 0. Face width is
+    // 80% of the frame, so w=r*2.57 matches the old coin.png footprint.
+    var fi = spinning ? Math.floor((t * 8) % 6) : 0;
+    var c3 = typeof SPRITES !== 'undefined' && SPRITES.get('coin_3d_' + fi);
+    if (c3) {
+      var w3 = r * 2.57, h3 = w3 * c3.height / c3.width;
+      ctx.drawImage(c3, x - w3 / 2, y - h3 / 2, w3, h3);
+      return;
+    }
+    var squish = spinning ? Math.abs(Math.cos(t * 4)) * 0.6 + 0.4 : 1;
     var cimg = typeof SPRITES !== 'undefined' && SPRITES.get('coin');
     if (cimg) {
       var w = r * 2.2, h = w * cimg.height / cimg.width;
