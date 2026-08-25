@@ -1,3 +1,14 @@
 {
-  "doodles": []
+  "doodles": [
+    {
+      "name": "spiky",
+      "sprite": "doodle_spiky",
+      "points": 40
+    },
+    {
+      "name": "ghost",
+      "sprite": "doodle_ghost",
+      "points": 40
+    }
+  ]
 }

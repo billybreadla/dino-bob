@@ -187,6 +187,13 @@ Kids' voice lines work the same way: drop MP3/M4A files named per
 
 ## ✅ Shipped (recent, newest first)
 
+- 2026-08-24 — **v34.1 "Kids' features live"**: both dormant kid pipelines are
+  now ACTIVE with sample content -- two crayon doodle enemies (spiky + ghost,
+  imported through tools/import_drawing.py, flood-fill cutout path verified)
+  and 4 placeholder announcer lines (macOS 'Junior' TTS in audio/*.m4a, the
+  mp3-first 404 probe is by design). Verified live: doodle spawned, wobbled,
+  got hit -> "PENNY'S DOODLE! +40". New KIDS_MAKE_YOURS.md one-pager for
+  Penny & Lachlan (draw monsters / record voice lines).
 - 2026-08-24 — **v34 "Angler" wave**: THE ANGLER GOLEM — second procedural
   Blender boss (stone body, glowing lure target-ring, big fangs; 6 damage
   frames) now guards Bubble Reef (stage 5 flipped to boss, hp 7); Boss
