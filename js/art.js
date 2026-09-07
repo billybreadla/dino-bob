@@ -155,6 +155,19 @@ var ART = (function () {
       if (opts.shiny && SPRITES.get('char_dinobob_shiny')) spriteName = 'char_dinobob_shiny';
       else if (opts.outfitId && opts.outfitId !== 'classic' && SPRITES.get('char_dinobob_' + opts.outfitId)) spriteName = 'char_dinobob_' + opts.outfitId;
     }
+    // Menu/preview heroes: prefer lit TripoSR turntable wobble when present.
+    // Gameplay passes opts.archer — keep those on flat/archer art.
+    if (!opts.archer && typeof SPRITES !== 'undefined' && spriteName === 'char_' + id) {
+      var phase = Math.floor((opts.t || 0) * 2.4) % 4;
+      // front → left → front → right (frames 0,1,0,5)
+      var fi = phase === 0 ? 0 : (phase === 1 ? 1 : (phase === 2 ? 0 : 5));
+      var h3 = SPRITES.get('char_' + id + '_3d_' + fi) || SPRITES.get('char_' + id + '_3d_0');
+      if (h3) {
+        drawCharacterSprite(ctx, h3, id, x, y, scale, opts);
+        if (posed) ctx.restore();
+        return;
+      }
+    }
     var sp = typeof SPRITES !== 'undefined' && SPRITES.get(spriteName);
     if (sp) {
       drawCharacterSprite(ctx, sp, id, x, y, scale, opts);
@@ -460,7 +473,8 @@ var ART = (function () {
   function drawBow(ctx, x, y, angle, draw, scale) {
     var s = scale || 1;
 
-    var img = typeof SPRITES !== 'undefined' && SPRITES.get('bow');
+    // Prefer lit 3D toy bow; fall back to flat bow.png.
+    var img = typeof SPRITES !== 'undefined' && (SPRITES.get('bow_3d_0') || SPRITES.get('bow'));
     if (img) {
       var h = 132 * s;
       var w = h * img.width / img.height;

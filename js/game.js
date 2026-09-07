@@ -289,6 +289,51 @@ var GAME = (function () {
     return t;
   }
 
+
+  // Wooden shield that orbits a host bullseye — blocks arrows (SNAP!).
+  function makeShield(host) {
+    var speed = (TUNING.OBSTACLE_SHIELD_SPEED || 1) * (rng() < 0.5 ? 1 : -1);
+    return {
+      type: 'obstacle', kind: 'shield', dead: false, hp: 1, frozenUntil: 0,
+      host: host,
+      angle: rand(0, Math.PI * 2),
+      orbitSpeed: speed,
+      orbitR: (host.r || 60) + 52,
+      r: TUNING.OBSTACLE_SHIELD_SIZE || 34,
+      x: host.x, y: host.y, mt: 0
+    };
+  }
+
+  // Tall stone wall — arc your shot over it. Phase 2+ only.
+  function makeWall() {
+    var h = TUNING.WALL_HEIGHT || 210;
+    var w = TUNING.WALL_WIDTH || 40;
+    return {
+      type: 'obstacle', kind: 'wall', dead: false, hp: 1, frozenUntil: 0,
+      x: rand(780, 1180),
+      y: GROUND - h / 2 - 8,
+      w: w, h: h,
+      r: w * 0.55,
+      mt: 0
+    };
+  }
+
+  // Segment vs axis-aligned box (stone walls). Samples the flight segment.
+  function segAABB(x1, y1, x2, y2, cx, cy, bw, bh) {
+    var left = cx - bw / 2, right = cx + bw / 2, top = cy - bh / 2, bot = cy + bh / 2;
+    for (var i = 0; i <= 10; i++) {
+      var u = i / 10;
+      var px = x1 + (x2 - x1) * u, py = y1 + (y2 - y1) * u;
+      if (px >= left && px <= right && py >= top && py <= bot) return { x: px, y: py };
+    }
+    return null;
+  }
+
+  function hitObstacle(ox, oy, nx, ny, t) {
+    if (t.kind === 'wall') return segAABB(ox, oy, nx, ny, t.x, t.y, t.w, t.h);
+    return segCircle(ox, oy, nx, ny, t.x, t.y, t.r);
+  }
+
   function makeBalloon() {
     return {
       type: 'balloon', dead: false, hp: 1, frozenUntil: 0,
@@ -413,8 +458,8 @@ var GAME = (function () {
      on TOP / MIDDLE / LOW of the sprite (lift = fraction - 0.5). */
   var WORKSHOP_BODIES = {
     moonstone: ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'],
-    crab: ['crab_3d_0', 'crab_3d_1', 'crab_3d_2', 'crab_3d_3', 'crab_3d_4', 'crab_3d_5'],
-    angler: ['angler_3d_0', 'angler_3d_1', 'angler_3d_2', 'angler_3d_3', 'angler_3d_4', 'angler_3d_5']
+    crab: ['boss_crab_3d_0', 'boss_crab_3d_1', 'boss_crab_3d_2', 'boss_crab_3d_3', 'boss_crab_3d_4', 'boss_crab_3d_5'],
+    angler: ['boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2', 'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5']
   };
 
   function workshopDef() {
@@ -500,7 +545,13 @@ var GAME = (function () {
         st.spawnCooldown = 0.35;
         return;
       }
-      st.targets.push(makeBullseye(kind));
+      var bye = makeBullseye(kind);
+      st.targets.push(bye);
+      // Phase 2+: sometimes an orbiting wooden shield — trick shot time!
+      if (ph >= 2 && kind !== 'static' && !bye.far &&
+          rng() < (TUNING.OBSTACLE_CHANCE || 0)) {
+        st.targets.push(makeShield(bye));
+      }
       st.spawnCooldown = 0.35;
       return;
     }
@@ -533,12 +584,16 @@ var GAME = (function () {
       if (balloons < 1 && roll < 0.4) { st.targets.push(makeBalloon()); st.spawnCooldown = 2.5; }
       else st.spawnCooldown = 1;
     } else if (ph === 2) {
-      if (balloons < 2 && roll < 0.35) { st.targets.push(makeBalloon()); st.spawnCooldown = 1.6; }
+      var walls2 = live.filter(function (t) { return t.type === 'obstacle' && t.kind === 'wall'; }).length;
+      if (walls2 < 1 && roll < (TUNING.WALL_CHANCE || 0.22)) { st.targets.push(makeWall()); st.spawnCooldown = 2.8; }
+      else if (balloons < 2 && roll < 0.35) { st.targets.push(makeBalloon()); st.spawnCooldown = 1.6; }
       else if (roll < 0.55) { st.targets.push(makeFruit()); st.spawnCooldown = 2.2; }
       else if (chests < 1 && roll < 0.68) { st.targets.push(makeChest()); st.spawnCooldown = 4; }
       else st.spawnCooldown = 0.9;
     } else {
-      if (balloons < 3 && roll < 0.35) { st.targets.push(makeBalloon()); st.spawnCooldown = 1.0; }
+      var walls3 = live.filter(function (t) { return t.type === 'obstacle' && t.kind === 'wall'; }).length;
+      if (walls3 < 2 && roll < (TUNING.WALL_CHANCE || 0.22) * 1.2) { st.targets.push(makeWall()); st.spawnCooldown = 2.0; }
+      else if (balloons < 3 && roll < 0.35) { st.targets.push(makeBalloon()); st.spawnCooldown = 1.0; }
       else if (roll < 0.65) { st.targets.push(makeFruit()); st.spawnCooldown = 1.2; }
       else if (chests < 2 && roll < 0.8) { st.targets.push(makeChest()); st.spawnCooldown = 2.5; }
       else st.spawnCooldown = 0.6;
@@ -618,6 +673,15 @@ var GAME = (function () {
     } else if (t.type === 'chest' && t.opened) {
       t.openTimer -= dt;
       if (t.openTimer <= 0) t.dead = true; // fully-open reveal finished
+    } else if (t.type === 'obstacle') {
+      if (t.kind === 'shield') {
+        var host = t.host;
+        if (!host || host.dead) { t.dead = true; return; }
+        if (!frozen) t.angle += t.orbitSpeed * dt;
+        t.x = host.x + Math.cos(t.angle) * t.orbitR;
+        t.y = host.y + Math.sin(t.angle) * t.orbitR * 0.72; // slight ellipse so it reads in front/behind
+      }
+      // walls stay put
     }
   }
 
@@ -686,10 +750,29 @@ var GAME = (function () {
       var ox = ar.x, oy = ar.y;
       simStep(ar, dt);
 
+      // Obstacles block first — wooden shields & stone walls SNAP the arrow.
+      for (var oi = 0; oi < st.targets.length; oi++) {
+        var obs = st.targets[oi];
+        if (obs.dead || obs.type !== 'obstacle') continue;
+        var ohit = hitObstacle(ox, oy, ar.x, ar.y, obs);
+        if (ohit) {
+          ar.hitSomething = true;
+          ar.dead = true;
+          snapArrow(ohit.x, ohit.y, Math.atan2(ar.vy, ar.vx), st.arrowType);
+          st.floaters.push({
+            x: ohit.x, y: ohit.y - 50, vy: -60, life: 0.9,
+            text: obs.kind === 'wall' ? 'ARC OVER!' : 'BLOCKED!',
+            big: false, color: '#c9a07a'
+          });
+          break;
+        }
+      }
+      if (ar.dead) return;
+
       // hit targets (swept)
       for (var i = 0; i < st.targets.length; i++) {
         var t = st.targets[i];
-        if (t.dead) continue;
+        if (t.dead || t.type === 'obstacle') continue;
         var hit = segCircle(ox, oy, ar.x, ar.y, t.x, t.y, t.r);
         if (hit) {
           ar.hitSomething = true;
@@ -902,7 +985,7 @@ var GAME = (function () {
         st.floaters.push({ x: t.x, y: t.y - t.r - 34, vy: -60, life: 1.2, text: 'LONG SHOT!', big: true, color: '#8fdcff' });
       }
       if (base === rings[0]) {
-        st.stats.bullseyes++;
+        st.stats.bullseyes++; st.petCheer = 1;
         st.cinematicUntil = reducedMotion() ? st.t : st.t + 0.34;
         if (!reducedMotion()) st.camKick = (st.camKick || 0) + 0.05;
         AUDIO.bullseye();
@@ -1296,6 +1379,7 @@ var GAME = (function () {
   function update(dt) {
     st.t += dt;
     st.shake = Math.max(0, st.shake - dt);
+    st.petCheer = Math.max(0, (st.petCheer || 0) - dt * 1.8);
     st.releaseKick = Math.max(0, st.releaseKick - dt * 7.5);
     st.lookTimer += dt;
 
@@ -1788,7 +1872,8 @@ var GAME = (function () {
     if (far && mid) {
       var sx = st.shakeX || 0, sy = st.shakeY || 0;
       var sway = reducedMotion() ? 0 : Math.sin(st.t * 0.1) * 8;
-      ctx.drawImage(far, -sx * 0.15, -sy * 0.15, W, H);
+      var farK = (typeof TUNING !== 'undefined' && TUNING.PARALLAX_FAR != null) ? TUNING.PARALLAX_FAR : 0.15;
+      ctx.drawImage(far, -sx * farK, -sy * farK, W, H);
       // mid spans W+16 so the ±8px sway never exposes an edge seam
       ctx.drawImage(mid, sway - 8, 0, W + 16, H);
       if (st.rules.theme === 'cave') drawCaveOverlay();
@@ -1796,7 +1881,11 @@ var GAME = (function () {
     }
     var bg = SPRITES.get(st.bgName) || SPRITES.get('bg_meadow');
     if (bg) {
-      ctx.drawImage(bg, 0, 0, W, H);
+      // same far-plane contract as the sliced path: counter-shake + gentle sway
+      var bsx = st.shakeX || 0, bsy = st.shakeY || 0;
+      var bsway = reducedMotion() ? 0 : Math.sin(st.t * 0.1) * 8;
+      var farK = (typeof TUNING !== 'undefined' && TUNING.PARALLAX_FAR != null) ? TUNING.PARALLAX_FAR : 0.15;
+      ctx.drawImage(bg, bsway - 8 - bsx * farK, -bsy * farK, W + 16, H);
       if (st.rules.theme === 'cave') drawCaveOverlay();
       return;
     }
@@ -2421,8 +2510,9 @@ var GAME = (function () {
       }
       if (fg2) {
         var sx = st.shakeX || 0, sy = st.shakeY || 0;
+        var fgK = (typeof TUNING !== 'undefined' && TUNING.PARALLAX_FG2 != null) ? TUNING.PARALLAX_FG2 : 0.4;
         var f2h = W * fg2.height / fg2.width;
-        ctx.drawImage(fg2, sx * 0.4, H - f2h + sy * 0.4, W, f2h);
+        ctx.drawImage(fg2, sx * fgK, H - f2h + sy * fgK, W, f2h);
       }
       return;
     }
@@ -2457,7 +2547,8 @@ var GAME = (function () {
     var color =
       t.type === 'golden' ? 'rgba(255,226,70,0.44)' :
       t.type === 'powerup' ? 'rgba(98,230,255,0.30)' :
-      t.type === 'chest' ? 'rgba(255,210,58,0.18)' : '';
+      t.type === 'chest' ? 'rgba(255,210,58,0.18)' :
+      t.type === 'obstacle' ? 'rgba(160,120,70,0.16)' : '';
     if (!color) return;
     ctx.save();
     ctx.globalAlpha = 0.9;
@@ -2892,6 +2983,37 @@ var GAME = (function () {
     drawGroundShadow(t);
     drawObjectAura(t);
 
+    if (t.type === 'obstacle') {
+      if (t.kind === 'shield') {
+        // Painted wooden shield (falls back to simple circles if sprite missing)
+        var sr = t.r;
+        ctx.rotate(t.angle || 0);
+        var shImg = SPRITES.get('obstacle_shield');
+        if (shImg) {
+          var ss = sr * 2.15;
+          ctx.drawImage(shImg, -ss / 2, -ss / 2, ss, ss);
+        } else {
+          ART.circle(ctx, 0, 0, sr, '#8a5a2b');
+          ART.circle(ctx, 0, 0, sr * 0.92, '#a76b36');
+          ctx.strokeStyle = '#3a2210'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.arc(0, 0, sr * 0.96, 0, Math.PI * 2); ctx.stroke();
+        }
+      } else if (t.kind === 'wall') {
+        // Painted stone pillar — arc your shot over the top
+        var hw = t.w / 2, hh = t.h / 2;
+        var wImg = SPRITES.get('obstacle_wall');
+        if (wImg) {
+          // sprite is a tall pillar; stretch to wall hitbox with a little bleed
+          ctx.drawImage(wImg, -hw * 1.15, -hh * 1.05, t.w * 1.3, t.h * 1.12);
+        } else {
+          ART.rr(ctx, -hw, -hh, t.w, t.h, 8, '#6a6e78');
+          ART.rr(ctx, -hw - 4, -hh - 10, t.w + 8, 18, 6, '#9aa3ab');
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
     if (t.type === 'bullseye') {
       var timg = gradedSprite('target') || SPRITES.get('target');
       // plain disc (used for swing + easel styles, and as fallback)
@@ -3043,10 +3165,10 @@ var GAME = (function () {
       }
       ctx.restore();
     } else if (t.type === 'fruit') {
-      // apple + watermelon have V6 tumble frames (real 3D turnaround);
+      // apple + watermelon + banana have V6 tumble frames (real 3D turnaround);
       // the frames do the spinning, so only a light sway on top
       var f3d = null;
-      if (t.kind === 'apple' || t.kind === 'watermelon') {
+      if (t.kind === 'apple' || t.kind === 'watermelon' || t.kind === 'banana') {
         var ffi = reducedMotion() ? 0 : Math.floor((t.mt || 0) * 7) % 6;
         f3d = gradedSprite('fruit_' + t.kind + '_3d_' + ffi) || SPRITES.get('fruit_' + t.kind + '_3d_' + ffi);
       }
@@ -3204,7 +3326,16 @@ var GAME = (function () {
     var steps = Math.floor(26 * (st.perk.previewBonus || 1));
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     for (var i = 0; i < steps; i++) {
+      var ax0 = p.x, ay0 = p.y;
       for (var k = 0; k < 3; k++) simStep(p, 1 / 90);
+      // Preview tells the truth: stop the dots if the path hits a blocker.
+      var blocked = false;
+      for (var oi = 0; oi < st.targets.length; oi++) {
+        var obs = st.targets[oi];
+        if (obs.dead || obs.type !== 'obstacle') continue;
+        if (hitObstacle(ax0, ay0, p.x, p.y, obs)) { blocked = true; break; }
+      }
+      if (blocked) break;
       if (i % 2 === 0) {
         ctx.globalAlpha = 1 - i / steps * 0.7;
         ART.circle(ctx, p.x, p.y, 6 - i / steps * 3, i < 4 ? '#fff' : '#ffe9a8');
@@ -3217,6 +3348,50 @@ var GAME = (function () {
   // of the image (calibrated so the painted bow lands on the BOW anchor).
   var ARCHER_BOW_FX = 0.82, ARCHER_BOW_FY = 0.64, ARCHER_HEIGHT = 320;
   var ARCHER_DEBUG = false;
+
+
+  function drawPet() {
+    // Cosmetic sidekick — painted turntable wobble (frames 0..2) + cheer (last).
+    if (typeof TUNING === 'undefined' || !TUNING.SHOW_PET) return;
+    var id = st.profile && st.profile.equipped ? st.profile.equipped.pet : null;
+    if (!id) return;
+    var pet = (typeof DATA !== 'undefined' && DATA.petById) ? DATA.petById(id) : null;
+    if (pet && pet.comingSoon) return;
+    var frames = (pet && pet.frames && pet.frames.length) ? pet.frames : null;
+    var cheer = st.petCheer || 0;
+    var img = null;
+    if (frames) {
+      if (cheer > 0.15) {
+        // Mesh turntables: hop on current angle. Painted sets: last frame is cheer pose.
+        var cheerIdx = frames.length >= 5 ? Math.floor(st.t * 2.4) % Math.min(6, frames.length) : (frames.length - 1);
+        img = SPRITES.get(frames[cheerIdx]) || SPRITES.get(frames[0]);
+      } else if (frames.length >= 5) {
+        // Full mesh turntable (TripoSR bake) — same cadence as balloon_3d
+        var n = Math.min(6, frames.length);
+        var idx = reducedMotion() ? 0 : Math.floor(st.t * 2.4) % n;
+        img = SPRITES.get(frames[idx]) || SPRITES.get(frames[0]);
+      } else {
+        // Painted multi-angle wobble: front → left → front → right
+        var wobbleN = Math.min(3, frames.length);
+        var phase = reducedMotion() ? 0 : Math.floor(st.t * 2.4) % 4;
+        var idx2 = phase === 0 ? 0 : (phase === 1 ? Math.min(1, wobbleN - 1) : (phase === 2 ? 0 : Math.min(2, wobbleN - 1)));
+        img = SPRITES.get(frames[idx2]) || SPRITES.get(frames[0]);
+      }
+    }
+    if (!img) img = SPRITES.get('pet_' + id + '_0');
+    if (!img) return;
+    var bob = reducedMotion() ? 0 : Math.sin(st.t * 3.2) * 10;
+    var hop = cheer > 0 ? Math.sin((1 - cheer) * Math.PI) * 28 : 0;
+    var px = BOW.x - 150 + (reducedMotion() ? 0 : Math.sin(st.t * 1.7) * 6);
+    var py = BOW.y - 40 + bob - hop;
+    var s = 88 + (cheer > 0 ? 10 : 0);
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ART.ellipse(ctx, px, GROUND + 2, s * 0.28, 7, 'rgba(20,16,20,1)');
+    ctx.globalAlpha = 0.98;
+    ctx.drawImage(img, px - s / 2, py - s / 2, s, s);
+    ctx.restore();
+  }
 
   function drawPlayer() {
     var p = st.profile;
@@ -3498,13 +3673,29 @@ var GAME = (function () {
     }
 
     drawBackground();
+
+    // Sky / haze rides with the far plane (counter-shake → net ×0.85).
+    var farK = (typeof TUNING !== 'undefined' && TUNING.PARALLAX_FAR != null) ? TUNING.PARALLAX_FAR : 0.15;
+    var actK = (typeof TUNING !== 'undefined' && TUNING.PARALLAX_ACTION != null) ? TUNING.PARALLAX_ACTION : 0.15;
+    ctx.save();
+    if (!reducedMotion() && (st.shakeX || st.shakeY)) {
+      ctx.translate(-(st.shakeX || 0) * farK, -(st.shakeY || 0) * farK);
+    }
     drawStageAtmosphere();
     drawDepthHaze();
+    ctx.restore();
+
+    // Action layer (targets, arrows, player, FX): net ×1.15 so it sits in front of bg.
+    ctx.save();
+    if (!reducedMotion() && (st.shakeX || st.shakeY)) {
+      ctx.translate((st.shakeX || 0) * actK, (st.shakeY || 0) * actK);
+    }
     st.targets.forEach(drawTarget);
     drawBlackholes();
     drawBrokenArrows();
     drawAim();
     drawPlayer();
+    drawPet();
 
     // flying arrows cast a small running shadow on the ground below them
     st.arrows.forEach(function (a) {
@@ -3615,6 +3806,8 @@ var GAME = (function () {
 
     // homing coins (undefined t under reduced motion => static 3D frame 0)
     st.coins.forEach(function (c) { ART.drawCoin(ctx, c.x, c.y, 13, reducedMotion() ? undefined : c.t); });
+
+    ctx.restore(); // end action-layer parallax
 
     drawForegroundDepth();
 

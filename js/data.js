@@ -101,6 +101,30 @@ var DATA = {
     { id: 'astro',   name: 'Space Helmet',   get price() { return TUNING.PRICE_HAT; } }
   ],
 
+  pets: [
+    {
+      id: 'ptero',
+      get name() { return TUNING.NAME_PET_PTERO; },
+      get price() { return TUNING.PRICE_PET; },
+      perkText: 'Flies behind you and hops on bullseyes!',
+      frames: ['pet_ptero_0', 'pet_ptero_1', 'pet_ptero_2', 'pet_ptero_3', 'pet_ptero_4', 'pet_ptero_5']
+    },
+    {
+      id: 'turtle',
+      get name() { return TUNING.NAME_PET_TURTLE; },
+      get price() { return TUNING.PRICE_PET; },
+      perkText: 'A chill shell buddy who hops on bullseyes!',
+      frames: ['pet_turtle_0', 'pet_turtle_1', 'pet_turtle_2', 'pet_turtle_3', 'pet_turtle_4', 'pet_turtle_5']
+    },
+    {
+      id: 'firefly',
+      get name() { return TUNING.NAME_PET_FIREFLY; },
+      get price() { return TUNING.PRICE_PET; },
+      perkText: 'A tiny glowing friend who flares on bullseyes!',
+      frames: ['pet_firefly_0', 'pet_firefly_1', 'pet_firefly_2', 'pet_firefly_3', 'pet_firefly_4', 'pet_firefly_5']
+    }
+  ],
+
   // Badges / stickers the player can earn (checked in game.js)
   badges: [
     { id: 'first_bullseye', emoji: '🎯', name: 'Bullseye!',     desc: 'Hit your first bullseye' },
@@ -146,6 +170,9 @@ var DATA = {
   },
   outfitById: function (id) {
     return this.outfits.find(function (o) { return o.id === id; }) || this.outfits[0];
+  },
+  petById: function (id) {
+    return this.pets.find(function (p) { return p.id === id; }) || null;
   },
   badgeById: function (id) {
     return this.badges.find(function (b) { return b.id === id; }) || null;

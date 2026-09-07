@@ -35,6 +35,17 @@ var TUNING = {
   COMBO_STEP: 2,        // every 2 hits in a row bumps the multiplier
   COMBO_MAX: 5,         // biggest multiplier you can reach (x5)
 
+
+  // ---------- OBSTACLES / TRICK SHOTS ----------
+  // From phase 2 on, some targets get blockers. Arrows THUNK and SNAP on them.
+  // 0 = never, 1 = always. Start gentle so Penny can crank it up.
+  OBSTACLE_CHANCE: 0.4,        // chance a new moving target gets an orbiting shield
+  WALL_CHANCE: 0.22,           // chance to spawn a stone wall (phase 2+)
+  OBSTACLE_SHIELD_SPEED: 1.05, // how fast the wooden shield orbits (turns per ~2s)
+  OBSTACLE_SHIELD_SIZE: 34,    // shield hit radius
+  WALL_HEIGHT: 210,            // stone wall height (arc over it!)
+  WALL_WIDTH: 40,              // stone wall thickness
+
   // ---------- WIND ----------
   // Sometimes the round gets a breeze! Wind pushes arrows sideways while
   // they fly. Watch the little flag at the top of the screen.
@@ -117,5 +128,20 @@ var TUNING = {
   // ---------- SECRET FUN SWITCHES ----------
   CONFETTI_AMOUNT: 120,      // confetti pieces when you buy something
   HIGH_SCORE_FIREWORKS: 7,   // fireworks when you beat your high score
-  SCREEN_SHAKE: true         // shake the screen on a bullseye?
+  SCREEN_SHAKE: true,        // shake the screen on a bullseye?
+  // Depth parallax — extra motion on top of the global ×1.0 shake.
+  // Bigger numbers = more 3D twist. 0 = flat (everything shakes together).
+  PARALLAX_FAR: 0.15,        // far bg + sky atmosphere counter-move (net ×0.85)
+  PARALLAX_ACTION: 0.15,     // targets, arrows, player (net ×1.15)
+  PARALLAX_FG2: 0.4,         // nearest foreground strip (net ×1.4)
+
+  // ---------- PET SIDEKICK ----------
+  // First baked pet: baby pterodactyl (assets/sprites/pet_ptero_*.webp).
+  // Arcade shop tab comes later — flip SHOW_PET off to hide meanwhile.
+  SHOW_PET: true,            // master switch for pet sidekicks
+  NAME_PET_PTERO: 'Pip the Ptero',
+  NAME_PET_TURTLE: 'Shelly',
+  NAME_PET_FIREFLY: 'Glowbug',
+  PRICE_PET: 2500
 };
+

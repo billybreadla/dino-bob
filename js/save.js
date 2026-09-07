@@ -24,14 +24,16 @@ var SAVE = (function () {
         arrows: ['wooden'],
         hats: [],
         outfits: ['classic'],
-        shiny: []
+        shiny: [],
+        pets: []
       },
       equipped: {
         character: 'dinobob',
         arrow: 'wooden',
         hat: null,
         outfit: 'classic',
-        shiny: false
+        shiny: false,
+        pet: null
       }
     };
   }
@@ -59,6 +61,10 @@ var SAVE = (function () {
       if (!p.customChallenge) p.customChallenge = null;
       if (!Array.isArray(p.customBosses)) p.customBosses = [];   // Penny's Boss Workshop
       if (typeof p.marathonBest !== 'number') p.marathonBest = 0; // Marathon endless best
+      if (!p.unlocked) p.unlocked = {};
+      if (!Array.isArray(p.unlocked.pets)) p.unlocked.pets = [];
+      if (!p.equipped) p.equipped = {};
+      if (typeof p.equipped.pet === 'undefined') p.equipped.pet = null;
     });
     // device-wide settings (audio + accessibility), not per-profile
     if (!state.settings) state.settings = {};
@@ -222,13 +228,14 @@ var SAVE = (function () {
     unlock: function (kind, id) {
       var p = current();
       if (!p) return;
+      if (!Array.isArray(p.unlocked[kind])) p.unlocked[kind] = [];
       if (p.unlocked[kind].indexOf(id) === -1) p.unlocked[kind].push(id);
       persist();
     },
 
     owns: function (kind, id) {
       var p = current();
-      return !!p && p.unlocked[kind].indexOf(id) !== -1;
+      return !!p && Array.isArray(p.unlocked[kind]) && p.unlocked[kind].indexOf(id) !== -1;
     },
 
     equip: function (slot, value) {

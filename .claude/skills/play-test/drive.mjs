@@ -22,7 +22,7 @@ const LIVE = process.argv.includes('--live');
 const urlArg = process.argv.map(a => a.match(/^--url=(.+)$/)).filter(Boolean)[0];
 const skillDir = path.dirname(new URL(import.meta.url).pathname);
 const REPO = path.resolve(skillDir, '../../..');            // <repo>/.claude/skills/play-test -> <repo>
-const TARGET = urlArg ? urlArg[1] : LIVE ? 'https://dino-bob-penny.netlify.app/' : 'file://' + REPO + '/index.html';
+const TARGET = urlArg ? urlArg[1] : LIVE ? 'https://billybreadla.github.io/dino-bob/' : 'file://' + REPO + '/index.html';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHOTS = '/tmp/dino-shots';
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));

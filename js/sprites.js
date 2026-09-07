@@ -57,8 +57,9 @@ var SPRITES = (function () {
     'bg_sunset_beach_far', 'bg_sunset_beach_mid', 'bg_starlight_far', 'bg_starlight_mid',
     'bg_underwater_far', 'bg_underwater_mid', 'bg_moon_cave_far', 'bg_moon_cave_mid',
     'fg2_meadow', 'fg2_mountain', 'fg2_sunset_beach', 'fg2_starlight', 'fg2_underwater', 'fg2_moon_cave',
-    // baked 3D gear: bow (same-name bow.png replacement) + rolling arrow
+    // baked 3D gear: lit toy bow (single side-view) + rolling arrow
     // turntables per type (6 frames each, cycle in flight)
+    'bow_3d_0',
     'arrow_wooden_3d_0', 'arrow_wooden_3d_1', 'arrow_wooden_3d_2',
     'arrow_wooden_3d_3', 'arrow_wooden_3d_4', 'arrow_wooden_3d_5',
     'arrow_fire_3d_0', 'arrow_fire_3d_1', 'arrow_fire_3d_2',
@@ -70,12 +71,31 @@ var SPRITES = (function () {
     'arrow_obsidian_3d_0', 'arrow_obsidian_3d_1', 'arrow_obsidian_3d_2',
     'arrow_obsidian_3d_3', 'arrow_obsidian_3d_4', 'arrow_obsidian_3d_5',
     // the Crab King: procedural Blender mini-boss (tools/model_toys.py),
-    // 6 frames = 3 damage states x 2 hit-flash yaws
-    'crab_3d_0', 'crab_3d_1', 'crab_3d_2',
-    'crab_3d_3', 'crab_3d_4', 'crab_3d_5',
+    // 6 frames = 3 damage states x 2 hit-flash yaws — V7 contract boss_crab_3d_*
+    'boss_crab_3d_0', 'boss_crab_3d_1', 'boss_crab_3d_2',
+    'boss_crab_3d_3', 'boss_crab_3d_4', 'boss_crab_3d_5',
     // the Angler Golem: same pipeline, guards Bubble Reef
-    'angler_3d_0', 'angler_3d_1', 'angler_3d_2',
-    'angler_3d_3', 'angler_3d_4', 'angler_3d_5'
+    'boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2',
+    'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5',
+    // Pip/Shelly/Glowbug: TripoSR mesh turntables 0..5
+    'pet_ptero_0', 'pet_ptero_1', 'pet_ptero_2', 'pet_ptero_3', 'pet_ptero_4', 'pet_ptero_5',
+    'pet_turtle_0', 'pet_turtle_1', 'pet_turtle_2', 'pet_turtle_3', 'pet_turtle_4', 'pet_turtle_5',
+    'pet_firefly_0', 'pet_firefly_1', 'pet_firefly_2', 'pet_firefly_3', 'pet_firefly_4', 'pet_firefly_5',
+    // painted obstacles
+    'obstacle_shield', 'obstacle_wall',
+    // Menu/preview hero turntables (TripoSR + Blender studio; decorative only)
+    'char_dinobob_3d_0', 'char_dinobob_3d_1', 'char_dinobob_3d_2',
+    'char_dinobob_3d_3', 'char_dinobob_3d_4', 'char_dinobob_3d_5',
+    'char_ninja_3d_0', 'char_ninja_3d_1', 'char_ninja_3d_2',
+    'char_ninja_3d_3', 'char_ninja_3d_4', 'char_ninja_3d_5',
+    'char_astronaut_3d_0', 'char_astronaut_3d_1', 'char_astronaut_3d_2',
+    'char_astronaut_3d_3', 'char_astronaut_3d_4', 'char_astronaut_3d_5',
+    'char_robot_3d_0', 'char_robot_3d_1', 'char_robot_3d_2',
+    'char_robot_3d_3', 'char_robot_3d_4', 'char_robot_3d_5',
+    'char_bear_3d_0', 'char_bear_3d_1', 'char_bear_3d_2',
+    'char_bear_3d_3', 'char_bear_3d_4', 'char_bear_3d_5',
+    'char_trixie_3d_0', 'char_trixie_3d_1', 'char_trixie_3d_2',
+    'char_trixie_3d_3', 'char_trixie_3d_4', 'char_trixie_3d_5'
   ];
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,

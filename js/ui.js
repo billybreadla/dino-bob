@@ -1116,6 +1116,38 @@ var UI = (function () {
   var arcadePreviewRaf = null;
   var arcadePreviewT = 0;
 
+
+  function drawPetCard(cv, pet, t, big) {
+    var w = big ? 260 : 150, h = big ? 220 : 160;
+    cv.width = w; cv.height = h;
+    var c = cv.getContext('2d');
+    c.clearRect(0, 0, w, h);
+    if (pet.frames && pet.frames.length) {
+      // Match in-game turntable wobble: front → left → front → right (skip cheer)
+      var wobbleN = Math.min(3, pet.frames.length);
+      var phase = Math.floor((t || 0) * 2.4) % 4;
+      var idx = phase === 0 ? 0 : (phase === 1 ? Math.min(1, wobbleN - 1) : (phase === 2 ? 0 : Math.min(2, wobbleN - 1)));
+      var img = SPRITES.get(pet.frames[idx]) || SPRITES.get(pet.frames[0]);
+      if (img) {
+        var s = big ? 170 : 110;
+        var bob = Math.sin((t || 0) * 3.2) * (big ? 8 : 5);
+        c.drawImage(img, (w - s) / 2, (h - s) / 2 + bob, s, s);
+        return;
+      }
+    }
+    c.font = (big ? 84 : 54) + 'px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.globalAlpha = pet.comingSoon ? 0.55 : 1;
+    c.fillText(pet.emoji || '🐾', w / 2, h / 2);
+    c.globalAlpha = 1;
+    if (pet.comingSoon) {
+      c.font = 'bold ' + (big ? 22 : 16) + 'px Nunito, sans-serif';
+      c.fillStyle = '#ffd23a';
+      c.fillText('COMING SOON', w / 2, h - (big ? 28 : 18));
+    }
+  }
+
   function renderArcade() {
     var p = SAVE.current();
     $('arcade-coins').textContent = p.coins;
@@ -1162,7 +1194,7 @@ var UI = (function () {
           equip: function () { SAVE.equip('arrow', a.id); }
         });
       });
-    } else {
+    } else if (currentTab === 'skins') {
       // skins: hats, then outfits, then shiny variants of owned characters
       DATA.hats.forEach(function (h) {
         addItem({
@@ -1219,6 +1251,49 @@ var UI = (function () {
           }
         });
       });
+    } else if (currentTab === 'pets') {
+      // free Unequip card
+      addItem({
+        id: 'pet_none',
+        name: 'No Pet',
+        perk: 'Fly solo — unequip your sidekick.',
+        price: 0,
+        owned: true,
+        equipped: !p.equipped.pet,
+        draw: function (cv) {
+          var c = cv.getContext('2d');
+          cv.width = 150; cv.height = 160;
+          c.font = '54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+          c.fillText('🚫', 75, 80);
+        },
+        previewDraw: function (cv) {
+          var c = cv.getContext('2d');
+          cv.width = 260; cv.height = 220;
+          c.font = '72px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+          c.fillText('🚫', 130, 110);
+        },
+        buy: function () {},
+        equip: function () { SAVE.equip('pet', null); }
+      });
+      DATA.pets.forEach(function (pet) {
+        addItem({
+          id: 'pet_' + pet.id,
+          name: pet.name,
+          perk: pet.perkText,
+          price: pet.price,
+          owned: !pet.comingSoon && SAVE.owns('pets', pet.id),
+          equipped: p.equipped.pet === pet.id,
+          comingSoon: !!pet.comingSoon,
+          draw: function (cv) { drawPetCard(cv, pet, 0); },
+          previewDraw: function (cv, t) { drawPetCard(cv, pet, t || 0, true); },
+          buy: function () {
+            if (pet.comingSoon) return;
+            SAVE.unlock('pets', pet.id);
+            SAVE.equip('pet', pet.id);
+          },
+          equip: function () { SAVE.equip('pet', pet.id); }
+        });
+      });
     }
     if (!items.some(function (item) { return item.id === arcadePreviewId; })) {
       var equipped = items.find(function (item) { return item.equipped; });
@@ -1242,7 +1317,10 @@ var UI = (function () {
     $('arcade-preview-perk').textContent = item.perk || 'Looks awesome in game.';
     var status = $('arcade-preview-status');
     status.className = 'arcade-preview-status';
-    if (item.equipped) {
+    if (item.comingSoon) {
+      status.classList.add('need-coins');
+      status.textContent = 'Coming soon — more pets on the way!';
+    } else if (item.equipped) {
       status.classList.add('equipped');
       status.textContent = '★ Equipped and ready to play';
     } else if (item.owned) {
@@ -1312,7 +1390,12 @@ var UI = (function () {
 
     var btn = document.createElement('button');
     btn.className = 's-btn';
-    if (item.equipped) {
+    if (item.comingSoon) {
+      btn.classList.add('cant');
+      btn.textContent = 'SOON';
+      btn.onclick = function (e) { e.stopPropagation(); AUDIO.nope(); };
+      nm.textContent = item.name; // show real name for coming-soon teasers
+    } else if (item.equipped) {
       btn.classList.add('equipped-label');
       btn.textContent = '★ EQUIPPED';
     } else if (item.owned) {

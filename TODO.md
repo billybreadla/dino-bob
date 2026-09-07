@@ -56,7 +56,7 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
 
 ## 🥇 Tier 1 — biggest player-facing wins
 
-- [ ] 🔴 **Obstacles / trick shots.** Nothing ever blocks an arrow today.
+- [x] 🔴 **Obstacles / trick shots.** _(shipped 2026-09-06: orbiting wooden shield + stone wall, SNAP on hit, aim preview stops, TUNING.OBSTACLE_*)_ Nothing ever blocks an arrow today.
   Add 1-2 obstacle types that make shots into puzzles: a wooden shield that
   slowly orbits a target, and/or a stone wall you must arc over. Spawn them
   in phases 2-3 only, never on the first stage. Arrows should THUNK and snap

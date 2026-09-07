@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v34-kids';
+var CACHE = 'dinobob-v52-pets-paintmesh';
 var FILES = [
   '.',
   'index.html',
@@ -21,9 +21,16 @@ var FILES = [
   'intro/intro.jsx',
   'intro/assets/forest.png',
   'intro/assets/dino_0.png',
+  'intro/assets/dino_1.png',
+  'intro/assets/dino_2.png',
   'intro/assets/dino_3.png',
   'intro/assets/bow.png',
+  'intro/assets/arrow_basic.png',
   'intro/assets/arrow_fire.png',
+  'intro/assets/arrow_firegold.png',
+  'intro/assets/arrow_gold.png',
+  'intro/assets/arrow_ice.png',
+  'intro/assets/balloon.png',
   'intro/assets/target.png',
   'intro/assets/coin.png',
   'manifest.webmanifest',
@@ -186,7 +193,8 @@ var FILES = [
   'assets/sprites/fg2_meadow.webp', 'assets/sprites/fg2_mountain.webp',
   'assets/sprites/fg2_sunset_beach.webp', 'assets/sprites/fg2_starlight.webp',
   'assets/sprites/fg2_underwater.webp', 'assets/sprites/fg2_moon_cave.webp',
-  // baked 3D gear: rolling arrow turntables per type
+  // baked 3D gear: lit toy bow + rolling arrow turntables per type
+  'assets/sprites/bow_3d_0.webp',
   'assets/sprites/arrow_wooden_3d_0.webp', 'assets/sprites/arrow_wooden_3d_1.webp',
   'assets/sprites/arrow_wooden_3d_2.webp', 'assets/sprites/arrow_wooden_3d_3.webp',
   'assets/sprites/arrow_wooden_3d_4.webp', 'assets/sprites/arrow_wooden_3d_5.webp',
@@ -204,14 +212,53 @@ var FILES = [
   'assets/sprites/arrow_obsidian_3d_4.webp', 'assets/sprites/arrow_obsidian_3d_5.webp',
   // cinematic title backdrop (tools/title_scene.py, CSS-referenced)
   'assets/sprites/title_scene.webp',
-  // the Crab King: procedural Blender mini-boss frames
-  'assets/sprites/crab_3d_0.webp', 'assets/sprites/crab_3d_1.webp',
-  'assets/sprites/crab_3d_2.webp', 'assets/sprites/crab_3d_3.webp',
-  'assets/sprites/crab_3d_4.webp', 'assets/sprites/crab_3d_5.webp',
-  // the Angler Golem: same pipeline, guards Bubble Reef
-  'assets/sprites/angler_3d_0.webp', 'assets/sprites/angler_3d_1.webp',
-  'assets/sprites/angler_3d_2.webp', 'assets/sprites/angler_3d_3.webp',
-  'assets/sprites/angler_3d_4.webp', 'assets/sprites/angler_3d_5.webp'
+  // the Crab King: V7 contract boss_crab_3d_* (900px damage turntable)
+  'assets/sprites/boss_crab_3d_0.webp', 'assets/sprites/boss_crab_3d_1.webp',
+  'assets/sprites/boss_crab_3d_2.webp', 'assets/sprites/boss_crab_3d_3.webp',
+  'assets/sprites/boss_crab_3d_4.webp', 'assets/sprites/boss_crab_3d_5.webp',
+  // the Angler Golem: V7 contract boss_angler_3d_* (900px)
+  'assets/sprites/boss_angler_3d_0.webp', 'assets/sprites/boss_angler_3d_1.webp',
+  'assets/sprites/boss_angler_3d_2.webp', 'assets/sprites/boss_angler_3d_3.webp',
+  'assets/sprites/boss_angler_3d_4.webp', 'assets/sprites/boss_angler_3d_5.webp',
+  'assets/sprites/pet_ptero_0.webp',
+  'assets/sprites/pet_ptero_1.webp',
+  'assets/sprites/pet_ptero_2.webp',
+  'assets/sprites/pet_ptero_3.webp',
+  'assets/sprites/pet_ptero_4.webp',
+  'assets/sprites/pet_ptero_5.webp',
+  'assets/sprites/pet_turtle_0.webp',
+  'assets/sprites/pet_turtle_1.webp',
+  'assets/sprites/pet_turtle_2.webp',
+  'assets/sprites/pet_turtle_3.webp',
+  'assets/sprites/pet_turtle_4.webp',
+  'assets/sprites/pet_turtle_5.webp',
+  'assets/sprites/pet_firefly_0.webp',
+  'assets/sprites/pet_firefly_1.webp',
+  'assets/sprites/pet_firefly_2.webp',
+  'assets/sprites/pet_firefly_3.webp',
+  'assets/sprites/pet_firefly_4.webp',
+  'assets/sprites/pet_firefly_5.webp',
+  'assets/sprites/obstacle_shield.webp',
+  'assets/sprites/obstacle_wall.webp',
+  // Menu/preview hero turntables (decorative; gameplay archer poses unchanged)
+  'assets/sprites/char_dinobob_3d_0.webp', 'assets/sprites/char_dinobob_3d_1.webp',
+  'assets/sprites/char_dinobob_3d_2.webp', 'assets/sprites/char_dinobob_3d_3.webp',
+  'assets/sprites/char_dinobob_3d_4.webp', 'assets/sprites/char_dinobob_3d_5.webp',
+  'assets/sprites/char_ninja_3d_0.webp', 'assets/sprites/char_ninja_3d_1.webp',
+  'assets/sprites/char_ninja_3d_2.webp', 'assets/sprites/char_ninja_3d_3.webp',
+  'assets/sprites/char_ninja_3d_4.webp', 'assets/sprites/char_ninja_3d_5.webp',
+  'assets/sprites/char_astronaut_3d_0.webp', 'assets/sprites/char_astronaut_3d_1.webp',
+  'assets/sprites/char_astronaut_3d_2.webp', 'assets/sprites/char_astronaut_3d_3.webp',
+  'assets/sprites/char_astronaut_3d_4.webp', 'assets/sprites/char_astronaut_3d_5.webp',
+  'assets/sprites/char_robot_3d_0.webp', 'assets/sprites/char_robot_3d_1.webp',
+  'assets/sprites/char_robot_3d_2.webp', 'assets/sprites/char_robot_3d_3.webp',
+  'assets/sprites/char_robot_3d_4.webp', 'assets/sprites/char_robot_3d_5.webp',
+  'assets/sprites/char_bear_3d_0.webp', 'assets/sprites/char_bear_3d_1.webp',
+  'assets/sprites/char_bear_3d_2.webp', 'assets/sprites/char_bear_3d_3.webp',
+  'assets/sprites/char_bear_3d_4.webp', 'assets/sprites/char_bear_3d_5.webp',
+  'assets/sprites/char_trixie_3d_0.webp', 'assets/sprites/char_trixie_3d_1.webp',
+  'assets/sprites/char_trixie_3d_2.webp', 'assets/sprites/char_trixie_3d_3.webp',
+  'assets/sprites/char_trixie_3d_4.webp', 'assets/sprites/char_trixie_3d_5.webp'
 ];
 
 self.addEventListener('install', function (e) {

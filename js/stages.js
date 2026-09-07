@@ -43,18 +43,18 @@ var STAGES = (function () {
     },
     crab: {
       name: 'Crab King',
-      sprite: 'crab_3d_0',
-      renderFrames: ['crab_3d_0', 'crab_3d_1', 'crab_3d_2', 'crab_3d_3', 'crab_3d_4', 'crab_3d_5'],
+      sprite: 'boss_crab_3d_0',
+      renderFrames: ['boss_crab_3d_0', 'boss_crab_3d_1', 'boss_crab_3d_2', 'boss_crab_3d_3', 'boss_crab_3d_4', 'boss_crab_3d_5'],
       hp: 6,
-      scale: 2.4,
+      scale: 2.3,
       lift: -0.06
     },
     angler: {
       name: 'Angler Golem',
-      sprite: 'angler_3d_0',
-      renderFrames: ['angler_3d_0', 'angler_3d_1', 'angler_3d_2', 'angler_3d_3', 'angler_3d_4', 'angler_3d_5'],
+      sprite: 'boss_angler_3d_0',
+      renderFrames: ['boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2', 'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5'],
       hp: 7,
-      scale: 2.4,
+      scale: 2.3,
       lift: 0.05
     }
   };
