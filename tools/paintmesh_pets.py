@@ -21,6 +21,8 @@ PETS = [
     ("pet_ptero", "ptero_tt_soft", "pet_ptero_3d"),
     ("pet_turtle", "turtle_tt_soft", "pet_turtle_3d"),
     ("pet_firefly", "firefly_tt_soft", "pet_firefly_3d"),
+    # v65 Bunbun: procedural soft TT (model_toys) + painted_bak Lab match
+    ("pet_bunbun", "bunbun_tt_soft", "pet_bunbun"),
 ]
 
 
@@ -216,10 +218,21 @@ def contact_sheet(paths_by_pet: dict[str, list[str]], out_path: str) -> None:
 
 
 def main() -> int:
+    import sys
+    only = [a for a in sys.argv[1:] if not a.startswith("-")]
+    pets = PETS
+    if only:
+        keys = set()
+        for a in only:
+            keys.add(a if a.startswith("pet_") else f"pet_{a}")
+        pets = [p for p in PETS if p[0] in keys]
+        if not pets:
+            raise SystemExit(f"no pets matched {only}; known {[p[0] for p in PETS]}")
     paths = {}
-    for live, tt_dir, tt_prefix in PETS:
+    for live, tt_dir, tt_prefix in pets:
         paths[live] = process_pet(live, tt_dir, tt_prefix)
-    contact_sheet(paths, os.path.join(MESHY, "contact_pets_v52.png"))
+    out = "contact_pets_v65_bunbun.png" if only else "contact_pets_v52.png"
+    contact_sheet(paths, os.path.join(MESHY, out))
     return 0
 
 

@@ -28,8 +28,8 @@ def paintify(im):
     rgb = ImageOps.posterize(rgb, 5)
     rgb = rgb.filter(ImageFilter.SMOOTH_MORE)
     rgb = rgb.filter(ImageFilter.SMOOTH)
-    rgb = ImageEnhance.Color(rgb).enhance(1.28)
-    rgb = ImageEnhance.Contrast(rgb).enhance(1.12)
+    rgb = ImageEnhance.Color(rgb).enhance(1.34)
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.16)
     rgb = ImageEnhance.Brightness(rgb).enhance(1.03)
     out = rgb.convert("RGBA")
     a = im.split()[-1]
