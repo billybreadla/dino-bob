@@ -447,8 +447,8 @@ var UI = (function () {
       if (r.challengeFrom) ctx.textContent = '🎁 Challenge from ' + r.challengeFrom + '!';
       else if (activeMode.type === 'daily') ctx.textContent = "📅 Today's family challenge";
       else if (activeMode.type === 'marathon') {
-        ctx.textContent = r.marathonRecord ? '🏆 Waves survived: ' + (r.waves || 1) :
-          '🏃 Waves survived: ' + (r.waves || 1) + ' · Best: ' + r.marathonBest;
+        ctx.textContent = r.marathonRecord ? '🏆 New best ' + r.score + ' · Wave ' + (r.waves || 1) :
+          '🏃 Score ' + r.score + ' · Wave ' + (r.waves || 1) + ' · Best ' + r.marathonBest;
       }
       else if (activeMode.type === 'workshop' && r.workshopWon && r.workshopBoss) ctx.textContent = '👑 ' + r.workshopBoss + ' has fallen!';
       else ctx.textContent = '';
@@ -806,14 +806,14 @@ var UI = (function () {
 
   /* ============ Marathon endless mode ============ */
 
-  // Endless score attack: no clock, no arrow limit. Three targets escaping
-  // ends the run; every 30s wave pushes speed past the normal phase-3 cap.
+  // Endless score attack: no clock. Play until arrows run out — bullseyes
+  // and golden bananas gift more arrows. Waves escalate forever.
   function marathonOptions() {
     return {
       mode: 'marathon',
       label: 'MARATHON',
       roundSeconds: 3600,          // never counts down — rules.endless turns the clock off
-      arrows: 99999,               // endless arrows (∞ on the HUD)
+      arrows: TUNING.ARROWS_PER_ROUND,
       moversAt: TUNING.MARATHON_MOVERS_AT,
       chaosAt: TUNING.MARATHON_CHAOS_AT,
       targetSpeed: 1,

@@ -39,7 +39,10 @@ var STAGES = (function () {
       renderFrames: ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'],
       hp: 6,
       scale: 2.5,
-      lift: 0.06
+      lift: 0.06,
+      // Slam: winds up, then lobs a slow stone arc toward the player.
+      // Shoot the stone mid-air for a bonus — or let it thud (shake only).
+      attack: { kind: 'slam', cooldown: 8, telegraph: 1.25 }
     },
     crab: {
       name: 'Crab King',
@@ -47,7 +50,9 @@ var STAGES = (function () {
       renderFrames: ['boss_crab_3d_0', 'boss_crab_3d_1', 'boss_crab_3d_2', 'boss_crab_3d_3', 'boss_crab_3d_4', 'boss_crab_3d_5'],
       hp: 6,
       scale: 2.3,
-      lift: -0.06
+      lift: -0.06,
+      // Charge: claws glow, then a readable rush toward the bow and back.
+      attack: { kind: 'charge', cooldown: 8.5, telegraph: 1.1 }
     },
     angler: {
       name: 'Angler Golem',
@@ -55,7 +60,9 @@ var STAGES = (function () {
       renderFrames: ['boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2', 'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5'],
       hp: 7,
       scale: 2.3,
-      lift: 0.05
+      lift: 0.05,
+      // Spit: lure flares, then a slow glowing blob arcs at the player side.
+      attack: { kind: 'spit', cooldown: 7.5, telegraph: 1.15 }
     }
   };
 

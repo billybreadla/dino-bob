@@ -49,7 +49,7 @@ var TUNING = {
   // ---------- WIND ----------
   // Sometimes the round gets a breeze! Wind pushes arrows sideways while
   // they fly. Watch the little flag at the top of the screen.
-  WIND_MAX: 55,            // strongest push possible (px/s^2) — big gusts are rare!
+  WIND_MAX: 55,            // strongest push (px/s^2) ≈ 10-15% of arrow speed over a flight
   WIND_CHANCE: 0.6,        // chance a round is windy (0.6 = 60% of rounds). Rest are calm.
   WIND_MIN_SHOW: 4,        // a whisper of wind smaller than this shows no flag
 
@@ -66,13 +66,25 @@ var TUNING = {
   WEATHER_LIGHTNING_MAX: 14,     // longest quiet stretch between lightning
 
   // ---------- MARATHON ----------
-  // Marathon is ENDLESS! It never runs out of time or arrows, but if three
-  // targets get away (float off, fly past, or fall), the run is over.
-  MARATHON_ESCAPES: 3,       // hearts: how many targets may escape before game over
-  MARATHON_WAVE_SECONDS: 30, // a new wave starts every this-many seconds
-  MARATHON_MOVERS_AT: 30,    // wave when targets start moving
-  MARATHON_CHAOS_AT: 60,     // wave-second when CHAOS MODE kicks in... and keeps growing!
-  MARATHON_RAMP: 0.18,       // extra speed added every wave past wave 3 — it gets wild!
+  // Marathon is ENDLESS time! No clock — you play until the arrows run out.
+  // Land a BULLSEYE to earn +1 arrow; nail the GOLDEN BANANA for +3. Waves
+  // still escalate so later rounds get wilder and wilder.
+  MARATHON_BULLSEYE_ARROWS: 1,  // arrows gifted for a true bullseye (center ring)
+  MARATHON_GOLDEN_ARROWS: 3,    // arrows gifted for the golden banana
+  MARATHON_WAVE_SECONDS: 30,    // a new wave starts every this-many seconds
+  MARATHON_MOVERS_AT: 30,       // seconds when targets start moving
+  MARATHON_CHAOS_AT: 60,        // seconds when CHAOS MODE kicks in... and keeps growing!
+  MARATHON_RAMP: 0.18,          // extra speed added every wave past wave 3 — it gets wild!
+
+  // ---------- BOSS ATTACKS ----------
+  // Each boss winds up (glow!) then does ONE telegraphed move kids can read.
+  // Never spammy — long cooldown, and the "hurt" is shake / lost time, not HP.
+  BOSS_ATTACK_COOLDOWN: 8,     // seconds between attacks (fair + readable)
+  BOSS_ATTACK_TELEGRAPH: 1.25, // wind-up glow before the move lands
+  BOSS_STONE_SPEED: 420,       // Moonstone slam-stone flight speed
+  BOSS_STONE_BONUS: 75,        // points for bursting the stone mid-air
+  BOSS_CHARGE_SPEED: 520,      // Crab King charge rush speed
+  BOSS_SPIT_SPEED: 380,        // Angler spit blob speed
 
   // ---------- OBSIDIAN BLACK HOLE ----------
   BLACKHOLE_RADIUS: 210,   // how far the black hole reaches to suck things in

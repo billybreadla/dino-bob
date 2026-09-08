@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v52-pets-paintmesh';
+var CACHE = 'dinobob-v56-bow-poses';
 var FILES = [
   '.',
   'index.html',

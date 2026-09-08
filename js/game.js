@@ -110,7 +110,7 @@ var GAME = (function () {
       customBoss: options.customBoss || null,
       theme: options.theme || null,
       challengeFrom: options.challengeFrom || null,
-      // Marathon endless mode: no clock, no arrow limit (see rules.endless).
+      // Marathon endless mode: no clock; arrows still count (see rules.endless).
       endless: !!options.endless
     };
     if (rules.bossAtStart && AUDIO.music) AUDIO.music.start('tense');
@@ -196,7 +196,7 @@ var GAME = (function () {
       lookTimer: 0,
       lastTickSec: 6,
       spawnCooldown: 0,
-      escaped: 0,             // MARATHON: targets that got away (each costs a heart)
+      escaped: 0,             // soft counter (escapes no longer end Marathon)
       wave: 1,                // MARATHON: current 30-second wave number
       baseSpeed: rules.targetSpeed, // MARATHON: speed the escalation ramp builds from
       combo: 0,               // hits in a row without a miss
@@ -465,6 +465,7 @@ var GAME = (function () {
   function workshopDef() {
     var c = st.rules.customBoss || {};
     var frames = WORKSHOP_BODIES[c.body] || WORKSHOP_BODIES.moonstone;
+    var bodyAtk = (STAGES.bosses[c.body] || STAGES.bosses.moonstone || {}).attack || null;
     return {
       name: c.name || "Penny's Boss",
       sprite: frames[0],
@@ -474,7 +475,8 @@ var GAME = (function () {
       scale: c.scale,
       lift: (c.weak === 'top' ? -0.20 : c.weak === 'low' ? 0.20 : 0),
       hue: c.hue || 0,
-      wobbleAmp: c.wobble / 50          // slider 0..100 -> amplitude x0..x2 (50 = classic)
+      wobbleAmp: c.wobble / 50,          // slider 0..100 -> amplitude x0..x2 (50 = classic)
+      attack: bodyAtk                   // inherit slam/charge/spit from the body type
     };
   }
 
@@ -489,6 +491,7 @@ var GAME = (function () {
     var custom = st.rules.bossId === 'custom' && st.rules.customBoss;
     var def = resolveBossDef(st.rules.bossId);
     var hitR = custom ? Math.round(130 * (def.scale / 2.5)) : 130;
+    var atk = def.attack || null;
     return {
       type: 'boss', bossId: st.rules.bossId || 'moonstone',
       dead: false, hp: def.hp, maxHp: def.hp, frozenUntil: 0,
@@ -496,7 +499,16 @@ var GAME = (function () {
       // instead of floating in the sky (art bottom lands near GROUND).
       x: W / 2 + 120, baseX: W / 2 + 120, y: 620,
       r: hitR, wobble: 0, mt: 0,
-      motion: 'slide', range: 220, speed: 1.0
+      motion: 'slide', range: 220, speed: 1.0,
+      // Telegraphed attack: idle → windup (glow) → active → recover.
+      atkKind: atk ? atk.kind : null,
+      atkCd: atk ? (atk.cooldown || TUNING.BOSS_ATTACK_COOLDOWN) * 0.55 : 9999,
+      atkTele: atk ? (atk.telegraph || TUNING.BOSS_ATTACK_TELEGRAPH) : 1.2,
+      atkPhase: 'idle',
+      atkT: 0,
+      atkGlow: 0,
+      chargeHomeX: W / 2 + 120,
+      chargeDir: -1
     };
   }
 
@@ -610,14 +622,96 @@ var GAME = (function () {
     if (t.type === 'powerup' || t.bonusFruit) return;
     t.escapedCounted = true;
     st.escaped++;
-    addShake(0.2);
-    AUDIO.nope();
-    st.floaters.push({
-      x: Math.max(160, Math.min(W - 160, t.x)), y: Math.max(120, t.y),
-      vy: -55, life: 1.3,
-      text: 'GOT AWAY! ' + '❤'.repeat(Math.max(0, TUNING.MARATHON_ESCAPES - st.escaped)),
-      big: false, color: '#ff5f5f'
-    });
+    // Soft feedback only — Marathon ends when arrows run out, not on escapes.
+  }
+
+
+  // ---- Boss telegraphed attacks (one readable move each) ----
+  function updateBossAttack(t, dt, frozen) {
+    if (!t.atkKind || frozen) return;
+    if (t.atkPhase === 'charge') return; // motion handled in updateTarget
+    var cd = (resolveBossDef(t.bossId).attack || {}).cooldown || TUNING.BOSS_ATTACK_COOLDOWN;
+    var tele = t.atkTele || TUNING.BOSS_ATTACK_TELEGRAPH;
+    if (t.atkPhase === 'idle') {
+      t.atkCd -= dt;
+      t.atkGlow = Math.max(0, (t.atkGlow || 0) - dt);
+      if (t.atkCd <= 0) {
+        t.atkPhase = 'windup';
+        t.atkT = tele;
+        t.atkGlow = 1;
+        AUDIO.tick();
+        st.floaters.push({
+          x: t.x, y: t.y - t.r - 70, vy: -40, life: 1.1,
+          text: t.atkKind === 'slam' ? 'SLAM!' : t.atkKind === 'charge' ? 'CHARGE!' : 'SPIT!',
+          big: true, color: '#ff8ad4'
+        });
+      }
+      return;
+    }
+    if (t.atkPhase === 'windup') {
+      t.atkT -= dt;
+      t.atkGlow = 0.55 + 0.45 * Math.sin(st.t * 14);
+      if (t.atkT <= 0) fireBossAttack(t);
+      return;
+    }
+    if (t.atkPhase === 'recover') {
+      t.atkT -= dt;
+      t.atkGlow = Math.max(0, (t.atkGlow || 0) - dt * 1.5);
+      if (t.atkT <= 0) {
+        t.atkPhase = 'idle';
+        t.atkCd = cd;
+        t.atkGlow = 0;
+      }
+    }
+  }
+
+  function fireBossAttack(t) {
+    var kind = t.atkKind;
+    t.atkGlow = 1;
+    if (kind === 'slam') {
+      // Lob a slow stone arc toward the player side — shoot it for a bonus!
+      var tx = BOW.x + 80 + rand(-40, 80);
+      var ty = GROUND - 10;
+      var T = 1.15;
+      var vx = (tx - t.x) / T;
+      var vy = (ty - t.y) / T - 0.5 * 520 * T;
+      st.targets.push({
+        type: 'bossShot', kind: 'stone', dead: false, hp: 1, frozenUntil: 0,
+        x: t.x - 30, y: t.y - 40, r: 28,
+        vx: vx, vy: vy, grav: 520, life: 2.4,
+        color: '#b8c4d4', bonus: TUNING.BOSS_STONE_BONUS || 75
+      });
+      AUDIO.thunk();
+      t.atkPhase = 'recover';
+      t.atkT = 0.7;
+    } else if (kind === 'charge') {
+      t.chargeHomeX = t.baseX;
+      t.chargeTargetX = Math.max(260, BOW.x + 160);
+      t.chargeDir = t.chargeTargetX < t.x ? -1 : 1;
+      t.chargeVx = t.chargeDir * (TUNING.BOSS_CHARGE_SPEED || 520);
+      t.atkPhase = 'charge';
+      t.atkT = 1.1;
+      addShake(0.18);
+      AUDIO.roundEnd();
+    } else if (kind === 'spit') {
+      var sx = BOW.x + 60 + rand(-30, 50);
+      var sy = GROUND - 20;
+      var TT = 1.25;
+      var svx = (sx - t.x) / TT;
+      var svy = (sy - t.y) / TT - 0.5 * 380 * TT;
+      st.targets.push({
+        type: 'bossShot', kind: 'spit', dead: false, hp: 1, frozenUntil: 0,
+        x: t.x - 20, y: t.y - 50, r: 24,
+        vx: svx, vy: svy, grav: 380, life: 2.6,
+        color: '#62e6ff', bonus: 60
+      });
+      AUDIO.pop();
+      t.atkPhase = 'recover';
+      t.atkT = 0.65;
+    } else {
+      t.atkPhase = 'idle';
+      t.atkCd = TUNING.BOSS_ATTACK_COOLDOWN;
+    }
   }
 
   function updateTarget(t, dt) {
@@ -629,12 +723,45 @@ var GAME = (function () {
     t.hitFlash = Math.max(0, (t.hitFlash || 0) - dt * 4.5);
 
     if (t.type === 'bullseye' || t.type === 'boss' || t.type === 'doodle') {
-      if (t.motion === 'slide' && !frozen) {
+      if (t.type === 'boss' && t.atkPhase === 'charge' && !frozen) {
+        // Crab rush: fly toward the bow, then ease home.
+        t.atkT -= dt;
+        t.x += t.chargeVx * dt;
+        if ((t.chargeDir < 0 && t.x <= t.chargeTargetX) ||
+            (t.chargeDir > 0 && t.x >= t.chargeTargetX) ||
+            t.atkT <= 0) {
+          t.atkPhase = 'recover';
+          t.atkT = 0.55;
+          t.baseX = t.chargeHomeX;
+          t.mt = 0;
+        }
+      } else if (t.motion === 'slide' && !frozen && t.atkPhase !== 'charge') {
         t.x = t.baseX + Math.sin(t.mt * t.speed) * t.range;
       } else if (t.motion === 'swing') {
         var th = Math.sin(t.mt * t.speed) * t.amp;
         t.x = t.anchor.x + Math.sin(th) * t.len;
         t.y = t.anchor.y + Math.cos(th) * t.len;
+      }
+      if (t.type === 'boss') updateBossAttack(t, dt, frozen);
+    } else if (t.type === 'bossShot') {
+      if (!frozen) {
+        t.x += t.vx * dt;
+        t.y += t.vy * dt;
+        t.vy += (t.grav || 0) * dt;
+        t.life -= dt;
+      }
+      if (t.life <= 0 || t.y > GROUND + 40 || t.x < -80 || t.x > W + 80) {
+        // Harmless thud — shake + sparkle, never player damage.
+        if (!t.burst) {
+          addShake(0.28);
+          AUDIO.thunk();
+          burst(t.x, Math.min(t.y, GROUND), t.color || '#c9a07a');
+          st.floaters.push({
+            x: Math.max(120, Math.min(W - 120, t.x)), y: Math.min(t.y, GROUND) - 40,
+            vy: -50, life: 1.0, text: 'THUD!', big: false, color: '#c9a07a'
+          });
+        }
+        t.dead = true;
       }
     } else if (t.type === 'balloon') {
       if (!frozen) {
@@ -708,7 +835,7 @@ var GAME = (function () {
     // camera punch on release; the LAST arrow gets a dramatic slow-send
     if (!reducedMotion()) {
       st.camKick = (st.camKick || 0) + 0.045;
-      if (st.arrowsLeft === 0 && !st.rules.endless) {
+      if (st.arrowsLeft === 0) {
         st.cinematicUntil = Math.max(st.cinematicUntil, st.t + 0.16);
         st.camKick += 0.05;
       }
@@ -781,7 +908,7 @@ var GAME = (function () {
           // real targets (bullseyes, chests, boss). Doodles are paper: soft.
           var soft = (t.type === 'balloon' || t.type === 'fruit' ||
                       t.type === 'golden' || t.type === 'powerup' ||
-                      t.type === 'doodle');
+                      t.type === 'doodle' || t.type === 'bossShot');
           if (!soft) {
             if (ar.pierceLeft > 0) { ar.pierceLeft--; flame(hit.x, hit.y); }
             else { ar.dead = true; }
@@ -974,6 +1101,21 @@ var GAME = (function () {
     st.stats.hits++;
     var moving = t.type === 'bullseye' && t.motion !== 'static' && st.t >= t.frozenUntil;
 
+    if (t.type === 'bossShot') {
+      // Burst the telegraphed projectile mid-air for a bonus — kids' win!
+      t.dead = true; t.burst = true;
+      award(t.bonus || 75, t.x, t.y - 20, { bonusObj: true });
+      AUDIO.coin();
+      ring(t.x, t.y, t.color || '#ffd23a');
+      burst(t.x, t.y, t.color || '#ffd23a');
+      st.floaters.push({
+        x: t.x, y: t.y - 50, vy: -60, life: 1.2,
+        text: t.kind === 'spit' ? 'BLOCKED!' : 'STONE BURST!',
+        big: true, color: '#ffd23a'
+      });
+      return;
+    }
+
     if (t.type === 'bullseye') {
       var d = Math.hypot(hit.x - t.x, hit.y - t.y) / t.r;
       var rings = TUNING.SCORE_BULLSEYE_RINGS;
@@ -994,6 +1136,15 @@ var GAME = (function () {
         st.floaters.push({ x: t.x, y: t.y - t.r - 56, vy: -70, life: 1.3, text: 'BULLSEYE!', big: true, color: '#ffd23a' });
         earn('first_bullseye');
         characterMoment(t.x, t.y - t.r - 95);
+        // Marathon: a true bullseye gifts another arrow so the run keeps going!
+        if (st.rules.endless) {
+          var ba = TUNING.MARATHON_BULLSEYE_ARROWS || 1;
+          st.arrowsLeft += ba;
+          st.floaters.push({
+            x: t.x, y: t.y - t.r - 90, vy: -55, life: 1.2,
+            text: '+' + ba + ' ARROW!', big: false, color: '#9fd636'
+          });
+        }
       } else {
         AUDIO.thunk();
       }
@@ -1032,6 +1183,15 @@ var GAME = (function () {
       spawnCoins(12, t.x, t.y);
       st.floaters.push({ x: t.x, y: t.y - 60, vy: -60, life: 1.5, text: 'GOLDEN!', big: true, color: '#ffd23a' });
       earn('golden');
+      // Marathon: golden banana is the big arrow jackpot!
+      if (st.rules.endless) {
+        var ga = TUNING.MARATHON_GOLDEN_ARROWS || 3;
+        st.arrowsLeft += ga;
+        st.floaters.push({
+          x: t.x, y: t.y - 95, vy: -55, life: 1.4,
+          text: '+' + ga + ' ARROWS!', big: true, color: '#9fd636'
+        });
+      }
     } else if (t.type === 'powerup') {
       applyPowerup(t);
     } else if (t.type === 'plane') {
@@ -1450,8 +1610,8 @@ var GAME = (function () {
 
     var noArrows = st.arrowsLeft <= 0 && st.arrows.every(function (a) { return a.dead; });
     var bossWon = st.rules.bossAtStart && st.stats.bossDefeated && st.arrows.every(function (a) { return a.dead; });
-    var allGone = st.rules.endless && st.escaped >= TUNING.MARATHON_ESCAPES; // 3 hearts spent
-    if (st.time <= 0 || noArrows || bossWon || allGone) {
+    // Marathon (endless): no clock — the run ends when arrows are gone.
+    if ((!st.rules.endless && st.time <= 0) || noArrows || bossWon) {
       st.time = Math.max(0, st.time);
       st.over = true;
       AUDIO.roundEnd();
@@ -2845,6 +3005,19 @@ var GAME = (function () {
 
     ctx.drawImage(img, -bw / 2, -bh / 2 - byoff, bw, bh);
 
+    // Wind-up telegraph: big pink/gold pulse kids can read before the attack.
+    if ((t.atkGlow || 0) > 0.05) {
+      var ag = Math.min(1, t.atkGlow);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.35 + ag * 0.45;
+      var ringR = t.r * (1.15 + ag * 0.35);
+      ctx.strokeStyle = t.atkKind === 'spit' ? '#62e6ff' : (t.atkKind === 'charge' ? '#ff8a3a' : '#ff8ad4');
+      ctx.lineWidth = 10 + ag * 10;
+      ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
     if (bossImg && !reducedMotion()) {
       var armSwing = Math.sin(st.t * 2.7 + t.mt) * 0.018 * amp + recoil * 0.05;
       drawBossCrop(img, 0.02, 0.28, 0.29, 0.50, bw, bh, byoff, -recoil * 8, recoil * 7, -armSwing - recoil * 0.03, 1);
@@ -3256,6 +3429,27 @@ var GAME = (function () {
       ctx.font = '900 ' + Math.round(t.r * 1.0) + 'px Nunito, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(t.kind === 'arrows' ? '+3' : '⏱', 0, 2);
+    } else if (t.type === 'bossShot') {
+      // Telegraphed projectile — big readable stone / spit blob kids can shoot.
+      var pulse = reducedMotion() ? 1 : 1 + Math.sin(st.t * 10) * 0.08;
+      var glowCol = t.kind === 'spit' ? 'rgba(98,230,255,0.7)' : 'rgba(255,210,58,0.7)';
+      var glow = memoGlowSprite('boss-shot|' + (t.kind || 'stone'), t.r * 1.8, function (c, R) {
+        var g = c.createRadialGradient(R, R, R * 0.05, R, R, R);
+        g.addColorStop(0, glowCol);
+        g.addColorStop(1, 'rgba(255,210,58,0)');
+        c.fillStyle = g;
+        c.fillRect(0, 0, R * 2, R * 2);
+      });
+      ctx.drawImage(glow.sp, -glow.R * pulse, -glow.R * pulse, glow.R * 2 * pulse, glow.R * 2 * pulse);
+      if (t.kind === 'spit') {
+        ART.circle(ctx, 0, 0, t.r * pulse, '#62e6ff');
+        ART.circle(ctx, -t.r * 0.25, -t.r * 0.3, t.r * 0.35, 'rgba(255,255,255,0.65)');
+        ART.circle(ctx, 0, 0, t.r * 0.45, '#1a7fb8');
+      } else {
+        ART.circle(ctx, 0, 0, t.r * pulse, '#9aa7b8');
+        ART.circle(ctx, -t.r * 0.2, -t.r * 0.25, t.r * 0.55, '#c5ced8');
+        ART.circle(ctx, t.r * 0.25, t.r * 0.15, t.r * 0.28, '#6d7888');
+      }
     } else if (t.type === 'boss') {
       var bdef = resolveBossDef(t.bossId);
       var bossSprite = bossDamageSprite(bdef, t);
@@ -3309,6 +3503,62 @@ var GAME = (function () {
       }
       ctx.closePath();
       ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+
+  // ---- Wind leaf particles (gameplay cue, separate from biome weather) ----
+  function ensureWindLeaves() {
+    if (!st || !st.rules) return;
+    var wind = st.rules.wind || 0;
+    if (Math.abs(wind) < TUNING.WIND_MIN_SHOW || reducedMotion()) {
+      st.windLeaves = null;
+      return;
+    }
+    if (st.windLeaves && st.windLeaves.length) return;
+    var n = 10 + Math.round(8 * Math.min(1, Math.abs(wind) / TUNING.WIND_MAX));
+    var dir = wind >= 0 ? 1 : -1;
+    var cols = ['#a8d43a', '#d9a621', '#8bc34a', '#e8b23a', '#c4e86a'];
+    st.windLeaves = [];
+    for (var i = 0; i < n; i++) {
+      st.windLeaves.push({
+        x: Math.random() * W,
+        y: 40 + Math.random() * (GROUND - 120),
+        sp: 70 + Math.random() * 120,
+        r: 3.5 + Math.random() * 3.5,
+        rot: Math.random() * 6.28,
+        vr: (Math.random() * 2 - 1) * 4,
+        sw: 20 + Math.random() * 30,
+        ph: Math.random() * 6.28,
+        c: cols[i % cols.length],
+        dir: dir
+      });
+    }
+  }
+
+  function drawWindLeaves() {
+    if (reducedMotion()) return;
+    ensureWindLeaves();
+    var leaves = st.windLeaves;
+    if (!leaves || !leaves.length) return;
+    var wind = st.rules.wind || 0;
+    var boost = 0.7 + Math.min(1, Math.abs(wind) / TUNING.WIND_MAX);
+    ctx.save();
+    for (var i = 0; i < leaves.length; i++) {
+      var L = leaves[i];
+      var x = ((L.x + L.dir * L.sp * boost * st.t) % (W + 80) + (W + 80)) % (W + 80) - 40;
+      var y = L.y + Math.sin(st.t * 1.7 + L.ph) * L.sw;
+      var rot = L.rot + st.t * L.vr;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = L.c;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, L.r * 1.6, L.r * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -3560,19 +3810,12 @@ var GAME = (function () {
 
     // timer — top center
     if (st.rules.endless) {
-      // MARATHON: no clock! Show the wave number and the three escape hearts.
-      hudPanel(W / 2 - 130, 24, 260, 56);
+      // MARATHON: no clock! Show the wave number — arrows are the real life bar.
+      hudPanel(W / 2 - 110, 24, 220, 56);
       ctx.fillStyle = '#ffd23a';
-      ctx.font = '900 28px Lilita One, Nunito, sans-serif';
+      ctx.font = '900 30px Lilita One, Nunito, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('WAVE ' + st.wave, W / 2 - 52, 53);
-      var hearts = '';
-      for (var hi = 0; hi < TUNING.MARATHON_ESCAPES; hi++) {
-        hearts += hi < TUNING.MARATHON_ESCAPES - st.escaped ? '❤️' : '🖤';
-      }
-      ctx.font = '800 21px Nunito, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(hearts, W / 2 + 16, 54);
+      ctx.fillText('WAVE ' + st.wave, W / 2, 53);
     } else {
     var urgent = st.time <= 5.5;
     hudPanel(W / 2 - 110, 24, 220, 56);
@@ -3621,7 +3864,7 @@ var GAME = (function () {
     ctx.fillStyle = '#fff';
     ctx.font = '800 30px Nunito, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(st.rules.endless ? '∞' : '×' + st.arrowsLeft, W - 128, 52);
+    ctx.fillText('×' + st.arrowsLeft, W - 128, 52);
 
     // floaters
     st.floaters.forEach(function (f) {
@@ -3813,6 +4056,7 @@ var GAME = (function () {
 
     // live weather rides over the whole world but under the HUD
     drawWeather();
+    drawWindLeaves();
     ctx.restore(); // end the photo pan/zoom world block
 
     if (photoMode) {
@@ -3896,8 +4140,7 @@ var GAME = (function () {
       ctx.font = '900 110px Lilita One, Nunito, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      var msg = st.rules.endless ?
-        (st.escaped >= TUNING.MARATHON_ESCAPES ? '3 GOT AWAY!' : 'RUN OVER!') :
+      var msg = st.rules.endless ? 'OUT OF ARROWS!' :
         (st.arrowsLeft <= 0 && st.time > 0 ? 'OUT OF ARROWS!' : "TIME'S UP!");
       ctx.strokeText(msg, W / 2, H / 2 - 20);
       ctx.fillText(msg, W / 2, H / 2 - 20);

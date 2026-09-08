@@ -64,26 +64,9 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
   `OBSTACLE_CHANCE`, kid-named. Files: game.js (spawner, updateTarget,
   updateArrows collision, drawTarget), tuning.js. This changes game feel —
   needs taste + play-testing, not just code.
-- [ ] 🔴 **Wind.** A per-round (or per-phase) horizontal wind that pushes
-  arrows in flight, shown as a little animated flag on the HUD and drifting
-  leaf particles. One force number + direction; affects `simStep` and the
-  aim preview in `drawAim` (the preview MUST show the true wind-bent path,
-  kids can't compensate for invisible physics). `TUNING.WIND_MAX` in
-  Penny's zone. Start gentle (10-15% of arrow speed max).
-- [ ] 🟢 **Endless mode ("Marathon").** New home-screen mode: no timer, you
-  play until arrows run out; every bullseye +1 arrow, golden banana +3.
-  Track a separate `marathonBest` on the profile, show on results + home.
-  Mostly wiring: a `mode:'endless'` rules object (roundSeconds ~9999,
-  arrows from TUNING), end condition already exists (OUT OF ARROWS),
-  ui.js home button + results copy, save.js field. Follow the pattern of
-  how `openChallenge`/`startRound` work.
-- [ ] 🔴 **Boss fights back.** The Moonstone King only slides. Give him ONE
-  telegraphed move: every ~8s he winds up (glow + sound cue) and lobs a slow
-  stone arc toward the player side; if the player hits the stone mid-air it
-  bursts for bonus points, otherwise it thuds harmlessly with screen shake
-  (never punish, this is a kids' game — the "damage" is lost time/arrows
-  wasted dodging). Files: game.js boss section, stages.js bossDef gets
-  `attack:{...}` config so future bosses vary.
+- [x] 🔴 **Wind.** _(shipped 2026-09-07: per-round wind on simStep+drawAim, HUD flag, wind leaf particles, TUNING.WIND_*)_
+- [x] 🟢 **Endless mode ("Marathon").** _(shipped 2026-09-07: no timer, arrows-out, bullseye +1 / golden +3, marathonBest, home+results)_
+- [x] 🔴 **Boss fights back.** _(shipped 2026-09-07: Moonstone slam / Crab charge / Angler spit — telegraphed, shootable projectiles)_
 
 ## 🥈 Tier 2 — retention & progression
 
