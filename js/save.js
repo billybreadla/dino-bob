@@ -362,7 +362,10 @@ var SAVE = (function () {
         var tmpl = pool.find(function (t) { return t.id === q.id; });
         if (!tmpl) return;
         var d = deltas[tmpl.stat] || 0;
-        if (d > 0 && q.progress < q.target) q.progress = Math.min(q.target, q.progress + d);
+        if (d <= 0 || q.progress >= q.target) return;
+        // Combo quests track the best streak reached (max), not a running sum.
+        if (tmpl.stat === 'combo') q.progress = Math.min(q.target, Math.max(q.progress, d));
+        else q.progress = Math.min(q.target, q.progress + d);
       });
       persist();
     },

@@ -130,7 +130,7 @@ try {
   const qCount = await page.evaluate(() => document.querySelectorAll('#quests-list .quest-card').length);
   check('daily quests render (3)', qCount === 3, qCount + ' cards');
   await click('btn-quests-back'); await sleep(150);
-  await page.evaluate(() => SAVE.addQuestProgress({ bullseyes: 999, balloons: 999, fruits: 999, chests: 999, coins: 99999, rounds: 999, score: 999999 }));
+  await page.evaluate(() => SAVE.addQuestProgress({ bullseyes: 999, balloons: 999, fruits: 999, chests: 999, coins: 99999, rounds: 999, score: 999999, golden: 99, boss: 99, planes: 99, doodles: 99, combo: 99 }));
   await click('btn-quests'); await sleep(300);
   const coinsBefore = await page.evaluate(() => SAVE.current().coins);
   const claimBtns = await page.evaluate(() => document.querySelectorAll('#quests-list .quest-claim').length);
@@ -157,6 +157,27 @@ try {
   await shot('06-game-ingame');
   const bg = await page.evaluate(() => typeof SPRITES !== 'undefined' && !!(SPRITES.get('bg_meadow') || SPRITES.get('bg_mountain'))).catch(() => false);
   check('WebP background sprite loaded', bg);
+
+  // Pause: toggle on → overlay "PAUSED" paints → debugStep must NOT advance time.
+  const pauseCheck = await page.evaluate(() => {
+    if (!GAME.isRunning()) return { ok: false, why: 'not running' };
+    const t0 = GAME.debugState().t;
+    const on = GAME.togglePause();
+    const tMid = GAME.debugState().t;
+    GAME.debugStep(0.25);
+    const tAfter = GAME.debugState().t;
+    // Sample a bright yellow PAUSED glyph near canvas center-top.
+    const c = document.getElementById('game-canvas');
+    const ctx = c.getContext('2d');
+    const x = Math.floor(c.width / 2), y = Math.floor(c.height * 0.38);
+    const pix = ctx.getImageData(x, y, 1, 1).data;
+    const bright = pix[0] + pix[1] + pix[2];
+    const off = GAME.togglePause();
+    return { ok: on === true && off === false && tAfter === tMid, on, off, t0, tMid, tAfter, bright, why: '' };
+  });
+  check('pause toggles + freezes sim (debugStep gated)', pauseCheck.ok, JSON.stringify(pauseCheck));
+  check('pause overlay visible (PAUSED paint)', pauseCheck.bright > 200, 'center luminance=' + pauseCheck.bright);
+
   await playRound(26);
   await shot('07-results');
   const onResults = await screen() === 'results';

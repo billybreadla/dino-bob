@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v59-streak-stars';
+var CACHE = 'dinobob-v63-music';
 var FILES = [
   '.',
   'index.html',
@@ -16,6 +16,8 @@ var FILES = [
   'js/ui.js',
   'js/changelog.js',
   'js/main.js',
+  'assets/audio/music_loop.ogg',
+  'assets/audio/music_loop.mp3',
   'intro/intro.dc.html',
   'intro/support.js',
   'intro/intro.jsx',

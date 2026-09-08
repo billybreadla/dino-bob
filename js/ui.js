@@ -149,20 +149,22 @@ var UI = (function () {
     var COLORS = ['#ffd23a', '#ff5fa2', '#62e6ff', '#9fd636', '#9b5fe8', '#ff7a1a'];
     return {
       confetti: function () {
+        // Fully respect reduced motion — decorative confetti is skipped entirely
+        // (quest-claim, shop buys, high-score). Sound still goes through AUDIO.
+        if (wantsReducedMotion()) return;
         ensure();
-        var reduced = wantsReducedMotion();
-        var total = reduced ? Math.min(18, Math.ceil(TUNING.CONFETTI_AMOUNT * 0.15)) : TUNING.CONFETTI_AMOUNT;
+        var total = TUNING.CONFETTI_AMOUNT;
         for (var i = 0; i < total; i++) {
           parts.push({
             x: Math.random() * canvas.width,
-            y: reduced ? canvas.height * 0.12 + Math.random() * canvas.height * 0.18 : -20 - Math.random() * canvas.height * 0.3,
-            vx: (Math.random() - 0.5) * (reduced ? 36 : 120),
-            vy: reduced ? 35 + Math.random() * 55 : 120 + Math.random() * 240,
-            grav: reduced ? 18 : 60,
-            r: 4 + Math.random() * (reduced ? 3 : 6),
+            y: -20 - Math.random() * canvas.height * 0.3,
+            vx: (Math.random() - 0.5) * 120,
+            vy: 120 + Math.random() * 240,
+            grav: 60,
+            r: 4 + Math.random() * 6,
             rot: Math.random() * 6,
-            vr: (Math.random() - 0.5) * (reduced ? 2 : 10),
-            life: reduced ? 0.8 + Math.random() * 0.4 : 2 + Math.random() * 1.5,
+            vr: (Math.random() - 0.5) * 10,
+            life: 2 + Math.random() * 1.5,
             color: COLORS[i % COLORS.length],
             shape: 'rect'
           });
@@ -359,7 +361,13 @@ var UI = (function () {
       chests: s.chests || 0,
       coins: r.coins || 0,
       rounds: 1,
-      score: r.score || 0
+      score: r.score || 0,
+      golden: s.golden || 0,
+      boss: s.bossDefeated ? 1 : 0,
+      planes: s.planes || 0,
+      doodles: s.doodles || 0,
+      // combo quests look at the round's best streak (xN), not a sum
+      combo: Math.max(r.bestCombo || 0, s.bestCombo || 0)
     });
   }
 
@@ -418,7 +426,12 @@ var UI = (function () {
         claim.textContent = '+' + q.reward + ' 🪙';
         claim.onclick = function () {
           var got = SAVE.claimQuest(q.id);
-          if (got > 0) { AUDIO.coin(); fx.confetti(); renderQuests(); renderQuestBanner(); $('home-coins').textContent = SAVE.current().coins; }
+          if (got > 0) {
+            if (AUDIO.sfxEnabled()) AUDIO.coin();
+            fx.confetti(); // no-op under reduced motion
+            renderQuests(); renderQuestBanner();
+            $('home-coins').textContent = SAVE.current().coins;
+          }
         };
         action.appendChild(claim);
       } else {
@@ -1289,7 +1302,7 @@ var UI = (function () {
         addItem({
           id: 'shiny_' + chId,
           name: 'Shiny ' + ch.name,
-          perk: '✨ Sparkles everywhere! ✨',
+          perk: '✨ Glow + sparkles (stacks with outfits!) · bonus coins on bullseyes',
           price: TUNING.PRICE_SHINY,
           owned: SAVE.owns('shiny', chId),
           equipped: p.equipped.shiny && p.equipped.character === chId,

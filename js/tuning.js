@@ -122,7 +122,11 @@ var TUNING = {
   PRICE_CHARACTER: 1000,
   PRICE_HAT: 250,
   PRICE_OUTFIT: 500,
-  PRICE_SHINY: 750,
+  // Shiny used to be just a glow (worse value than a 500c outfit). Now it
+  // stacks WITH outfits, sparkles harder, and tosses bonus coins on bullseyes.
+  PRICE_SHINY: 400,          // coins to unlock shiny for one character
+  SHINY_BULLSEYE_COINS: 2,   // bonus coins that pop out on a true bullseye while shiny
+  SHINY_GLOW_BLUR: 28,       // how soft/bright the shiny halo is (bigger = glowier)
   PRICE_FIRE_ARROW: 500,
   PRICE_ICE_ARROW: 1000,
   PRICE_LIGHTNING_ARROW: 2000,

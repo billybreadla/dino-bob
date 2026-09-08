@@ -141,21 +141,36 @@ var DATA = {
   // Daily quest templates. Each day picks 3 (see SAVE.dailyQuests). Progress is
   // cumulative across the day's rounds; %n in text is replaced with the target.
   questPool: [
-    { id: 'q_bullseyes', icon: '🎯', text: 'Hit %n bullseyes',        stat: 'bullseyes', target: 8,    reward: 40 },
-    { id: 'q_balloons',  icon: '🎈', text: 'Pop %n balloons',         stat: 'balloons',  target: 15,   reward: 40 },
-    { id: 'q_fruits',    icon: '🍉', text: 'Splat %n fruits',         stat: 'fruits',    target: 12,   reward: 40 },
-    { id: 'q_chests',    icon: '🎁', text: 'Open %n treasure chests', stat: 'chests',    target: 3,    reward: 55 },
-    { id: 'q_coins',     icon: '🪙', text: 'Earn %n coins',           stat: 'coins',     target: 200,  reward: 40 },
-    { id: 'q_rounds',    icon: '🏹', text: 'Play %n rounds',          stat: 'rounds',    target: 3,    reward: 30 },
-    { id: 'q_score',     icon: '⭐', text: 'Score %n points total',   stat: 'score',     target: 1500, reward: 50 }
+    // Classic targets (kids know these)
+    { id: 'q_bullseyes',   icon: '🎯', text: 'Hit %n bullseyes',          stat: 'bullseyes', target: 8,    reward: 40 },
+    { id: 'q_bullseyes_big',icon: '🎯', text: 'Nail %n bullseyes today',   stat: 'bullseyes', target: 20,   reward: 70 },
+    { id: 'q_balloons',    icon: '🎈', text: 'Pop %n balloons',           stat: 'balloons',  target: 15,   reward: 40 },
+    { id: 'q_balloons_party',icon:'🎈', text: 'Pop a party of %n balloons',stat: 'balloons', target: 30,   reward: 65 },
+    { id: 'q_fruits',      icon: '🍉', text: 'Splat %n fruits',           stat: 'fruits',    target: 12,   reward: 40 },
+    { id: 'q_fruits_feast',icon: '🍍', text: 'Feast on %n fruits',        stat: 'fruits',    target: 25,   reward: 60 },
+    { id: 'q_chests',      icon: '🎁', text: 'Open %n treasure chests',   stat: 'chests',    target: 3,    reward: 55 },
+    { id: 'q_coins',       icon: '🪙', text: 'Earn %n coins',             stat: 'coins',     target: 200,  reward: 40 },
+    { id: 'q_coins_bank',  icon: '🪙', text: 'Bank %n coins today',       stat: 'coins',     target: 500,  reward: 75 },
+    { id: 'q_rounds',      icon: '🏹', text: 'Play %n rounds',            stat: 'rounds',    target: 3,    reward: 30 },
+    { id: 'q_rounds_day',  icon: '🗓️', text: 'Play %n rounds in a day',   stat: 'rounds',    target: 5,    reward: 50 },
+    { id: 'q_score',       icon: '⭐', text: 'Score %n points total',     stat: 'score',     target: 1500, reward: 50 },
+    { id: 'q_score_star',  icon: '🌟', text: 'Rack up %n points today',   stat: 'score',     target: 4000, reward: 80 },
+    // Variety — use round stats already tracked in game.js
+    { id: 'q_golden',      icon: '🍌', text: 'Catch %n Golden Bananas',   stat: 'golden',    target: 1,    reward: 60 },
+    { id: 'q_boss',        icon: '👑', text: 'Defeat a boss target',      stat: 'boss',      target: 1,    reward: 80 },
+    { id: 'q_planes',      icon: '✈️', text: 'Sky-hit %n planes',         stat: 'planes',    target: 2,    reward: 45 },
+    { id: 'q_doodles',     icon: '✏️', text: 'Pop %n doodle enemies',     stat: 'doodles',   target: 5,    reward: 45 },
+    { id: 'q_combo',       icon: '🔥', text: 'Reach a x%n combo',         stat: 'combo',     target: 5,    reward: 55 }
   ],
 
   outfits: [
-    { id: 'classic', name: 'Classic',      price: 0,    swap: null },
-    { id: 'ruby',    name: 'Ruby Red',     get price() { return TUNING.PRICE_OUTFIT; }, swap: '#e23b3b' },
-    { id: 'grape',   name: 'Grape Purple', get price() { return TUNING.PRICE_OUTFIT; }, swap: '#8e4fd0' },
-    { id: 'gold',    name: 'Golden',       get price() { return TUNING.PRICE_OUTFIT; }, swap: '#e8a91d' },
-    { id: 'mint',    name: 'Minty Fresh',  get price() { return TUNING.PRICE_OUTFIT; }, swap: '#36c98e' }
+    // hue = canvas hue-rotate for characters without painted recolor sprites
+    // (Dino Bob still uses char_dinobob_<id>.png when present).
+    { id: 'classic', name: 'Classic',      price: 0,    swap: null,     hue: 0 },
+    { id: 'ruby',    name: 'Ruby Red',     get price() { return TUNING.PRICE_OUTFIT; }, swap: '#e23b3b', hue: 340 },
+    { id: 'grape',   name: 'Grape Purple', get price() { return TUNING.PRICE_OUTFIT; }, swap: '#8e4fd0', hue: 275 },
+    { id: 'gold',    name: 'Golden',       get price() { return TUNING.PRICE_OUTFIT; }, swap: '#e8a91d', hue: 48 },
+    { id: 'mint',    name: 'Minty Fresh',  get price() { return TUNING.PRICE_OUTFIT; }, swap: '#36c98e', hue: 145 }
   ],
 
   // shiny variants are generated per character: id 'shiny_<characterId>'

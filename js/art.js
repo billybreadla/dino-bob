@@ -106,17 +106,20 @@ var ART = (function () {
   }
 
   function sparkles(ctx, x, y, s, t) {
-    for (var i = 0; i < 5; i++) {
-      var a = t * 1.5 + i * (Math.PI * 2 / 5);
-      var px = x + Math.cos(a) * 42 * s;
-      var py = y - 45 * s + Math.sin(a * 1.3) * 50 * s;
-      var tw = (Math.sin(t * 6 + i * 2) + 1) / 2;
+    // Shiny sparkle ring — a few more stars + a soft pulse so it reads as a
+    // premium perk, not just a filter. Always drawn on top of outfits.
+    for (var i = 0; i < 8; i++) {
+      var a = t * 1.7 + i * (Math.PI * 2 / 8);
+      var rad = (36 + (i % 2) * 10) * s;
+      var px = x + Math.cos(a) * rad;
+      var py = y - 50 * s + Math.sin(a * 1.35) * 52 * s;
+      var tw = (Math.sin(t * 7 + i * 1.7) + 1) / 2;
       ctx.save();
-      ctx.globalAlpha = 0.35 + tw * 0.6;
+      ctx.globalAlpha = 0.4 + tw * 0.55;
       ctx.translate(px, py);
       ctx.rotate(a);
-      ctx.fillStyle = '#fff7c4';
-      var r = (2 + tw * 3) * s;
+      ctx.fillStyle = i % 2 ? '#fff7c4' : '#ffffff';
+      var r = (2.2 + tw * 3.4) * s;
       ctx.beginPath();
       ctx.moveTo(0, -r * 2); ctx.lineTo(r * 0.6, -r * 0.6); ctx.lineTo(r * 2, 0);
       ctx.lineTo(r * 0.6, r * 0.6); ctx.lineTo(0, r * 2); ctx.lineTo(-r * 0.6, r * 0.6);
@@ -124,6 +127,42 @@ var ART = (function () {
       ctx.closePath(); ctx.fill();
       ctx.restore();
     }
+  }
+
+  /* Outfit hue-rotate cache (for ninja/astronaut/robot/bear/trixie — and any
+     future character without painted recolor PNGs). Same eviction pattern as
+     game.js balloon hues. Keyed by source identity + hue degrees. */
+  var OUTFIT_HUE_CACHE_MAX = 36;
+  var outfitHueCache = {};
+  var outfitHueOrder = [];
+  function outfitHueDegrees(outfitId) {
+    if (!outfitId || outfitId === 'classic') return 0;
+    if (typeof DATA !== 'undefined' && DATA.outfitById) {
+      var o = DATA.outfitById(outfitId);
+      if (o && typeof o.hue === 'number') return o.hue;
+    }
+    return ({ ruby: 340, grape: 275, gold: 48, mint: 145 })[outfitId] || 0;
+  }
+  function hueTintedImage(img, cacheKey, hue) {
+    hue = ((Math.round(hue || 0) % 360) + 360) % 360;
+    if (!hue || !img) return null;
+    var k = cacheKey + '|' + hue;
+    if (outfitHueCache[k]) return outfitHueCache[k];
+    if (typeof document === 'undefined' || !document.createElement) return null;
+    var c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width;
+    c.height = img.naturalHeight || img.height;
+    if (!c.width || !c.height) return null;
+    var g = c.getContext('2d');
+    g.filter = 'hue-rotate(' + hue + 'deg) saturate(1.15)';
+    g.drawImage(img, 0, 0, c.width, c.height);
+    g.filter = 'none';
+    while (outfitHueOrder.length >= OUTFIT_HUE_CACHE_MAX) {
+      delete outfitHueCache[outfitHueOrder.shift()];
+    }
+    outfitHueCache[k] = c;
+    outfitHueOrder.push(k);
+    return c;
   }
 
   /* Draw a character standing, feet at (x, y). scale 1 ≈ 130px tall.
@@ -148,13 +187,21 @@ var ART = (function () {
     }
 
     // Use the real rendered sprite when it's available. Dino Bob has painted
-    // recolor + shiny variants, so the outfit shop visibly changes his look
-    // (other characters fall back to the base sprite).
+    // recolor sprites; other characters get a hue-rotate outfit tint in
+    // drawCharacterSprite. Shiny is a GLOW LAYER that stacks with outfits
+    // (never replaces an outfit sprite — that was the old value bug).
     var spriteName = 'char_' + id;
-    if (id === 'dinobob' && typeof SPRITES !== 'undefined') {
-      if (opts.shiny && SPRITES.get('char_dinobob_shiny')) spriteName = 'char_dinobob_shiny';
-      else if (opts.outfitId && opts.outfitId !== 'classic' && SPRITES.get('char_dinobob_' + opts.outfitId)) spriteName = 'char_dinobob_' + opts.outfitId;
+    var paintedOutfit = false;
+    if (typeof SPRITES !== 'undefined') {
+      if (opts.outfitId && opts.outfitId !== 'classic' && SPRITES.get('char_' + id + '_' + opts.outfitId)) {
+        spriteName = 'char_' + id + '_' + opts.outfitId;
+        paintedOutfit = true;
+      } else if (opts.shiny && id === 'dinobob' && SPRITES.get('char_dinobob_shiny')) {
+        // Classic + shiny: use the painted shiny sprite.
+        spriteName = 'char_dinobob_shiny';
+      }
     }
+    opts._paintedOutfit = paintedOutfit;
     // Menu/preview heroes: prefer lit TripoSR turntable wobble when present.
     // Gameplay passes opts.archer — keep those on flat/archer art.
     if (!opts.archer && typeof SPRITES !== 'undefined' && spriteName === 'char_' + id) {
@@ -338,8 +385,28 @@ var ART = (function () {
     var h = 138 * scale;
     var w = h * img.width / img.height;
     var source = opts.archer && archerArtReady(id) ? archerSprite(img, id) : img;
+    // Hue-tint outfits for characters without painted recolor sprites.
+    // Painted outfit PNGs (Dino Bob today) skip this so we don't double-shift.
+    if (!opts._paintedOutfit && opts.outfitId && opts.outfitId !== 'classic') {
+      var hue = outfitHueDegrees(opts.outfitId);
+      if (hue) {
+        var tintKey = (source && (source.src || source._outfitKey)) || ('char_' + id + (opts.archer ? '_archer' : ''));
+        if (!source._outfitKey) try { source._outfitKey = tintKey + '_' + (source.width || 0); } catch (e) {}
+        var tinted = hueTintedImage(source, tintKey + '|' + (source.width || 0) + 'x' + (source.height || 0), hue);
+        if (tinted) source = tinted;
+      }
+    }
     ctx.save();
-    if (opts.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.9)'; ctx.shadowBlur = 18 * scale; }
+    if (opts.shiny) {
+      var blur = (typeof TUNING !== 'undefined' && TUNING.SHINY_GLOW_BLUR) ? TUNING.SHINY_GLOW_BLUR : 28;
+      ctx.shadowColor = 'rgba(255,247,180,0.95)';
+      ctx.shadowBlur = blur * scale;
+      // second pass halo
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(source, x - w / 2, y - h, w, h);
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = (blur * 0.55) * scale;
+    }
     ctx.drawImage(source, x - w / 2, y - h, w, h);
     ctx.restore();
 

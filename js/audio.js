@@ -1,5 +1,7 @@
-/* All sound is synthesized with WebAudio — no audio files needed.
-   Audio starts on the first user tap (browser autoplay rules). */
+/* Sound effects are synthesized with WebAudio. Background music prefers a
+   real looping file at assets/audio/music_loop.{ogg,mp3,m4a} when present,
+   and falls back to the procedural biome loops below. Audio starts on the
+   first user tap (browser autoplay rules). Mute/settings still work. */
 
 var AUDIO = (function () {
   var ctx = null;
@@ -10,6 +12,18 @@ var AUDIO = (function () {
   var voiceEls = {};      // one HTMLAudio per line name
   var voiceMissing = {};  // names whose mp3 AND m4a both failed: silent forever
   var voiceLast = {};     // name -> timestamp of last play (throttle)
+
+  /* Real music drop-in: place assets/audio/music_loop.ogg (or .mp3/.m4a).
+     When the file loads we route it through musicGain so the Music toggle
+     and volume bus still apply. Procedural loops stay as the fallback. */
+  var fileMusic = {
+    el: null, node: null, ready: false, failed: false, wanted: false, probing: false
+  };
+  var FILE_MUSIC_CANDIDATES = [
+    'assets/audio/music_loop.ogg',
+    'assets/audio/music_loop.mp3',
+    'assets/audio/music_loop.m4a'
+  ];
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -71,6 +85,8 @@ var AUDIO = (function () {
   var NOTE_BASE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
   var NOTE_RE = /^([a-g])([#b]?)(\d)$/;
   var LOOPS = {
+    // Fallback procedural loops (used when assets/audio/music_loop.* is missing,
+    // and always for boss 'tense' music). Real file music overrides ambient kinds.
     // bouncy C-major plink-tune with an oom-pah bass bounce
     meadow: {
       bpm: 112, spb: 2, melType: 'triangle', melVol: 0.34,
@@ -95,7 +111,7 @@ var AUDIO = (function () {
         'f2 . c3 . f2 . c3 .',
         'g2 . d3 . g2 b2 . .'
       ],
-      hats: '.x.x.x.x', hatVol: 0.05
+      hats: 'x.x.x.xx.', hatVol: 0.055
     },
     // minor + driving, lower-octave pulse (boss / mountain)
     tense: {
@@ -231,20 +247,106 @@ var AUDIO = (function () {
     return g;
   }
 
-  function startMusicKind(kind) {
+  function stopFileMusic() {
+    fileMusic.wanted = false;
+    if (fileMusic.el) {
+      try { fileMusic.el.pause(); } catch (e) {}
+    }
+  }
+
+  function playFileMusic() {
+    if (!fileMusic.ready || !fileMusic.el || !musicOn) return false;
+    fileMusic.wanted = true;
+    // File music wins over procedural ambient once it is ready.
+    if (musicTimer) {
+      seq.kind = null;
+      if (seq.bus) {
+        try {
+          seq.bus.gain.cancelScheduledValues(ctx.currentTime);
+          seq.bus.gain.setValueAtTime(0.0001, ctx.currentTime);
+        } catch (e) {}
+        seq.fading.push({ g: seq.bus, until: ctx.currentTime + 0.05 });
+        seq.bus = null;
+      }
+      clearInterval(musicTimer); musicTimer = null;
+    }
+    try {
+      fileMusic.el.loop = true;
+      var p = fileMusic.el.play();
+      if (p && p.catch) p.catch(function () { /* autoplay: wait for next unlock */ });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function attachFileMusicElement(url) {
+    if (!ensure()) return;
+    var el = new Audio(url);
+    el.loop = true;
+    el.preload = 'auto';
+    try {
+      // MediaElementSource may only be created once per element.
+      fileMusic.node = ctx.createMediaElementSource(el);
+      fileMusic.node.connect(musicGain);
+    } catch (e) {
+      // Fallback: element plays through its own volume (still muteable via pause).
+      el.volume = 0.35;
+    }
+    fileMusic.el = el;
+    fileMusic.ready = true;
+    if (fileMusic.wanted && musicOn) playFileMusic();
+  }
+
+  function probeFileMusic() {
+    if (fileMusic.ready || fileMusic.failed || fileMusic.probing) return;
+    fileMusic.probing = true;
+    var i = 0;
+    function tryNext() {
+      if (i >= FILE_MUSIC_CANDIDATES.length) {
+        fileMusic.failed = true;
+        fileMusic.probing = false;
+        // Fall back to procedural if music is wanted.
+        if (fileMusic.wanted && musicOn) startProceduralKind(seq.ambient || 'meadow');
+        return;
+      }
+      var url = FILE_MUSIC_CANDIDATES[i++];
+      var probe = new Audio();
+      var settled = false;
+      function ok() {
+        if (settled) return; settled = true;
+        fileMusic.probing = false;
+        attachFileMusicElement(url);
+      }
+      function bad() {
+        if (settled) return; settled = true;
+        tryNext();
+      }
+      probe.addEventListener('canplaythrough', ok);
+      probe.addEventListener('loadeddata', ok);
+      probe.addEventListener('error', bad);
+      probe.preload = 'auto';
+      probe.src = url;
+      // Some browsers need an explicit load(); ignore failures.
+      try { probe.load(); } catch (e) { bad(); }
+      // Safety timeout so a hung probe never blocks music forever.
+      setTimeout(function () { if (!settled) bad(); }, 2500);
+    }
+    tryNext();
+  }
+
+  function startProceduralKind(kind) {
     kind = LOOPS[kind] ? kind : seq.ambient;
     if (!LOOPS[kind]) return false;
     if (kind !== 'tense') seq.ambient = kind;   // remember the round default
     if (seq.timer && seq.kind === kind) return true; // already playing it
     if (!ensure()) return false;
     if (seq.bus) {                               // crossfade out the old kind
-      var old = seq.bus;
+      var oldBus = seq.bus;
       try {
-        old.gain.cancelScheduledValues(ctx.currentTime);
-        old.gain.setValueAtTime(old.gain.value, ctx.currentTime);
-        old.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+        oldBus.gain.cancelScheduledValues(ctx.currentTime);
+        oldBus.gain.setValueAtTime(oldBus.gain.value, ctx.currentTime);
+        oldBus.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
       } catch (e) {}
-      seq.fading.push({ g: old, until: ctx.currentTime + 0.9 });
+      seq.fading.push({ g: oldBus, until: ctx.currentTime + 0.9 });
     }
     seq.kind = kind;
     seq.bus = makeBus();
@@ -254,8 +356,48 @@ var AUDIO = (function () {
     return true;
   }
 
+  function startMusicKind(kind) {
+    // Boss tense music always uses the procedural battle loop (short cue).
+    // Ambient rounds prefer the real file loop when available.
+    kind = LOOPS[kind] ? kind : seq.ambient;
+    if (kind !== 'tense') seq.ambient = kind || seq.ambient;
+    musicOn = true;
+    fileMusic.wanted = true;
+    if (kind === 'tense') {
+      stopFileMusic();
+      fileMusic.wanted = false; // tense is procedural-only
+      return startProceduralKind('tense');
+    }
+    // Prefer file music for ambient/meadow/sea.
+    if (fileMusic.ready) {
+      // Stop procedural if it was running.
+      if (musicTimer) {
+        seq.kind = null;
+        if (seq.bus) {
+          try {
+            seq.bus.gain.cancelScheduledValues(ctx.currentTime);
+            seq.bus.gain.setValueAtTime(0.0001, ctx.currentTime);
+          } catch (e) {}
+          seq.fading.push({ g: seq.bus, until: ctx.currentTime + 0.05 });
+          seq.bus = null;
+        }
+        clearInterval(musicTimer); musicTimer = null;
+      }
+      return playFileMusic();
+    }
+    if (!fileMusic.failed && !fileMusic.probing) {
+      probeFileMusic();
+      // Start procedural immediately so kids hear something while probing;
+      // if the file loads, playFileMusic will take over and we stop procedural.
+      startProceduralKind(kind);
+      return true;
+    }
+    return startProceduralKind(kind);
+  }
+
   function stopMusicKind() {
     musicOn = false;
+    stopFileMusic();
     seq.kind = null;
     if (seq.bus) {
       var b = seq.bus;
@@ -280,7 +422,7 @@ var AUDIO = (function () {
       musicOn = true; startMusicKind(); return true;
     },
     setMusic: function (on) { if (on) { musicOn = true; startMusicKind(); } else stopMusicKind(); },
-    musicPlaying: function () { return !!musicTimer; },
+    musicPlaying: function () { return !!musicTimer || !!(fileMusic.el && !fileMusic.el.paused && fileMusic.wanted); },
 
     /* new engine: AUDIO.music.start('meadow'|'sky'.../'tense'|'sea') */
     music: {

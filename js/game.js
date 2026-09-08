@@ -205,7 +205,7 @@ var GAME = (function () {
       slowUntil: 0,           // slow-motion power-up active until this time
       cinematicUntil: 0,
       bossSpawned: false,
-      stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, doodles: 0, planes: 0, bossDefeated: false },
+      stats: { shots: 0, hits: 0, misses: 0, bullseyes: 0, balloons: 0, fruits: 0, chests: 0, doodles: 0, planes: 0, golden: 0, bossDefeated: false },
       weather: weather,       // this round's skies (see WEATHER roll above)
       bgName: bgName,
       // Per-round spawn RNG. rand()/pick()/spawner rolls all flow through
@@ -1043,7 +1043,7 @@ var GAME = (function () {
       award(o.value, o.x, o.y, { bonusObj: true }); fruitSplat(o); o.dead = true; track('fruits', 'fruits_100', 100);
     } else if (o.type === 'golden') {
       award(TUNING.SCORE_GOLDEN, o.x, o.y, { bonusObj: true }); burst(o.x, o.y, '#ffd23a');
-      spawnCoins(12, o.x, o.y); o.dead = true; earn('golden');
+      spawnCoins(12, o.x, o.y); o.dead = true; st.stats.golden = (st.stats.golden || 0) + 1; earn('golden');
     } else if (o.type === 'chest') {
       award(TUNING.SCORE_CHEST, o.x, o.y, { bonusObj: true }); spawnCoins(TUNING.COINS_FROM_CHEST, o.x, o.y);
       o.dead = true; track('chests', 'chests_10', 10);
@@ -1186,6 +1186,7 @@ var GAME = (function () {
       burst(t.x, t.y, '#ffd23a');
       spawnCoins(12, t.x, t.y);
       st.floaters.push({ x: t.x, y: t.y - 60, vy: -60, life: 1.5, text: 'GOLDEN!', big: true, color: '#ffd23a' });
+      st.stats.golden = (st.stats.golden || 0) + 1;
       earn('golden');
       // Marathon: golden banana is the big arrow jackpot!
       if (st.rules.endless) {
@@ -1462,6 +1463,22 @@ var GAME = (function () {
     }
     // one soft golden flash at the center
     st.particles.push({ x: t.x, y: t.y, vx: 0, vy: 0, life: 0.22, max: 0.22, grav: false, color: '#ffe78a', r: t.r * 0.85, flash: true });
+    // Shiny perk: extra star burst + a couple of bonus coins (stacks with outfits).
+    var shinyOn = st.profile && st.profile.equipped && st.profile.equipped.shiny;
+    if (shinyOn && !reducedMotion()) {
+      for (var si = 0; si < motionCount(16); si++) {
+        var sa = si / 16 * Math.PI * 2 + rand(-0.1, 0.1);
+        var ssp = rand(140, 380);
+        st.particles.push({
+          x: t.x, y: t.y, vx: Math.cos(sa) * ssp, vy: Math.sin(sa) * ssp - 40,
+          life: rand(0.35, 0.7), max: 0.7, grav: false,
+          color: pick(['#fff7c4', '#ffffff', '#ffd23a', '#62e6ff']), r: rand(3, 7), star: true,
+          rot: rand(0, Math.PI), vr: rand(-5, 5)
+        });
+      }
+      var bonus = (typeof TUNING !== 'undefined' && TUNING.SHINY_BULLSEYE_COINS) ? TUNING.SHINY_BULLSEYE_COINS : 2;
+      if (bonus > 0) spawnCoins(bonus, t.x, t.y - t.r);
+    }
   }
   function coinSparkle(c) {
     st.particles.push({
@@ -1654,7 +1671,8 @@ var GAME = (function () {
       coinBonus: coinBonus,
       isHighScore: isHigh,
       highScore: SAVE.current().highScore
-      , stats: st.stats
+      , stats: Object.assign({}, st.stats, { bestCombo: st.bestCombo || 0 })
+      , bestCombo: st.bestCombo || 0
       , mode: st.rules.mode
       , waves: st.wave || 1
       , escaped: st.escaped
@@ -3683,7 +3701,7 @@ var GAME = (function () {
       ctx.drawImage(shadowSprite(), -pr, -pr, pr * 2, pr * 2);
       ctx.restore();
       ctx.save();
-      if (p.equipped.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.9)'; ctx.shadowBlur = 22; }
+      if (p.equipped.shiny) { ctx.shadowColor = 'rgba(255,247,180,0.95)'; ctx.shadowBlur = (TUNING.SHINY_GLOW_BLUR || 28); }
       ctx.drawImage(poseImg, dx, dy, w, h);
       ctx.restore();
     } else {
@@ -4509,8 +4527,14 @@ var GAME = (function () {
     },
     // Inert accessors for automated tests; safe to ignore in normal play.
     debugState: function () { return st; },
-    // Bypasses pause intentionally so tests can advance a frozen scene by hand.
-    debugStep: function (dt) { if (running && st) { update(dt); render(); } },
+    // Advances one sim tick for tests/harness. Gated on pause so a paused
+    // round stays frozen (photo mode still allows render-only stepping).
+    debugStep: function (dt) {
+      if (!running || !st) return;
+      if (paused && !photoMode) { render(); return; }
+      update(dt); render();
+    },
+    isPaused: function () { return !!paused; },
     /* ---- Penny's Boss Workshop live preview ----
        Draws one frame of the workshop boss onto `canvasEl` using the REAL
        drawBoss2p5D path: we briefly swap the module canvas/state for a tiny

@@ -87,13 +87,13 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
   spare platform). ART FIRST (handoff doc pattern: write ART_ASSET_HANDOFF_V7),
   then wiring is small because drawBoss2p5D is generic.
 - [x] 🟢 **Adventure stage 7.** _(Crystal Pool — fruit master stage on spare platform; README/play-test updated)_
-- [ ] 🔴 **Real music.** Current music = procedural pentatonic loop
+- [x] 🔴 **Real music.** _(v63 music_loop.ogg/mp3 + procedural fallback)_ Current music = procedural pentatonic loop
   (audio.js musicTick). Option A: compose 2-3 short loops in code with a
   proper chord progression + bass + melody per biome group. Option B:
   generate short audio files (but repo is no-build static; keep files small,
   <300KB total, and add to SW precache). Must respect the Music toggle and
   not autoplay before first tap (AUDIO.unlock pattern).
-- [ ] 🎨 **Outfit recolors for the other 5 characters.** Only Dino Bob has
+- [x] 🎨 **Outfit recolors for the other 5 characters.** _(hue-rotate tint for non-Bob chars; Bob keeps painted sprites)_ Only Dino Bob has
   ruby/grape/gold/mint/shiny sprites. Ninja/Astronaut/Robot/Bear/Trixie
   outfits silently don't change appearance (long-standing gap). 5 chars ×
   5 variants = 25 sprites; batch per character. Alternative 🟢 fix if art
@@ -102,15 +102,15 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
 
 ## 🧹 Housekeeping / small fixes
 
-- [ ] 🟢 **Shiny value fix.** Shiny (750c) is a glow filter; outfits (500c)
+- [x] 🟢 **Shiny value fix.** _(price 400, stacks with outfits, bullseye coin perk)_ Shiny (750c) is a glow filter; outfits (500c)
   don't work for most characters (see above). Until recolors exist, either
   price-drop shinies to 400 or make shiny ALSO add sparkle particles on
   bullseyes so it feels premium. Tiny game.js/ui.js change.
-- [ ] 🟢 **Quest-claim confetti** respects reduced motion but always plays
+- [x] 🟢 **Quest-claim confetti** respects reduced motion but always plays
   the full sound; route through the sfx setting check. (audio.js/ui.js, 15 min.)
-- [ ] 🟢 **`GAME.debugStep` bypasses pause** (calls update directly). Fine for
+- [x] 🟢 **`GAME.debugStep` bypasses pause** (calls update directly). Fine for
   tests, but add a comment there so nobody "fixes" pause by accident.
-- [ ] 🟢 **Play-test suite additions**: a pause check (togglePause → overlay
+- [x] 🟢 **Play-test suite additions**: a pause check (togglePause → overlay
   pixel test or state assert), a far-target spawn check (force
   FAR_TARGET_CHANCE=1, assert t.far exists + standStyle), an endless-mode
   check when that ships. File: `.claude/skills/play-test/drive.mjs`.
