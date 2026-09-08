@@ -418,6 +418,37 @@ html, body {
   gap: 12px;
   padding-top: max(18px, env(safe-area-inset-top));
 }
+
+/* daily streak chip on the home top bar */
+.streak-chip {
+  background: linear-gradient(180deg, #ff8a3a, #e23b3b);
+  color: #fff8e8;
+  border: 3px solid #ffe27a;
+  box-shadow: 0 3px 0 #9a2a1a;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.adventure-golden-banner {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: linear-gradient(90deg, #ffe27a, #ffb43a, #ffe27a);
+  color: #5a3208;
+  font: 900 16px Nunito, sans-serif;
+  padding: 8px 22px;
+  border-radius: 999px;
+  border: 3px solid #fff8e8;
+  box-shadow: 0 4px 0 rgba(90, 50, 8, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+body.reduced-motion .adventure-golden-banner { animation: none; }
+.adventure-golden-banner:not(.hidden) {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
 .adventure-map {
   position: relative;
   width: min(960px, 92vw);

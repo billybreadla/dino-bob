@@ -131,10 +131,10 @@ var STAGES = (function () {
       id: 'crystal-pool',
       name: 'Crystal Pool',
       shortName: 'Pool',
-      blurb: 'A hidden master stage: balloon currents over the glowing pool.',
+      blurb: 'A hidden master stage: tumbling fruit over the glowing crystal pool.',
       background: 'bg_underwater',
-      round: { roundSeconds: 50, arrows: 22, moversAt: 5, chaosAt: 24, targetSpeed: 1.15, specialRule: 'balloons' },
-      win: { type: 'score', goal: 2000 },
+      round: { roundSeconds: 50, arrows: 22, moversAt: 5, chaosAt: 24, targetSpeed: 1.18, specialRule: 'fruit' },
+      win: { type: 'score', goal: 2100 },
       node: { x: '62%', y: '79%', color: '#1a7fb8', accent: '#bff5ff', sigil: 'bubble' }
     }
   ];

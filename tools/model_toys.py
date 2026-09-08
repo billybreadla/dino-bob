@@ -5,7 +5,7 @@ Builds a party balloon and a gold coin from primitives, then renders 6-frame
 Z-turntables headless using the studio rig from tools/TOY_PIPELINE.md:
 
     blender -b --python tools/model_toys.py -- <outdir> <prefix> <frames>
-      <prefix>: balloon_3d | coin_3d | pet_ptero | pet_turtle | pet_firefly | all     <frames>: default 6
+      <prefix>: balloon_3d | coin_3d | banana_3d | pet_ptero | pet_turtle | pet_firefly | all     <frames>: default 6
 
 Writes <outdir>/<prefix>_0.png .. _N.png (1024x1024 PNG RGBA, transparent).
 """
@@ -326,6 +326,95 @@ def build_coin():
     back.rotation_euler = (math.radians(-90), 0, 0)
     back.location = (0, 0.09, 0)
     back.parent = root
+    return root
+
+
+# ---------------------------------------------------------------- banana --
+# Single banana bunch (NO arrows) for fruit tumble frames.
+BANANA_ORTHO = 3.4
+
+
+def _banana_curve(name, yellow, tip_m, stem_m, yaw, pitch, roll, x, y, z, scale=1.0):
+    """One curved banana as a beveled bezier + tip nub."""
+    curve = bpy.data.curves.new(name, type='CURVE')
+    curve.dimensions = '3D'
+    curve.bevel_depth = 0.16 * scale
+    curve.bevel_resolution = 4
+    curve.use_fill_caps = True
+    sp = curve.splines.new('BEZIER')
+    # crescent arc in local XZ — stem at top, tip dangling
+    pts = [
+        (0.00, 0.00, 0.95),
+        (0.18, 0.00, 0.55),
+        (0.32, 0.00, 0.05),
+        (0.22, 0.00, -0.45),
+        (0.02, 0.00, -0.85),
+    ]
+    sp.bezier_points.add(len(pts) - 1)
+    for bp, pt in zip(sp.bezier_points, pts):
+        bp.co = (pt[0] * scale, pt[1] * scale, pt[2] * scale)
+        bp.handle_left_type = bp.handle_right_type = 'AUTO'
+        bp.radius = 1.0
+    # taper tip a touch
+    sp.bezier_points[-1].radius = 0.55
+    sp.bezier_points[0].radius = 0.85
+    ob = bpy.data.objects.new(name, curve)
+    ob.data.materials.append(yellow)
+    bpy.context.collection.objects.link(ob)
+    ob.rotation_euler = (pitch, roll, yaw)
+    ob.location = (x, y, z)
+    # brown blossom tip
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8,
+                                        radius=0.07 * scale,
+                                        location=(0, 0, 0))
+    tip = bpy.context.active_object
+    tip.data.materials.append(tip_m)
+    tip.parent = ob
+    # put tip at the banana's blossom end in local space of the curve object
+    tip.location = (0.02 * scale, 0.0, -0.92 * scale)
+    set_smooth(tip)
+    return ob
+
+
+def build_banana():
+    """A hand of bananas joined at a woody crown — tumble-friendly, no arrows."""
+    root = bpy.data.objects.new('banana_root', None)
+    bpy.context.collection.objects.link(root)
+    yellow = mat('banana_yel', srgb('#F5D031'), 0.28, coat=0.18, spec=0.35)
+    yellow_dk = mat('banana_dk', srgb('#D4AE1A'), 0.4)
+    tip_m = mat('banana_tip', srgb('#4A3018'), 0.55)
+    stem_m = mat('banana_stem', srgb('#6B4A22'), 0.5)
+    green = mat('banana_green', srgb('#8FBF3A'), 0.45)
+
+    # five bananas fanned around the crown
+    layout = [
+        # yaw, pitch, roll, x, y, z, scale
+        (math.radians(-18), math.radians(8),  math.radians(-12), -0.22,  0.10, 0.05, 1.00),
+        (math.radians( 10), math.radians(4),  math.radians( 8),   0.18,  0.05, 0.02, 0.96),
+        (math.radians(-6),  math.radians(14), math.radians( 0),  -0.02, -0.18, 0.08, 1.05),
+        (math.radians( 28), math.radians(10), math.radians( 16),  0.38, -0.05, 0.00, 0.92),
+        (math.radians(-32), math.radians(12), math.radians(-18), -0.40, -0.08, 0.00, 0.92),
+    ]
+    for i, (yaw, pitch, roll, x, y, z, sc) in enumerate(layout):
+        b = _banana_curve('banana_%d' % i, yellow if i % 2 == 0 else yellow_dk,
+                          tip_m, stem_m, yaw, pitch, roll, x, y, z, sc)
+        b.parent = root
+
+    # woody crown / cut stem at the top
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.22, depth=0.28,
+                                        location=(0, 0, 1.05))
+    crown = bpy.context.active_object
+    crown.data.materials.append(stem_m)
+    crown.parent = root
+    set_smooth(crown)
+    # green nubs where bananas meet the crown
+    for ang, r in ((0, 0.18), (1.2, 0.16), (2.4, 0.17), (3.6, 0.15), (4.8, 0.16)):
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=6, radius=0.08,
+                                            location=(math.cos(ang) * r, math.sin(ang) * r, 0.92))
+        nub = bpy.context.active_object
+        nub.data.materials.append(green)
+        nub.parent = root
+        set_smooth(nub)
     return root
 
 
@@ -1059,6 +1148,8 @@ def main():
             root, scale, wstr = build_balloon(), BALLOON_ORTHO, 0.18
         elif which.startswith('coin'):
             root, scale, wstr = build_coin(), COIN_ORTHO, 0.45
+        elif which in ('banana_3d', 'banana', 'fruit_banana_3d'):
+            root, scale, wstr = build_banana(), BANANA_ORTHO, 0.35
         elif which == 'bow':
             root, scale, wstr = build_bow(), BOW_ORTHO, 0.3
         elif which in ARROW_TYPES:
@@ -1125,7 +1216,8 @@ def main():
             continue
         else:
             raise SystemExit('unknown prefix: ' + which)
-        name = 'bow' if which == 'bow' else \
+        name = 'fruit_banana_3d' if which in ('banana_3d', 'banana', 'fruit_banana_3d') else \
+            'bow' if which == 'bow' else \
             ('arrow_%s_3d' % which) if which in ARROW_TYPES else which
         if which in ('crab_3d', 'angler_3d'):
             # inline render: render_turntable would overwrite the yaw

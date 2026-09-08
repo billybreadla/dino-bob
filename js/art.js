@@ -470,7 +470,7 @@ var ART = (function () {
   }
 
   /* Bow held by the player character. angle = aim direction, draw = 0..1 pull */
-  function drawBow(ctx, x, y, angle, draw, scale) {
+  function drawBow(ctx, x, y, angle, draw, scale, goldTint) {
     var s = scale || 1;
 
     // Prefer lit 3D toy bow; fall back to flat bow.png.
@@ -481,9 +481,12 @@ var ART = (function () {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
+      // Golden Bow unlock: warm gold wash over the toy bow (no new sprite needed).
+      if (goldTint) ctx.filter = 'sepia(0.85) saturate(2.4) hue-rotate(-8deg) brightness(1.12)';
       // native sprite is vertical with the string toward the archer; the grip
       // sits at the sprite's center, which we pin to the bow anchor.
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      if (goldTint) ctx.filter = 'none';
 
       // The source bow includes a relaxed string. This brighter tension line
       // makes the pull readable and follows the arrow nock under the finger.
@@ -541,7 +544,8 @@ var ART = (function () {
     if (flying) {
       var trailLength = (reduced ? Math.min(45, 20 + (motion.speed || 0) * 0.008) : Math.min(105, 42 + (motion.speed || 0) * 0.025)) * s;
       trailLength = Math.max(8, Math.round(trailLength / 8) * 8);   // quantized so the gradient can be cached
-      var trailColor = type.id === 'fire' ? '255,122,26' :
+      var trailColor = (motion && motion.goldTrail) ? '255,210,58' :
+        type.id === 'fire' ? '255,122,26' :
         type.id === 'ice' ? '146,225,255' :
         type.id === 'lightning' ? '255,227,58' : '255,255,255';
       var ck = type.id + '|' + trailLength + '|' + s + '|' + (reduced ? 'r' : 'f');
@@ -593,7 +597,9 @@ var ART = (function () {
       // sprite points right (+x) with the tip leading; magic glow baked in
       var w = 92 * s;
       var h = w * img.height / img.width;
+      if (motion && motion.goldTrail) ctx.filter = 'sepia(0.7) saturate(2.2) hue-rotate(-6deg) brightness(1.1)';
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      if (motion && motion.goldTrail) ctx.filter = 'none';
       ctx.restore();
       return;
     }

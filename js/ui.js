@@ -309,6 +309,13 @@ var UI = (function () {
       mChip.textContent = 'BEST ' + mBest;
       mChip.classList.toggle('hidden', !(mBest > 0));
     }
+    var streak = SAVE.streakInfo ? SAVE.streakInfo() : { count: 0 };
+    var streakEl = $('home-streak');
+    if (streakEl) {
+      var sc = streak.count || 0;
+      streakEl.textContent = '🔥 Day ' + sc;
+      streakEl.classList.toggle('hidden', sc <= 0);
+    }
     renderQuestBanner();
     show('home');
     animateHome();
@@ -331,6 +338,12 @@ var UI = (function () {
         if (activeMode.type === 'adventure') finishAdventureRound(results);
         if (activeMode.type === 'daily') applyDailyResult(results);
         if (activeMode.type === 'workshop') finishWorkshopRound(results);
+        // Daily streak: first round of the day bumps the fire + pays coins.
+        var streakHit = SAVE.noteDailyActivity ? SAVE.noteDailyActivity() : null;
+        if (streakHit && streakHit.firstToday) {
+          results.streakBonus = streakHit.bonus;
+          results.streakCount = streakHit.count;
+        }
         showResults(results);
       }
     }, options || activeMode.options || {});
@@ -371,6 +384,11 @@ var UI = (function () {
 
   function openQuests() {
     renderQuests();
+    var qStreak = $('quests-streak');
+    if (qStreak && SAVE.streakInfo) {
+      var si = SAVE.streakInfo();
+      qStreak.textContent = si.count > 0 ? ('🔥 Day ' + si.count + ' streak') : '🔥 Start a streak today!';
+    }
     show('quests');
   }
 
@@ -438,6 +456,33 @@ var UI = (function () {
     if (returnLabel) returnLabel.textContent = activeMode.type === 'adventure' ? 'MAP' : 'Home';
     var banner = $('results-highscore');
     banner.classList.toggle('hidden', !r.isHighScore);
+    if (r.streakBonus && r.streakBonus > 0) {
+      // Tasteful home-style toast on the results screen (first round of the day).
+      try {
+        var host = $('screen-results') || document.body;
+        var el = document.createElement('div');
+        el.className = 'streak-toast';
+        el.textContent = '🔥 Day ' + (r.streakCount || 1) + ' streak! +' + r.streakBonus + ' 🪙';
+        el.style.cssText = 'position:absolute;left:50%;top:88px;transform:translateX(-50%);z-index:8;' +
+          'background:rgba(26,24,34,0.92);color:#ffd23a;font:800 18px Nunito,sans-serif;' +
+          'padding:10px 22px;border-radius:999px;border:2px solid rgba(255,210,58,0.7);pointer-events:none;';
+        host.appendChild(el);
+        setTimeout(function () { el.remove(); }, 2600);
+      } catch (err) { /* cosmetic */ }
+    }
+    if (r.allStarsReward) {
+      try {
+        var host2 = $('screen-results') || document.body;
+        var el2 = document.createElement('div');
+        el2.textContent = '🌟 MAP MASTER! Golden Bow +' + r.allStarsReward.coins + ' 🪙';
+        el2.style.cssText = 'position:absolute;left:50%;top:130px;transform:translateX(-50%);z-index:8;' +
+          'background:linear-gradient(90deg,#ffe27a,#ffb43a);color:#5a3208;font:900 18px Nunito,sans-serif;' +
+          'padding:10px 22px;border-radius:999px;border:3px solid #fff8e8;pointer-events:none;';
+        host2.appendChild(el2);
+        setTimeout(function () { el2.remove(); }, 4200);
+        if (!document.body.classList.contains('reduced-motion')) fx.confetti();
+      } catch (err2) { /* cosmetic */ }
+    }
     $('results-header').textContent = r.adventureWon ? 'STAGE COMPLETE!' : (r.isHighScore ? 'AMAZING!' : 'ROUND OVER!');
     if (activeMode.type === 'workshop' && r.workshopWon) $('results-header').textContent = 'BOSS DEFEATED!';
     if (activeMode.type === 'marathon') $('results-header').textContent = r.marathonRecord ? 'NEW MARATHON BEST!' : 'MARATHON OVER!';
@@ -539,6 +584,11 @@ var UI = (function () {
     var unlocked = Math.min(STAGES.count - 1, Math.max(p.adventureStage || 0, highestCleared + 1));
     selectedStage = Math.min(selectedStage, unlocked);
     $('adventure-stars').textContent = starTotal + ' / ' + (STAGES.count * 3) + ' ★';
+    var goldBan = $('adventure-golden-banner');
+    if (goldBan) {
+      var hasGold = SAVE.hasGoldenBow ? SAVE.hasGoldenBow() : false;
+      goldBan.classList.toggle('hidden', !hasGold);
+    }
     var map = $('adventure-map');
     map.innerHTML = '';
     renderAdventureTrail(map, unlocked, stars);
@@ -641,6 +691,11 @@ var UI = (function () {
       $('results-header').textContent = 'STAGE COMPLETE!';
       AUDIO.voice('stage_clear');
       fx.confetti();
+      // 3★ on every stage → one-time Golden Bow + coin jackpot.
+      if (SAVE.tryClaimAllStarsReward) {
+        var jackpot = SAVE.tryClaimAllStarsReward();
+        if (jackpot) r.allStarsReward = jackpot;
+      }
     }
   }
 

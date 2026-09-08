@@ -16,6 +16,9 @@ var SAVE = (function () {
       adventureStars: [],
       adventureStarRatings: {},
       quests: null,     // { day:'YYYY-MM-DD', list:[{id,target,reward,progress,claimed}] }
+      streak: { count: 0, lastDay: null },  // consecutive days with play/claim
+      claimedRewards: { allStars: false },  // one-time payouts (3★ everything)
+      unlocks: { goldenBow: false },        // cosmetic unlocks (Golden Bow trail)
       customChallenge: null,
       stats: {},        // running tallies for badges (bullseyes, balloons, ...)
       badges: [],       // earned badge ids
@@ -65,6 +68,11 @@ var SAVE = (function () {
       if (!Array.isArray(p.unlocked.pets)) p.unlocked.pets = [];
       if (!p.equipped) p.equipped = {};
       if (typeof p.equipped.pet === 'undefined') p.equipped.pet = null;
+      if (!p.streak || typeof p.streak.count !== 'number') p.streak = { count: 0, lastDay: null };
+      if (!p.claimedRewards) p.claimedRewards = { allStars: false };
+      if (typeof p.claimedRewards.allStars !== 'boolean') p.claimedRewards.allStars = false;
+      if (!p.unlocks) p.unlocks = { goldenBow: false };
+      if (typeof p.unlocks.goldenBow !== 'boolean') p.unlocks.goldenBow = !!p.unlocks.goldenBow;
     });
     // device-wide settings (audio + accessibility), not per-profile
     if (!state.settings) state.settings = {};
@@ -96,6 +104,30 @@ var SAVE = (function () {
   function todayStr() {
     var d = new Date();
     return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function yesterdayStr() {
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  // Touch the daily streak once per calendar day. Consecutive days increment;
+  // a missed day resets to 1. Returns {count, bonus, firstToday} so UI can toast.
+  function noteStreakActivity(p) {
+    if (!p) return { count: 0, bonus: 0, firstToday: false };
+    if (!p.streak || typeof p.streak.count !== 'number') p.streak = { count: 0, lastDay: null };
+    var day = todayStr();
+    if (p.streak.lastDay === day) {
+      return { count: p.streak.count || 0, bonus: 0, firstToday: false };
+    }
+    if (p.streak.lastDay === yesterdayStr()) p.streak.count = (p.streak.count || 0) + 1;
+    else p.streak.count = 1;
+    p.streak.lastDay = day;
+    var per = (typeof TUNING !== 'undefined' && TUNING.STREAK_COIN_PER_DAY) || 25;
+    var cap = (typeof TUNING !== 'undefined' && TUNING.STREAK_COIN_CAP) || 150;
+    var bonus = Math.min(cap, p.streak.count * per);
+    p.coins = Math.max(0, Math.round((p.coins || 0) + bonus));
+    persist();
+    return { count: p.streak.count, bonus: bonus, firstToday: true };
   }
   // Deterministic per-day pick so every session that day sees the same quests.
   function pickDailyQuests(day) {
@@ -343,6 +375,7 @@ var SAVE = (function () {
       if (!q || q.claimed || q.progress < q.target) return 0;
       q.claimed = true;
       p.coins = Math.max(0, Math.round((p.coins || 0) + q.reward));
+      noteStreakActivity(p); // claiming counts as today's quest activity
       persist();
       return q.reward;
     },
@@ -380,6 +413,59 @@ var SAVE = (function () {
       return true;
     },
 
+
+    // Daily streak: count of consecutive calendar days with play/claim activity.
+    streakInfo: function () {
+      var p = current();
+      if (!p || !p.streak) return { count: 0, lastDay: null };
+      return { count: p.streak.count || 0, lastDay: p.streak.lastDay || null };
+    },
+    // Call once when a round finishes (or a quest is claimed). Pays the daily
+    // streak bonus the first time that calendar day. See TUNING.STREAK_*.
+    noteDailyActivity: function () {
+      return noteStreakActivity(current());
+    },
+
+    hasGoldenBow: function () {
+      var p = current();
+      return !!(p && p.unlocks && p.unlocks.goldenBow);
+    },
+
+    // True when every adventure stage has a 3★ rating.
+    allStagesThreeStars: function () {
+      var p = current();
+      if (!p) return false;
+      var n = (typeof STAGES !== 'undefined' ? STAGES.count : 0);
+      if (!n) return false;
+      for (var i = 0; i < n; i++) {
+        if (this.adventureStarRating(i) < 3) return false;
+      }
+      return true;
+    },
+
+    // One-time payout when the map is fully 3★'d: coins + Golden Bow + badge.
+    // Returns null if not ready / already claimed; otherwise the grant payload.
+    tryClaimAllStarsReward: function () {
+      var p = current();
+      if (!p) return null;
+      if (!p.claimedRewards) p.claimedRewards = { allStars: false };
+      if (p.claimedRewards.allStars) return null;
+      if (!this.allStagesThreeStars()) return null;
+      var coins = (typeof TUNING !== 'undefined' && TUNING.ALL_STARS_COIN_REWARD) || 500;
+      p.claimedRewards.allStars = true;
+      if (!p.unlocks) p.unlocks = { goldenBow: false };
+      p.unlocks.goldenBow = true;
+      p.coins = Math.max(0, Math.round((p.coins || 0) + coins));
+      persist();
+      var badgeNew = false;
+      if (!Array.isArray(p.badges)) p.badges = [];
+      if (p.badges.indexOf('all_stars') === -1) {
+        p.badges.push('all_stars');
+        badgeNew = true;
+        persist();
+      }
+      return { coins: coins, goldenBow: true, badge: badgeNew };
+    },
     recordRound: function (score) {
       var p = current();
       if (!p) return false;

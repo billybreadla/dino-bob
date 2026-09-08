@@ -33,8 +33,8 @@ It prints a step log + a PASS/FAIL summary and writes screenshots to
 `JS errors: 0`.
 
 ## What it checks
-- Loads, skips the intro overlay, reaches Home with all 6 mode buttons.
-- Adventure map (6 stage nodes + stars), Challenge Maker (6 controls), Family setup.
+- Loads, skips the intro overlay, reaches Home with all mode buttons (incl. Marathon).
+- Adventure map (all stage nodes + stars — currently 7), Challenge Maker (6 controls), Family setup.
 - A Target Practice round: fires arrows, the round ends, the Results screen shows
   the **Accuracy %** and **Bullseyes** rows.
 - The WebP backgrounds (`bg_meadow` / `bg_mountain`) are loaded.

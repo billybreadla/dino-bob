@@ -216,6 +216,10 @@ var GAME = (function () {
     };
   }
 
+  function hasGoldenBow() {
+    try { return !!(typeof SAVE !== 'undefined' && SAVE.hasGoldenBow && SAVE.hasGoldenBow()); }
+    catch (e) { return false; }
+  }
   function reducedMotion() {
     return !!(st && st.rules && st.rules.reducedMotion);
   }
@@ -3693,7 +3697,7 @@ var GAME = (function () {
       var fnX = BOW.x - Math.cos(angle) * draw * 46, fnY = BOW.y - Math.sin(angle) * draw * 46;
       ART.drawArcherArms(ctx, id, 150, GROUND + 10, 1.15, { x: BOW.x, y: BOW.y },
         { x: fnX, y: fnY }, { aimPower: draw, aimAngle: angle, recoil: recoil });
-      ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2);
+      ART.drawBow(ctx, BOW.x, BOW.y, angle, draw, 1.2, hasGoldenBow());
     }
 
     // Nocked arrow for poses WITHOUT baked draw frames (the draw frames already
@@ -3702,9 +3706,9 @@ var GAME = (function () {
       var nockX = bx - Math.cos(angle) * draw * 46;
       var nockY = by - Math.sin(angle) * draw * 46;
       if (!st.aiming && st.arrowsLeft > 0 && !st.over) {
-        ART.drawArrow(ctx, bx, by, angle, st.arrowType, 1, st.t);
+        ART.drawArrow(ctx, bx, by, angle, st.arrowType, 1, st.t, { goldTrail: hasGoldenBow() });
       } else if (st.aiming) {
-        ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t);
+        ART.drawArrow(ctx, nockX, nockY, st.aim.angle, st.arrowType, 1, st.t, { goldTrail: hasGoldenBow() });
       }
     }
 
@@ -3957,7 +3961,8 @@ var GAME = (function () {
       ART.drawArrow(ctx, a.x, a.y, Math.atan2(a.vy, a.vx), st.arrowType, 1, a.t, {
         flight: true,
         speed: Math.hypot(a.vx, a.vy),
-        reducedMotion: reducedMotion()
+        reducedMotion: reducedMotion(),
+        goldTrail: hasGoldenBow()
       });
     });
 

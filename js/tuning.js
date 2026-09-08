@@ -147,6 +147,17 @@ var TUNING = {
   PARALLAX_ACTION: 0.15,     // targets, arrows, player (net ×1.15)
   PARALLAX_FG2: 0.4,         // nearest foreground strip (net ×1.4)
 
+
+  // ---------- DAILY STREAK ----------
+  // Play (or claim a quest) each day to keep the fire lit!
+  // Day 1 = +25 coins, Day 2 = +50... up to the cap. Miss a day = back to 1.
+  STREAK_COIN_PER_DAY: 25,   // coins added for each day in a row
+  STREAK_COIN_CAP: 150,      // biggest streak bonus you can earn in one day
+
+  // ---------- 3-STAR EVERYTHING ----------
+  // Earn 3★ on EVERY adventure stage to unlock the Golden Bow forever.
+  ALL_STARS_COIN_REWARD: 500,  // one-time coin jackpot when you perfect the map
+
   // ---------- PET SIDEKICK ----------
   // First baked pet: baby pterodactyl (assets/sprites/pet_ptero_*.webp).
   // Arcade shop tab comes later — flip SHOW_PET off to hide meanwhile.

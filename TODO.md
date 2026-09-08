@@ -43,14 +43,7 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
 
 ## 🔄 In progress
 
-- [ ] 🎨 **Banana tumble frames redo** (Codex told 2026-07-04). The V6 batch
-  came back with arrows already stuck in the bananas; rejects parked in
-  `assets/source/art-v6/rejected/`. Need: `fruit_banana_3d_0..5`, a single
-  banana bunch tumbling, NO arrows, transparent PNG ~500px.
-  Wiring is already live — once files land as WebP in `assets/sprites/`,
-  add `'banana'` to the `t.kind === 'apple' || t.kind === 'watermelon'`
-  check in `drawTarget`'s fruit branch (game.js), add to sprites.js NAMES
-  (auto-WebP) + sw.js FILES, bump SW.
+- [x] 🎨 **Banana tumble frames redo** _(shipped 2026-09-07: Blender `build_banana` → fruit_banana_3d_0..5 clean tumble, no arrows)_
 
 ---
 
@@ -70,16 +63,8 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
 
 ## 🥈 Tier 2 — retention & progression
 
-- [ ] 🟢 **Daily streak.** save.js already tracks quest day (`todayStr`,
-  `dailyQuests`). Add `streak` {count, lastDay} per profile: playing ≥1
-  round a day increments, missing a day resets. Show "🔥 Day N" chip on the
-  home screen; +25 coin bonus per day capped at +150. Toast on first round
-  of the day. Files: save.js, ui.js (home render), game.js finish().
-- [ ] 🟢 **3-star-everything reward.** Stars are tracked
-  (`SAVE.adventureStarTotal()`, max = STAGES.count*3 = 18) but gate nothing.
-  At 18 stars unlock a **Golden Bow** skin: gold bow + gold trail on all
-  arrows (drawArrow/drawBow tint), a badge, and a banner on the adventure
-  map. Store as `profile.unlocks.goldenBow`. Check on adventure results.
+- [x] 🟢 **Daily streak.** _(shipped 2026-09-07: streak{count,lastDay}, home chip, TUNING.STREAK_*, toast)_
+- [x] 🟢 **3-star-everything reward.** _(shipped 2026-09-07: Golden Bow + coins + Map Master badge, claimedRewards.allStars)_
 - [ ] 🟢 **Coin sink: pet companion.** After the shop is bought out (~20k
   coins) money is meaningless. Add a "Pets" arcade tab: 3 pets (suggest:
   baby pterodactyl, turtle, firefly) at 2500 each. Pet follows behind the
@@ -101,10 +86,7 @@ Any model/agent picking up a task: read "House rules" first, do ONE task fully
   ADD two new stages so score stages aren't lost; the painted map has one
   spare platform). ART FIRST (handoff doc pattern: write ART_ASSET_HANDOFF_V7),
   then wiring is small because drawBoss2p5D is generic.
-- [ ] 🟢 **Adventure stage 7.** The painted map (`adventure_map.webp`) has one
-  unused platform. Add a 7th stage to STAGES.LIST (pick an existing bg,
-  crank difficulty, maybe specialRule:'fruit' + high goal). Purely data —
-  this is the easiest task on the board, good smoke test for a new model.
+- [x] 🟢 **Adventure stage 7.** _(Crystal Pool — fruit master stage on spare platform; README/play-test updated)_
 - [ ] 🔴 **Real music.** Current music = procedural pentatonic loop
   (audio.js musicTick). Option A: compose 2-3 short loops in code with a
   proper chord progression + bass + melody per biome group. Option B:
@@ -170,6 +152,9 @@ Kids' voice lines work the same way: drop MP3/M4A files named per
 
 ## ✅ Shipped (recent, newest first)
 
+- 2026-09-07 — **v59 streak-stars**: Adventure stage 7 Crystal Pool (fruit),
+  Blender banana tumble redo (no arrows), daily streak + 3★-everything Golden
+  Bow reward. SW dinobob-v59-streak-stars.
 - 2026-08-24 — **v34.1 "Kids' features live"**: both dormant kid pipelines are
   now ACTIVE with sample content -- two crayon doodle enemies (spiky + ghost,
   imported through tools/import_drawing.py, flood-fill cutout path verified)

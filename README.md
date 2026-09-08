@@ -6,7 +6,7 @@ the Arcade on new characters, magic arrows, and skins.
 
 ## Deluxe modes
 
-- **Adventure** — six connected stages (woods, peaks, moon cave boss, and more).
+- **Adventure** — seven connected stages (woods, peaks, moon cave boss, and more).
   Progress and stars save per player.
 - **Penny's Challenge Maker** — choose the timer, arrows, target speed,
   action level, scenery, and special rules without editing a file.

@@ -134,7 +134,8 @@ var DATA = {
     { id: 'golden',         emoji: '🍌', name: 'Golden Banana',  desc: 'Hit a Golden Banana' },
     { id: 'boss',           emoji: '👑', name: 'Boss Slayer',    desc: 'Defeat a boss target' },
     { id: 'blackhole',      emoji: '🕳️', name: 'Singularity',    desc: 'Open a black hole' },
-    { id: 'combo_x5',       emoji: '🔥', name: 'On Fire!',       desc: 'Reach a x5 combo' }
+    { id: 'combo_x5',       emoji: '🔥', name: 'On Fire!',       desc: 'Reach a x5 combo' },
+    { id: 'all_stars',      emoji: '🌟', name: 'Map Master',     desc: 'Earn 3★ on every adventure stage' }
   ],
 
   // Daily quest templates. Each day picks 3 (see SAVE.dailyQuests). Progress is

@@ -94,6 +94,7 @@
 <section id="screen-home" class="screen sky-bg hidden">
   <div class="home-top">
     <div class="chip coin-chip">🪙 <span id="home-coins">0</span></div>
+    <div class="chip streak-chip hidden" id="home-streak" title="Daily streak">🔥 Day 0</div>
     <div class="chip name-chip" id="home-name">—</div>
     <div class="home-top-right">
       <button id="btn-music" class="chip btn-chip icon-chip" title="Music on/off" aria-label="Music on or off"><svg class="game-icon"><use href="#icon-music"/></svg></button>
@@ -134,6 +135,7 @@
     <h2 class="panel-header"><svg class="game-icon"><use href="#icon-map"/></svg><span>DINO BOB'S ADVENTURE</span></h2>
     <span class="chip" id="adventure-stars">0 / 3 ★</span>
   </div>
+  <div id="adventure-golden-banner" class="adventure-golden-banner hidden">✨ GOLDEN BOW UNLOCKED — every arrow shines gold!</div>
   <div id="adventure-map" class="adventure-map"></div>
   <div id="adventure-detail" class="mode-card adventure-detail"></div>
 </section>
@@ -331,6 +333,7 @@
 <section id="screen-quests" class="screen arcade-bg hidden">
   <div class="mode-top">
     <button id="btn-quests-back" class="chip btn-chip"><svg class="game-icon"><use href="#icon-back"/></svg><span>Back</span></button>
+    <span class="chip streak-chip" id="quests-streak">🔥 Day 0</span>
     <h2 class="panel-header"><svg class="game-icon"><use href="#icon-quests"/></svg><span>DAILY QUESTS</span></h2>
   </div>
   <p class="quests-sub">Three new goals every day. Finish one to claim its coins!</p>
