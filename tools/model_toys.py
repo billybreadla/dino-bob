@@ -5,7 +5,7 @@ Builds a party balloon and a gold coin from primitives, then renders 6-frame
 Z-turntables headless using the studio rig from tools/TOY_PIPELINE.md:
 
     blender -b --python tools/model_toys.py -- <outdir> <prefix> <frames>
-      <prefix>: balloon_3d | coin_3d | banana_3d | pet_ptero | pet_turtle | pet_firefly | all     <frames>: default 6
+      <prefix>: balloon_3d | coin_3d | banana_3d | crab | angler | oak | roc | aurora | prism | pet_ptero | pet_turtle | pet_firefly | pet_bunbun | all     <frames>: default 6
 
 Writes <outdir>/<prefix>_0.png .. _N.png (1024x1024 PNG RGBA, transparent).
 """
@@ -828,6 +828,490 @@ def build_angler(damage=0, yaw=0.0):
 
 
 
+
+
+# ------------------------------------------------------------- Oak Guardian --
+# Treant golem for Whispering Woods. Bark body, leafy crown, glowing amber
+# heart-ring weak spot on the chest. Same 6-frame damage pipeline as crab.
+OAK_ORTHO = 4.6
+
+
+def build_oak(damage=0, yaw=0.0):
+    root = bpy.data.objects.new('oak_root', None)
+    bpy.context.collection.objects.link(root)
+
+    bark = mat('oak_bark', srgb('#6b3f24'), 0.55)
+    bark_dk = mat('oak_bark_dk', srgb('#3d2414'), 0.65)
+    moss = mat('oak_moss', srgb('#3d964c'), 0.5)
+    leaf = mat('oak_leaf', srgb('#9fd636'), 0.4)
+    cream = mat('oak_cream', srgb('#f2e0c0'), 0.5)
+    dark = mat('oak_dark', srgb('#1a1410'), 0.7)
+    glow = mat('oak_glow', srgb('#ffd23a'), 0.3)
+    gb = glow.node_tree.nodes.get('Principled BSDF')
+    gb.inputs['Emission Color'].default_value = (*srgb('#ffd23a'), 1.0)
+    gb.inputs['Emission Strength'].default_value = 2.5
+    ring = mat('oak_ring', srgb('#d85a3a'), 0.4)
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1)):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        return ob
+
+    # stump legs + trunk body
+    part('trunk', lambda: bpy.ops.mesh.primitive_cylinder_add(
+        vertices=28, radius=0.75, depth=1.6, location=(0, 0, 0)),
+        bark, (0, 0.05, 1.05), scale=(1.05, 0.95, 1.0))
+    part('belly', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.7, location=(0, 0, 0)),
+        bark, (0, -0.1, 0.95), scale=(1.15, 0.9, 0.95))
+    # glowing heart weak-spot
+    part('heart_ring', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.4, minor_radius=0.07, location=(0, 0, 0)),
+        ring, (0, -0.72, 1.05), rot=(math.radians(90), 0, 0))
+    part('heart_ring2', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.24, minor_radius=0.055, location=(0, 0, 0)),
+        cream, (0, -0.74, 1.05), rot=(math.radians(90), 0, 0))
+    part('heart_core', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=18, ring_count=12, radius=0.14, location=(0, 0, 0)),
+        glow, (0, -0.76, 1.05))
+
+    # blocky head with branch crown
+    part('head', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.62, location=(0, 0, 0)),
+        bark, (0, 0.05, 2.15), scale=(1.05, 0.95, 0.95))
+    for side in (-1, 1):
+        part('eye', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.12, location=(0, 0, 0)),
+            cream, (side * 0.28, -0.5, 2.25))
+        part('pupil', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.055, location=(0, 0, 0)),
+            dark, (side * 0.28, -0.58, 2.25))
+        part('brow', lambda: bpy.ops.mesh.primitive_cube_add(size=1),
+            bark_dk, (side * 0.28, -0.52, 2.42), rot=(0, 0, side * 0.4),
+            scale=(0.28, 0.06, 0.05))
+    # leafy crown branches
+    for i, (x, y, z, s) in enumerate([
+        (-0.35, 0.1, 2.7, 0.35), (0.4, 0.05, 2.75, 0.38),
+        (0.0, -0.15, 2.85, 0.42), (-0.15, 0.25, 2.65, 0.3), (0.2, 0.3, 2.7, 0.28)
+    ]):
+        part('leaf%d' % i, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=16, ring_count=10, radius=s, location=(0, 0, 0)),
+            leaf if i % 2 == 0 else moss, (x, y, z), scale=(1.1, 1.0, 0.7))
+
+    # branch arms
+    for side in (-1, 1):
+        part('arm', lambda: bpy.ops.mesh.primitive_cylinder_add(
+            vertices=12, radius=0.16, depth=1.1, location=(0, 0, 0)),
+            bark_dk, (side * 1.15, -0.05, 1.35),
+            rot=(0, math.radians(70 * side), math.radians(-20 * side)))
+        part('fist', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=16, ring_count=10, radius=0.28, location=(0, 0, 0)),
+            bark, (side * 1.7, -0.25, 1.55), scale=(1.1, 0.9, 0.95))
+        for j in range(3):
+            part('twig', lambda: bpy.ops.mesh.primitive_cone_add(
+                vertices=8, radius1=0.08, radius2=0, depth=0.35, location=(0, 0, 0)),
+                moss, (side * (1.75 + j * 0.05), -0.35 - j * 0.04, 1.7 + j * 0.08),
+                rot=(math.radians(-40), 0, side * 0.4))
+
+    # stubby root feet
+    for side in (-1, 1):
+        for i in range(2):
+            part('root', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+                segments=12, ring_count=8, radius=0.22, location=(0, 0, 0)),
+                bark_dk, (side * (0.45 + i * 0.35), 0.1 - i * 0.08, 0.18),
+                scale=(1.4, 1.0, 0.55))
+
+    crack_m = mat('oak_crack', srgb('#140c08'), 0.75)
+    if damage >= 1:
+        spots = [(0.4, -0.35, 1.6, 0.5, 0.65), (-0.45, 0.15, 1.4, -0.6, 0.55)]
+        if damage >= 2:
+            spots += [(0.1, -0.5, 2.3, 0.2, 0.7), (0.55, 0.2, 1.9, 0.9, 0.55)]
+        for i, (cx, cy, cz, rz, cs) in enumerate(spots):
+            part('crack%d' % i, lambda: bpy.ops.mesh.primitive_cube_add(size=1),
+                crack_m, (cx, cy, cz), rot=(0, rz, rz * 1.2),
+                scale=(cs, 0.06, 0.08))
+    if damage >= 1:
+        gb2 = glow.node_tree.nodes.get('Principled BSDF')
+        gb2.inputs['Emission Strength'].default_value = 1.5 if damage == 1 else 0.7
+    if damage >= 2:
+        leaves = [ob for ob in bpy.data.objects if ob.name.startswith('leaf')]
+        if leaves:
+            bpy.data.objects.remove(leaves[-1], do_unlink=True)
+        fists = [ob for ob in bpy.data.objects if ob.name.startswith('fist')]
+        if fists:
+            fists[-1].scale = (0.55, 0.55, 0.55)
+
+    root.rotation_euler = (0, 0, yaw)
+    root.location = (0, 0, -0.15)
+    return root
+
+
+# --------------------------------------------------------------- Storm Roc --
+# Rock eagle golem for Sky-High Peaks. Stone feathers, storm-yellow eye-ring
+# weak spot on the chest. Dive-charge attack.
+ROC_ORTHO = 4.7
+
+
+def build_roc(damage=0, yaw=0.0):
+    root = bpy.data.objects.new('roc_root', None)
+    bpy.context.collection.objects.link(root)
+
+    stone = mat('roc_stone', srgb('#7a8796'), 0.55)
+    stone_dk = mat('roc_stone_dk', srgb('#4a5564'), 0.65)
+    cream = mat('roc_cream', srgb('#f0e6d0'), 0.5)
+    gold = mat('roc_gold', srgb('#e8a91d'), 0.35)
+    dark = mat('roc_dark', srgb('#1a1e28'), 0.7)
+    sky = mat('roc_sky', srgb('#62e6ff'), 0.35)
+    glow = mat('roc_glow', srgb('#ffd23a'), 0.3)
+    gb = glow.node_tree.nodes.get('Principled BSDF')
+    gb.inputs['Emission Color'].default_value = (*srgb('#ffd23a'), 1.0)
+    gb.inputs['Emission Strength'].default_value = 2.5
+    ring = mat('roc_ring', srgb('#d85a3a'), 0.4)
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1)):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        return ob
+
+    part('body', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=32, ring_count=20, radius=0.85, location=(0, 0, 0)),
+        stone, (0, 0.1, 1.0), scale=(1.1, 0.95, 1.05))
+    part('chest_ring', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.38, minor_radius=0.07, location=(0, 0, 0)),
+        ring, (0, -0.78, 1.05), rot=(math.radians(90), 0, 0))
+    part('chest_ring2', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.22, minor_radius=0.055, location=(0, 0, 0)),
+        cream, (0, -0.8, 1.05), rot=(math.radians(90), 0, 0))
+    part('chest_core', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=16, ring_count=10, radius=0.12, location=(0, 0, 0)),
+        glow, (0, -0.82, 1.05))
+
+    part('head', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.48, location=(0, 0, 0)),
+        stone, (0, -0.15, 1.95), scale=(1.05, 1.0, 1.0))
+    part('beak', lambda: bpy.ops.mesh.primitive_cone_add(
+        vertices=16, radius1=0.2, radius2=0.02, depth=0.55, location=(0, 0, 0)),
+        gold, (0, -0.7, 1.8), rot=(math.radians(100), 0, 0), scale=(0.7, 0.55, 1.0))
+    for side in (-1, 1):
+        part('eye', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.11, location=(0, 0, 0)),
+            sky, (side * 0.22, -0.52, 2.05))
+        part('pupil', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.05, location=(0, 0, 0)),
+            dark, (side * 0.22, -0.6, 2.05))
+    # crest spikes
+    for i, x in enumerate((-0.2, 0.0, 0.2)):
+        part('crest', lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=8, radius1=0.1, radius2=0, depth=0.4, location=(0, 0, 0)),
+            stone_dk, (x, 0.05, 2.4), rot=(math.radians(-15), 0, 0))
+
+    # wings
+    for side in (-1, 1):
+        part('wing', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=20, ring_count=12, radius=0.55, location=(0, 0, 0)),
+            stone_dk, (side * 1.25, 0.05, 1.25),
+            rot=(0, math.radians(25 * side), math.radians(18 * side)),
+            scale=(0.45, 1.35, 0.85))
+        part('tip', lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=10, radius1=0.22, radius2=0, depth=0.6, location=(0, 0, 0)),
+            stone, (side * 2.0, -0.05, 1.15),
+            rot=(0, math.radians(90 * side), 0))
+
+    # talons
+    for side in (-1, 1):
+        part('leg', lambda: bpy.ops.mesh.primitive_cylinder_add(
+            vertices=10, radius=0.1, depth=0.55, location=(0, 0, 0)),
+            stone_dk, (side * 0.35, -0.1, 0.35))
+        part('talon', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=12, ring_count=8, radius=0.18, location=(0, 0, 0)),
+            gold, (side * 0.35, -0.2, 0.08), scale=(1.2, 0.9, 0.55))
+
+    # tail fan
+    part('tail', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=16, ring_count=10, radius=0.4, location=(0, 0, 0)),
+        stone_dk, (0, 0.85, 0.85), rot=(math.radians(70), 0, 0),
+        scale=(1.1, 0.35, 0.9))
+
+    crack_m = mat('roc_crack', srgb('#10141c'), 0.75)
+    if damage >= 1:
+        spots = [(0.45, -0.3, 1.4, 0.5, 0.6), (-0.5, 0.2, 1.2, -0.7, 0.55)]
+        if damage >= 2:
+            spots += [(0.05, -0.55, 1.9, 0.15, 0.65), (0.6, 0.25, 1.55, 0.9, 0.5)]
+        for i, (cx, cy, cz, rz, cs) in enumerate(spots):
+            part('crack%d' % i, lambda: bpy.ops.mesh.primitive_cube_add(size=1),
+                crack_m, (cx, cy, cz), rot=(0, rz, rz * 1.2),
+                scale=(cs, 0.06, 0.08))
+    if damage >= 1:
+        gb2 = glow.node_tree.nodes.get('Principled BSDF')
+        gb2.inputs['Emission Strength'].default_value = 1.4 if damage == 1 else 0.65
+    if damage >= 2:
+        tips = [ob for ob in bpy.data.objects if ob.name.startswith('tip')]
+        if tips:
+            tips[-1].scale = (0.45, 0.45, 0.45)
+        crests = [ob for ob in bpy.data.objects if ob.name.startswith('crest')]
+        if crests:
+            bpy.data.objects.remove(crests[-1], do_unlink=True)
+
+    root.rotation_euler = (0, 0, yaw)
+    root.location = (0, 0, -0.05)
+    return root
+
+
+# -------------------------------------------------------- Aurora Wisp King --
+# Crystal moth golem for Starlight Ridge. Soft moth wings, aurora glow body,
+# crystal core weak spot. Spits sparkle blobs.
+AURORA_ORTHO = 4.5
+
+
+def build_aurora(damage=0, yaw=0.0):
+    root = bpy.data.objects.new('aurora_root', None)
+    bpy.context.collection.objects.link(root)
+
+    body_m = mat('aur_body', srgb('#7652a8'), 0.4)
+    body_lt = mat('aur_body_lt', srgb('#caa7ff'), 0.35)
+    wing = mat('aur_wing', srgb('#8a6ad0'), 0.35)
+    wing_lt = mat('aur_wing_lt', srgb('#e0c8ff'), 0.3)
+    cream = mat('aur_cream', srgb('#fff4e0'), 0.45)
+    dark = mat('aur_dark', srgb('#1a1428'), 0.7)
+    crystal = mat('aur_crystal', srgb('#62e6ff'), 0.25)
+    glow = mat('aur_glow', srgb('#ffe27a'), 0.25)
+    gb = glow.node_tree.nodes.get('Principled BSDF')
+    gb.inputs['Emission Color'].default_value = (*srgb('#ffe27a'), 1.0)
+    gb.inputs['Emission Strength'].default_value = 2.8
+    cb = crystal.node_tree.nodes.get('Principled BSDF')
+    cb.inputs['Emission Color'].default_value = (*srgb('#62e6ff'), 1.0)
+    cb.inputs['Emission Strength'].default_value = 1.8
+    ring = mat('aur_ring', srgb('#ff8ad4'), 0.35)
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1)):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        return ob
+
+    part('body', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=32, ring_count=20, radius=0.7, location=(0, 0, 0)),
+        body_m, (0, 0.05, 1.05), scale=(1.05, 0.9, 1.15))
+    part('belly', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=24, ring_count=14, radius=0.45, location=(0, 0, 0)),
+        body_lt, (0, -0.35, 0.95), scale=(0.95, 0.7, 1.0))
+    # crystal weak-spot core
+    part('core_ring', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.36, minor_radius=0.065, location=(0, 0, 0)),
+        ring, (0, -0.7, 1.15), rot=(math.radians(90), 0, 0))
+    part('core_ring2', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.22, minor_radius=0.05, location=(0, 0, 0)),
+        cream, (0, -0.72, 1.15), rot=(math.radians(90), 0, 0))
+    part('core', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=16, ring_count=10, radius=0.14, location=(0, 0, 0)),
+        glow, (0, -0.74, 1.15))
+
+    part('head', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.48, location=(0, 0, 0)),
+        body_lt, (0, -0.05, 1.95), scale=(1.05, 1.0, 0.95))
+    for side in (-1, 1):
+        part('eye', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.13, location=(0, 0, 0)),
+            cream, (side * 0.24, -0.42, 2.05))
+        part('pupil', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.06, location=(0, 0, 0)),
+            dark, (side * 0.24, -0.52, 2.05))
+        # antennae
+        part('ant', lambda: bpy.ops.mesh.primitive_cylinder_add(
+            vertices=8, radius=0.035, depth=0.55, location=(0, 0, 0)),
+            crystal, (side * 0.22, -0.15, 2.45),
+            rot=(math.radians(-25), 0, side * 0.35))
+        part('ant_tip', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=12, ring_count=8, radius=0.09, location=(0, 0, 0)),
+            glow, (side * 0.32, -0.28, 2.7))
+
+    # moth wings (4)
+    for side in (-1, 1):
+        part('wing_u', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=20, ring_count=12, radius=0.65, location=(0, 0, 0)),
+            wing, (side * 1.15, 0.15, 1.45),
+            rot=(math.radians(15), math.radians(35 * side), math.radians(20 * side)),
+            scale=(0.35, 1.15, 0.95))
+        part('wing_l', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=18, ring_count=10, radius=0.45, location=(0, 0, 0)),
+            wing_lt, (side * 0.95, 0.25, 0.85),
+            rot=(math.radians(-10), math.radians(28 * side), math.radians(15 * side)),
+            scale=(0.3, 1.0, 0.75))
+        # crystal spots on wings
+        part('spot', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=12, ring_count=8, radius=0.12, location=(0, 0, 0)),
+            crystal, (side * 1.25, -0.05, 1.55))
+
+    # tiny feet
+    for side in (-1, 1):
+        part('foot', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.12, location=(0, 0, 0)),
+            body_m, (side * 0.28, -0.1, 0.2), scale=(1.1, 1.0, 0.55))
+
+    crack_m = mat('aur_crack', srgb('#1a1028'), 0.75)
+    if damage >= 1:
+        spots = [(0.35, -0.25, 1.5, 0.4, 0.55), (-0.4, 0.15, 1.25, -0.55, 0.5)]
+        if damage >= 2:
+            spots += [(0.0, -0.45, 1.9, 0.2, 0.6), (0.5, 0.2, 1.1, 0.85, 0.5)]
+        for i, (cx, cy, cz, rz, cs) in enumerate(spots):
+            part('crack%d' % i, lambda: bpy.ops.mesh.primitive_cube_add(size=1),
+                crack_m, (cx, cy, cz), rot=(0, rz, rz * 1.2),
+                scale=(cs, 0.05, 0.07))
+    if damage >= 1:
+        gb2 = glow.node_tree.nodes.get('Principled BSDF')
+        gb2.inputs['Emission Strength'].default_value = 1.5 if damage == 1 else 0.6
+    if damage >= 2:
+        tips = [ob for ob in bpy.data.objects if ob.name.startswith('ant_tip')]
+        if tips:
+            bpy.data.objects.remove(tips[-1], do_unlink=True)
+        wings = [ob for ob in bpy.data.objects if ob.name.startswith('wing_u')]
+        if wings:
+            wings[-1].scale = (0.25, 0.7, 0.55)
+
+    root.rotation_euler = (0, 0, yaw)
+    root.location = (0, 0, -0.1)
+    return root
+
+
+# ---------------------------------------------------------- Prism Serpent --
+# Crystal snake golem for Crystal Pool. Segmented crystal body, prism head,
+# glowing gem weak spot. Slam attack with crystal chunks.
+PRISM_ORTHO = 4.8
+
+
+def build_prism(damage=0, yaw=0.0):
+    root = bpy.data.objects.new('prism_root', None)
+    bpy.context.collection.objects.link(root)
+
+    crystal = mat('pris_crystal', srgb('#3db8d8'), 0.25, metallic=0.35)
+    crystal_dk = mat('pris_crystal_dk', srgb('#1a7fb8'), 0.35, metallic=0.4)
+    crystal_lt = mat('pris_crystal_lt', srgb('#bff5ff'), 0.2, metallic=0.25)
+    cream = mat('pris_cream', srgb('#fff8e8'), 0.45)
+    dark = mat('pris_dark', srgb('#0e2030'), 0.7)
+    glow = mat('pris_glow', srgb('#ffe27a'), 0.25)
+    gb = glow.node_tree.nodes.get('Principled BSDF')
+    gb.inputs['Emission Color'].default_value = (*srgb('#ffe27a'), 1.0)
+    gb.inputs['Emission Strength'].default_value = 2.6
+    ring = mat('pris_ring', srgb('#ff6b9a'), 0.35)
+    for m in (crystal, crystal_dk, crystal_lt):
+        n = m.node_tree.nodes.get('Principled BSDF')
+        n.inputs['Transmission Weight'].default_value = 0.35 if hasattr(n.inputs.get('Transmission Weight'), 'default_value') else 0
+        try:
+            n.inputs['Transmission Weight'].default_value = 0.4
+        except Exception:
+            pass
+        n.inputs['Emission Color'].default_value = (*srgb('#8cf2ff'), 1.0)
+        n.inputs['Emission Strength'].default_value = 0.6
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1)):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        return ob
+
+    # coiled segmented body (stacked spheres rising in an S)
+    segs = [
+        (0.0, 0.35, 0.35, 0.55, crystal_dk),
+        (0.15, 0.15, 0.75, 0.58, crystal),
+        (-0.1, -0.05, 1.15, 0.55, crystal_lt),
+        (0.2, 0.1, 1.55, 0.5, crystal),
+        (-0.05, -0.05, 1.95, 0.48, crystal_dk),
+    ]
+    for i, (x, y, z, r, m) in enumerate(segs):
+        part('seg%d' % i, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=24, ring_count=14, radius=r, location=(0, 0, 0)),
+            m, (x, y, z), scale=(1.15, 0.95, 0.9))
+
+    # head
+    part('head', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=28, ring_count=16, radius=0.55, location=(0, 0, 0)),
+        crystal_lt, (0.05, -0.25, 2.45), scale=(1.1, 1.05, 0.95))
+    part('snout', lambda: bpy.ops.mesh.primitive_cone_add(
+        vertices=14, radius1=0.28, radius2=0.06, depth=0.45, location=(0, 0, 0)),
+        crystal, (0.05, -0.7, 2.35), rot=(math.radians(95), 0, 0))
+    for side in (-1, 1):
+        part('eye', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.12, location=(0, 0, 0)),
+            cream, (side * 0.28, -0.55, 2.55))
+        part('pupil', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.055, location=(0, 0, 0)),
+            dark, (side * 0.28, -0.64, 2.55))
+        part('fang', lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=8, radius1=0.05, radius2=0, depth=0.22, location=(0, 0, 0)),
+            cream, (side * 0.12, -0.85, 2.2), rot=(math.radians(200), 0, 0))
+
+    # gem weak-spot on forehead
+    part('gem_ring', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.28, minor_radius=0.055, location=(0, 0, 0)),
+        ring, (0.05, -0.55, 2.75), rot=(math.radians(70), 0, 0))
+    part('gem_ring2', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.16, minor_radius=0.04, location=(0, 0, 0)),
+        cream, (0.05, -0.57, 2.76), rot=(math.radians(70), 0, 0))
+    part('gem', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=14, ring_count=10, radius=0.1, location=(0, 0, 0)),
+        glow, (0.05, -0.58, 2.76))
+
+    # crystal spines along back
+    for i, z in enumerate((0.7, 1.1, 1.5, 1.9)):
+        part('spine%d' % i, lambda: bpy.ops.mesh.primitive_cone_add(
+            vertices=8, radius1=0.12, radius2=0, depth=0.35, location=(0, 0, 0)),
+            crystal_lt, (0.05, 0.35, z), rot=(math.radians(-25), 0, 0))
+
+    # small ground coil foot
+    part('coil', lambda: bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.55, minor_radius=0.18, location=(0, 0, 0)),
+        crystal_dk, (0, 0.2, 0.2), rot=(math.radians(8), 0, 0))
+
+    crack_m = mat('pris_crack', srgb('#081420'), 0.75)
+    if damage >= 1:
+        spots = [(0.35, -0.2, 1.6, 0.45, 0.55), (-0.3, 0.15, 1.2, -0.55, 0.5)]
+        if damage >= 2:
+            spots += [(0.1, -0.45, 2.4, 0.2, 0.6), (0.4, 0.25, 1.85, 0.8, 0.5)]
+        for i, (cx, cy, cz, rz, cs) in enumerate(spots):
+            part('crack%d' % i, lambda: bpy.ops.mesh.primitive_cube_add(size=1),
+                crack_m, (cx, cy, cz), rot=(0, rz, rz * 1.2),
+                scale=(cs, 0.05, 0.07))
+    if damage >= 1:
+        gb2 = glow.node_tree.nodes.get('Principled BSDF')
+        gb2.inputs['Emission Strength'].default_value = 1.4 if damage == 1 else 0.6
+    if damage >= 2:
+        spines = [ob for ob in bpy.data.objects if ob.name.startswith('spine')]
+        if spines:
+            bpy.data.objects.remove(spines[-1], do_unlink=True)
+        fangs = [ob for ob in bpy.data.objects if ob.name.startswith('fang')]
+        if fangs:
+            fangs[-1].scale = (0.4, 0.4, 0.4)
+
+    root.rotation_euler = (0, 0, yaw)
+    root.location = (0, 0, -0.1)
+    return root
+
 # -------------------------------------------------------- baby pterodactyl --
 # Painted-toy pass: toon materials, ink outlines, overlapping soft forms.
 PTERO_ORTHO = 2.75
@@ -1102,6 +1586,93 @@ def build_firefly(bright=0.0):
     return root
 
 
+
+
+# ------------------------------------------------------------- Bunbun bunny --
+# Soft storybook bunny pet. 6-frame Z-turntable for Arcade hop perk.
+BUNBUN_ORTHO = 2.55
+
+
+def build_bunbun():
+    root = bpy.data.objects.new('bunbun_root', None)
+    bpy.context.collection.objects.link(root)
+
+    fur = mat_paint('bun_fur', srgb('#f2c9a0'), shadow=0.5, lit=1.18)
+    fur_lt = mat_paint('bun_fur_lt', srgb('#fff1de'), shadow=0.55, lit=1.12)
+    pink = mat_paint('bun_pink', srgb('#ff9aaf'), shadow=0.55, lit=1.15)
+    nose = mat_paint('bun_nose', srgb('#ff6b8a'), shadow=0.5, lit=1.15)
+    eye_w = mat_paint('bun_eye_w', srgb('#fffaf2'), shadow=0.7, lit=1.05)
+    eye_b = mat_paint('bun_eye_b', srgb('#1a1e28'), shadow=0.8, lit=1.0)
+    blush = mat_paint('bun_blush', srgb('#ffb0c0'), shadow=0.6, lit=1.1)
+
+    def part(name, mesh_fn, m, loc, rot=(0, 0, 0), scale=(1, 1, 1), ink=0.03):
+        mesh_fn()
+        ob = bpy.context.active_object
+        ob.name = name
+        ob.location = loc
+        ob.rotation_euler = rot
+        ob.scale = scale
+        ob.data.materials.append(m)
+        ob.parent = root
+        set_smooth(ob)
+        if ink:
+            add_ink_outline(ob, ink)
+        return ob
+
+    part('body', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=36, ring_count=20, radius=0.62),
+        fur, (0.05, 0, 0.05), scale=(1.05, 0.95, 1.0), ink=0.04)
+    part('belly', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=24, ring_count=14, radius=0.42),
+        fur_lt, (0.02, -0.28, -0.02), scale=(0.95, 0.65, 0.9), ink=0.0)
+    part('head', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=32, ring_count=18, radius=0.48),
+        fur, (-0.45, -0.02, 0.55), scale=(1.05, 1.02, 1.0), ink=0.04)
+    part('neck', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=20, ring_count=12, radius=0.28),
+        fur, (-0.22, -0.02, 0.28), scale=(1.15, 1.0, 1.0), ink=0.0)
+
+    # long ears
+    for side, y in ((-1, -0.18), (1, 0.16)):
+        part('ear_%d' % side, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=20, ring_count=12, radius=0.22),
+            fur, (-0.55, y, 1.15),
+            rot=(0, math.radians(-12), side * 0.15),
+            scale=(0.55, 0.45, 1.55), ink=0.025)
+        part('ear_in_%d' % side, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=16, ring_count=10, radius=0.14),
+            pink, (-0.58, y - 0.02 * side, 1.12),
+            rot=(0, math.radians(-12), side * 0.15),
+            scale=(0.45, 0.35, 1.35), ink=0.0)
+
+    part('nose', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=14, ring_count=10, radius=0.09),
+        nose, (-0.88, -0.04, 0.48), scale=(0.9, 1.1, 0.7), ink=0.0)
+    for side, y in ((-1, -0.2), (1, 0.14)):
+        part('eye_w_%d' % side, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=16, ring_count=10, radius=0.13),
+            eye_w, (-0.72, y, 0.62), ink=0.0)
+        part('eye_b_%d' % side, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=12, ring_count=8, radius=0.055),
+            eye_b, (-0.78, y - 0.01, 0.63), ink=0.0)
+        part('blush_%d' % side, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=10, ring_count=8, radius=0.07),
+            blush, (-0.62, y, 0.4), scale=(0.5, 1.0, 0.45), ink=0.0)
+
+    # paws + fluffy tail
+    for i, (x, y) in enumerate([(-0.25, -0.4), (-0.25, 0.4), (0.35, -0.38), (0.35, 0.38)]):
+        part('paw_%d' % i, lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+            segments=14, ring_count=10, radius=0.16),
+            fur_lt, (x, y * 0.85, -0.35), scale=(1.0, 0.95, 0.7), ink=0.02)
+    part('tail', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=18, ring_count=12, radius=0.22),
+        fur_lt, (0.7, 0.02, 0.05), scale=(1.0, 1.0, 1.0), ink=0.025)
+
+    root.location = (0.05, 0, 0.12)
+    root.rotation_euler = (0, 0, math.radians(18))
+    return root
+
+
 def render_turntable(root, prefix, outdir, frames, ortho_scale, world_strength):
     setup_camera(ortho_scale)
     # per-toy ambient: the balloon is a diffuse red — a bright world washes it
@@ -1137,9 +1708,14 @@ def main():
         list(ARROW_TYPES) if prefix == 'arrows' else \
         ['crab_3d'] if prefix == 'crab' else \
         ['angler_3d'] if prefix == 'angler' else \
+        ['oak_3d'] if prefix in ('oak', 'oak_3d', 'treant') else \
+        ['roc_3d'] if prefix in ('roc', 'roc_3d', 'storm') else \
+        ['aurora_3d'] if prefix in ('aurora', 'aurora_3d', 'wisp') else \
+        ['prism_3d'] if prefix in ('prism', 'prism_3d', 'serpent') else \
         ['pet_ptero'] if prefix in ('pet_ptero', 'ptero', 'pet') else \
         ['pet_turtle'] if prefix in ('pet_turtle', 'turtle', 'shelly') else \
-        ['pet_firefly'] if prefix in ('pet_firefly', 'firefly', 'glowbug') else [prefix]
+        ['pet_firefly'] if prefix in ('pet_firefly', 'firefly', 'glowbug') else \
+        ['pet_bunbun'] if prefix in ('pet_bunbun', 'bunbun', 'bunny') else [prefix]
     # crab/angler: 6 frames = 3 damage states x 2 yaws (bossDamageSprite
     # indexes frame 0 healthy, 2 light, 4 heavy; odd frames = hit-flash poses)
     boss_specs = [(0, 0.0), (0, 0.16), (1, 0.0), (1, 0.16), (2, 0.0), (2, 0.16)]
@@ -1158,6 +1734,14 @@ def main():
             root, scale, wstr = build_crab(), CRAB_ORTHO, 0.3
         elif which == 'angler_3d':
             root, scale, wstr = build_angler(), ANGLER_ORTHO, 0.3
+        elif which == 'oak_3d':
+            root, scale, wstr = build_oak(), OAK_ORTHO, 0.3
+        elif which == 'roc_3d':
+            root, scale, wstr = build_roc(), ROC_ORTHO, 0.3
+        elif which == 'aurora_3d':
+            root, scale, wstr = build_aurora(), AURORA_ORTHO, 0.28
+        elif which == 'prism_3d':
+            root, scale, wstr = build_prism(), PRISM_ORTHO, 0.28
         elif which == 'pet_ptero':
             # two wing poses, not a Z-spin — matches TODO "idle/hop"
             sc = bpy.context.scene
@@ -1214,18 +1798,32 @@ def main():
                 for nm in doomed:
                     bpy.data.objects.remove(bpy.data.objects[nm], do_unlink=True)
             continue
+        elif which == 'pet_bunbun':
+            root, scale, wstr = build_bunbun(), BUNBUN_ORTHO, 0.28
+            soft_pet_lights()
+            render_turntable(root, 'pet_bunbun', outdir, frames, scale, wstr)
+            doomed = [ob.name for ob in bpy.data.objects
+                      if ob == root or (ob.parent and ob.parent.name == root.name)]
+            for nm in doomed:
+                bpy.data.objects.remove(bpy.data.objects[nm], do_unlink=True)
+            continue
         else:
             raise SystemExit('unknown prefix: ' + which)
         name = 'fruit_banana_3d' if which in ('banana_3d', 'banana', 'fruit_banana_3d') else \
             'bow' if which == 'bow' else \
             ('arrow_%s_3d' % which) if which in ARROW_TYPES else which
-        if which in ('crab_3d', 'angler_3d'):
+        if which in ('crab_3d', 'angler_3d', 'oak_3d', 'roc_3d', 'aurora_3d', 'prism_3d'):
             # inline render: render_turntable would overwrite the yaw
             sc = bpy.context.scene
             setup_camera(scale)
+            builders = {
+                'crab_3d': build_crab, 'angler_3d': build_angler,
+                'oak_3d': build_oak, 'roc_3d': build_roc,
+                'aurora_3d': build_aurora, 'prism_3d': build_prism,
+            }
+            build_fn = builders[which]
             for i, (dmg, yaw) in enumerate(boss_specs):
-                r = build_crab(dmg, yaw) if which == 'crab_3d' \
-                    else build_angler(dmg, yaw)
+                r = build_fn(dmg, yaw)
                 sc.render.filepath = os.path.join(
                     outdir, '%s_%d.png' % (which, i))
                 bpy.ops.render.render(write_still=True)

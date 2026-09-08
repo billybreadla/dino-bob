@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v63-music';
+var CACHE = 'dinobob-v64-bosses-pet';
 var FILES = [
   '.',
   'index.html',
@@ -222,6 +222,19 @@ var FILES = [
   'assets/sprites/boss_angler_3d_0.webp', 'assets/sprites/boss_angler_3d_1.webp',
   'assets/sprites/boss_angler_3d_2.webp', 'assets/sprites/boss_angler_3d_3.webp',
   'assets/sprites/boss_angler_3d_4.webp', 'assets/sprites/boss_angler_3d_5.webp',
+  // Oak Guardian / Storm Roc / Aurora Wisp King / Prism Serpent
+  'assets/sprites/boss_oak_3d_0.webp', 'assets/sprites/boss_oak_3d_1.webp',
+  'assets/sprites/boss_oak_3d_2.webp', 'assets/sprites/boss_oak_3d_3.webp',
+  'assets/sprites/boss_oak_3d_4.webp', 'assets/sprites/boss_oak_3d_5.webp',
+  'assets/sprites/boss_roc_3d_0.webp', 'assets/sprites/boss_roc_3d_1.webp',
+  'assets/sprites/boss_roc_3d_2.webp', 'assets/sprites/boss_roc_3d_3.webp',
+  'assets/sprites/boss_roc_3d_4.webp', 'assets/sprites/boss_roc_3d_5.webp',
+  'assets/sprites/boss_aurora_3d_0.webp', 'assets/sprites/boss_aurora_3d_1.webp',
+  'assets/sprites/boss_aurora_3d_2.webp', 'assets/sprites/boss_aurora_3d_3.webp',
+  'assets/sprites/boss_aurora_3d_4.webp', 'assets/sprites/boss_aurora_3d_5.webp',
+  'assets/sprites/boss_prism_3d_0.webp', 'assets/sprites/boss_prism_3d_1.webp',
+  'assets/sprites/boss_prism_3d_2.webp', 'assets/sprites/boss_prism_3d_3.webp',
+  'assets/sprites/boss_prism_3d_4.webp', 'assets/sprites/boss_prism_3d_5.webp',
   'assets/sprites/pet_ptero_0.webp',
   'assets/sprites/pet_ptero_1.webp',
   'assets/sprites/pet_ptero_2.webp',
@@ -240,6 +253,12 @@ var FILES = [
   'assets/sprites/pet_firefly_3.webp',
   'assets/sprites/pet_firefly_4.webp',
   'assets/sprites/pet_firefly_5.webp',
+  'assets/sprites/pet_bunbun_0.webp',
+  'assets/sprites/pet_bunbun_1.webp',
+  'assets/sprites/pet_bunbun_2.webp',
+  'assets/sprites/pet_bunbun_3.webp',
+  'assets/sprites/pet_bunbun_4.webp',
+  'assets/sprites/pet_bunbun_5.webp',
   'assets/sprites/obstacle_shield.webp',
   'assets/sprites/obstacle_wall.webp',
   // Menu/preview hero turntables (decorative; gameplay archer poses unchanged)

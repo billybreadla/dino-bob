@@ -169,6 +169,7 @@ var TUNING = {
   NAME_PET_PTERO: 'Pip the Ptero',
   NAME_PET_TURTLE: 'Shelly',
   NAME_PET_FIREFLY: 'Glowbug',
+  NAME_PET_BUNBUN: 'Bunbun',
   PRICE_PET: 2500
 };
 

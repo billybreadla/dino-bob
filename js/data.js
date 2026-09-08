@@ -122,6 +122,13 @@ var DATA = {
       get price() { return TUNING.PRICE_PET; },
       perkText: 'A tiny glowing friend who flares on bullseyes!',
       frames: ['pet_firefly_0', 'pet_firefly_1', 'pet_firefly_2', 'pet_firefly_3', 'pet_firefly_4', 'pet_firefly_5']
+    },
+    {
+      id: 'bunbun',
+      get name() { return TUNING.NAME_PET_BUNBUN; },
+      get price() { return TUNING.PRICE_PET; },
+      perkText: 'A fluffy bunny buddy who hops on bullseyes!',
+      frames: ['pet_bunbun_0', 'pet_bunbun_1', 'pet_bunbun_2', 'pet_bunbun_3', 'pet_bunbun_4', 'pet_bunbun_5']
     }
   ],
 

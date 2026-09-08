@@ -463,7 +463,11 @@ var GAME = (function () {
   var WORKSHOP_BODIES = {
     moonstone: ['boss_moonstone_3d_0', 'boss_moonstone_3d_1', 'boss_moonstone_3d_2', 'boss_moonstone_3d_3', 'boss_moonstone_3d_4', 'boss_moonstone_3d_5'],
     crab: ['boss_crab_3d_0', 'boss_crab_3d_1', 'boss_crab_3d_2', 'boss_crab_3d_3', 'boss_crab_3d_4', 'boss_crab_3d_5'],
-    angler: ['boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2', 'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5']
+    angler: ['boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2', 'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5'],
+    oak: ['boss_oak_3d_0', 'boss_oak_3d_1', 'boss_oak_3d_2', 'boss_oak_3d_3', 'boss_oak_3d_4', 'boss_oak_3d_5'],
+    roc: ['boss_roc_3d_0', 'boss_roc_3d_1', 'boss_roc_3d_2', 'boss_roc_3d_3', 'boss_roc_3d_4', 'boss_roc_3d_5'],
+    aurora: ['boss_aurora_3d_0', 'boss_aurora_3d_1', 'boss_aurora_3d_2', 'boss_aurora_3d_3', 'boss_aurora_3d_4', 'boss_aurora_3d_5'],
+    prism: ['boss_prism_3d_0', 'boss_prism_3d_1', 'boss_prism_3d_2', 'boss_prism_3d_3', 'boss_prism_3d_4', 'boss_prism_3d_5']
   };
 
   function workshopDef() {

@@ -77,10 +77,20 @@ var SPRITES = (function () {
     // the Angler Golem: same pipeline, guards Bubble Reef
     'boss_angler_3d_0', 'boss_angler_3d_1', 'boss_angler_3d_2',
     'boss_angler_3d_3', 'boss_angler_3d_4', 'boss_angler_3d_5',
-    // Pip/Shelly/Glowbug: TripoSR mesh turntables 0..5
+    // Oak Guardian / Storm Roc / Aurora Wisp King / Prism Serpent
+    'boss_oak_3d_0', 'boss_oak_3d_1', 'boss_oak_3d_2',
+    'boss_oak_3d_3', 'boss_oak_3d_4', 'boss_oak_3d_5',
+    'boss_roc_3d_0', 'boss_roc_3d_1', 'boss_roc_3d_2',
+    'boss_roc_3d_3', 'boss_roc_3d_4', 'boss_roc_3d_5',
+    'boss_aurora_3d_0', 'boss_aurora_3d_1', 'boss_aurora_3d_2',
+    'boss_aurora_3d_3', 'boss_aurora_3d_4', 'boss_aurora_3d_5',
+    'boss_prism_3d_0', 'boss_prism_3d_1', 'boss_prism_3d_2',
+    'boss_prism_3d_3', 'boss_prism_3d_4', 'boss_prism_3d_5',
+    // Pip/Shelly/Glowbug/Bunbun: turntables 0..5
     'pet_ptero_0', 'pet_ptero_1', 'pet_ptero_2', 'pet_ptero_3', 'pet_ptero_4', 'pet_ptero_5',
     'pet_turtle_0', 'pet_turtle_1', 'pet_turtle_2', 'pet_turtle_3', 'pet_turtle_4', 'pet_turtle_5',
     'pet_firefly_0', 'pet_firefly_1', 'pet_firefly_2', 'pet_firefly_3', 'pet_firefly_4', 'pet_firefly_5',
+    'pet_bunbun_0', 'pet_bunbun_1', 'pet_bunbun_2', 'pet_bunbun_3', 'pet_bunbun_4', 'pet_bunbun_5',
     // painted obstacles
     'obstacle_shield', 'obstacle_wall',
     // Menu/preview hero turntables (TripoSR + Blender studio; decorative only)
