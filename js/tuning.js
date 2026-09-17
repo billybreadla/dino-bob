@@ -203,5 +203,7 @@ var TUNING = {
   ARROW_3D_PARALLAX: 0.35,        // extra shake on foreground vs background
   ARROW_3D_PARTICLES: true,     // hit sparkles + dust puffs
   ARROW_3D_PARTICLE_COUNT: 12,  // sparks per bullseye
+  ARROW_3D_IDLE_SWAY: 0.035,   // tiny camera wobble when you're not aiming — like the world is breathing
+  ARROW_3D_FIREWORKS: 7,       // how many fireworks pop when you beat your best!
 };
 

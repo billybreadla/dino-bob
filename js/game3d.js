@@ -45,8 +45,10 @@ var GAME3D = (function () {
       WIND_CHANCE: t.ARROW_3D_WIND_CHANCE || 0.6,
       SHADOW_ENABLED: (t.ARROW_3D_SHADOW_ENABLED !== false),
       PARALLAX: t.ARROW_3D_PARALLAX || 0.35,
-      PARTICLES: (t.ARROW_3D_PARTICLES!==false), PARTICLE_COUNT: t.ARROW_3D_PARTICLE_COUNT||12,
-      FOV_BASE: 46
+       PARTICLES: (t.ARROW_3D_PARTICLES!==false), PARTICLE_COUNT: t.ARROW_3D_PARTICLE_COUNT||12,
+       IDLE_SWAY: t.ARROW_3D_IDLE_SWAY || 0.035,
+       FIREWORKS: t.ARROW_3D_FIREWORKS || 7,
+       FOV_BASE: 46
     };
   })();
 
@@ -154,6 +156,7 @@ function onRoundEnd(){
     // show HUD feedback
     if(isHigh) { say('NEW BEST! +' + coins + ' coins'); if(AUDIO && AUDIO.newBest) try{AUDIO.newBest();}catch(e){} }
     else if(coins>0) { say('+' + coins + ' coins'); }
+    if(isHigh){ spawnFireworks(K.FIREWORKS); if(navigator.vibrate) try{navigator.vibrate([30,40,30,40,60]);}catch(e){} }
     if(streak && streak.firstToday && streak.bonus>0) { setTimeout(function(){ say('Streak Day '+streak.count+'! +'+streak.bonus+' coins'); }, 1800); }
     if(isDaily) { setTimeout(function(){ say('NEW FAMILY BEST!'); }, 900); }
     // also store best in hud for display
@@ -612,6 +615,31 @@ function spawnBalloonShreds(x,y,z){
   hitParticles.push({obj:line, vel:new THREE.Vector3(0,-1.2,0), life:0.45, maxLife:0.45, isString:true});
 }
 
+function spawnFireworks(n){
+  if(!K.PARTICLES) return;
+  for(var f=0;f<n;f++){
+    (function(){
+      var fx = (Math.random()-0.5)*12;
+      var fy = 8 + Math.random()*6;
+      var fz = -12 - Math.random()*40;
+      var col = [0xffd23a,0xe8443a,0x6cc24a,0x9b5fe8,0x5ac8ff][f%5];
+      setTimeout(function(){
+        for(var i=0;i<18;i++){
+          var ang=Math.random()*Math.PI*2;
+          var sp=2.5+Math.random()*2.8;
+          var vel=new THREE.Vector3(Math.cos(ang)*sp*0.55, Math.sin(ang)*sp*0.55+1.0, (Math.random()-0.5)*sp*0.4);
+          var m=new THREE.Mesh(new THREE.SphereGeometry(0.07,5,5), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.95}));
+          m.position.set(fx,fy,fz);
+          scene.add(m);
+          hitParticles.push({obj:m, vel:vel, life:0.9+Math.random()*0.4, maxLife:0.9+Math.random()*0.4});
+        }
+        camShake=Math.max(camShake,0.22);
+        if(AUDIO && AUDIO.firework) try{AUDIO.firework();}catch(e){}
+      }, f*220);
+    })();
+  }
+}
+
 function updateHitParticles(dt){
   for(var i=hitParticles.length-1;i>=0;i--){
     var p=hitParticles[i];
@@ -649,10 +677,14 @@ function updateHitParticles(dt){
     } else {
       pet.holder.rotation.y += (-0.5 - pet.holder.rotation.y) * Math.min(1, dt * 3);
     }
+    // combo cheer — pet gets extra excited when you're on a streak!
+    if(st && st.combo>2) pet.cheer = Math.max(pet.cheer, 0.6);
     pet.model.position.y = pet.model.userData.baseY === undefined
       ? (pet.model.userData.baseY = pet.model.position.y)
       : pet.model.userData.baseY;
     pet.model.position.y += Math.sin(pet.bob) * 0.06 + hop;
+    // keep pet planted — gentle drift back to perch so he never wanders off
+    pet.holder.position.x += (1.9 - pet.holder.position.x)*dt*0.5;
   }
 
   // ============================================================
@@ -991,6 +1023,15 @@ function updateHitParticles(dt){
     var leanY = (drag && drag.active) ? (drag.dy / denom) * 0.22 : 0;
     camera.position.x += (clamp(leanX, -0.6, 0.6) - camera.position.x) * Math.min(1, dt * 6);
     camera.position.y += ((K.EYE_HEIGHT + clamp(leanY, -0.2, 0.3)) - camera.position.y) * Math.min(1, dt * 6);
+    // idle sway — gentle breathing when not aiming (feels alive, not static)
+    if(!drag || !drag.active){
+      var idleT = Date.now()*0.0005;
+      var idleX = Math.sin(idleT*1.1)*K.IDLE_SWAY;
+      var idleY = Math.cos(idleT*0.8)*K.IDLE_SWAY*0.6;
+      camera.position.x += idleX * dt * 6;
+      camera.position.y += idleY * dt * 6;
+      if(bgFar) { bgFar.rotation.y = idleX*0.02; }
+    }
     // shake decays quickly — additive kick on fire, with differential parallax
     camShake *= Math.max(0, 1 - dt * 7);
     if (camShake > 0.001) {
