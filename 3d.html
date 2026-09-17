@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Dino Bob 3D — Prototype</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8ecfe8;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
+  #c3d { display: block; width: 100vw; height: 100vh; touch-action: none; }
+
+  .hud { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 18px;
+    padding: 14px 18px; pointer-events: none; align-items: flex-start; }
+  .chip { background: rgba(20, 32, 44, 0.62); color: #fff; border-radius: 14px;
+    padding: 8px 14px; font-weight: 700; font-size: 20px; line-height: 1.1;
+    box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+  .chip small { display: block; font-size: 11px; font-weight: 600; opacity: .75;
+    letter-spacing: .08em; text-transform: uppercase; }
+  #hudCombo { color: #ffcf3d; min-width: 0; }
+  .spacer { flex: 1; }
+
+  #hudMsg { position: fixed; left: 0; right: 0; top: 34%; text-align: center;
+    font-size: 34px; font-weight: 800; color: #fff; text-shadow: 0 3px 12px rgba(0,0,0,.55);
+    opacity: 0; transition: opacity .25s; pointer-events: none; }
+
+  #hint { position: fixed; left: 0; right: 0; bottom: 16px; text-align: center;
+    color: #fff; font-size: 15px; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,.5);
+    pointer-events: none; opacity: .9; }
+
+  #overPanel { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(12, 22, 32, .62); }
+  .card { background: #fffdf6; border-radius: 22px; padding: 26px 34px; text-align: center;
+    box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+  .card h2 { margin: 0 0 6px; font-size: 26px; }
+  .card .big { font-size: 54px; font-weight: 800; color: #e8443a; line-height: 1; margin: 6px 0 14px; }
+  .card button { font: inherit; font-weight: 700; font-size: 18px; border: 0; cursor: pointer;
+    background: #e8443a; color: #fff; border-radius: 999px; padding: 12px 30px; }
+  .card a { display: block; margin-top: 12px; font-size: 14px; color: #6a7783; }
+</style>
+</head>
+<body>
+<canvas id="c3d"></canvas>
+
+<div class="hud">
+  <div class="chip"><small>Score</small><span id="hudScore">0</span></div>
+  <div class="chip"><small>Arrows</small><span id="hudArrows">20</span></div>
+  <div class="chip"><small>Time</small><span id="hudTime">60</span>s</div>
+  <div class="chip" id="hudCombo"></div>
+  <div class="chip" id="hudPhase" style="opacity:0.85">Warm-up</div>
+  <div class="spacer"></div>
+  <div class="chip"><small>Prototype</small>3D</div>
+</div>
+
+<div id="hudMsg"></div>
+<div id="hint">Drag back like a slingshot and let go. Pull down to shoot higher, sideways to steer.</div>
+
+<div id="overPanel">
+  <div class="card">
+    <h2>Out of arrows!</h2>
+    <div class="big" id="finalScore">0</div>
+    <button id="againBtn">Shoot again</button>
+    <a href="index.html">back to the 2D game</a>
+  </div>
+</div>
+
+<!-- Double-clicking this file works, but Chrome will not read the .glb pet
+     model off disk, so the pet falls back to a simple shape. To see the real
+     3D model, run this from the repo root:   python3 -m http.server 8769
+     then open  http://127.0.0.1:8769/3d.html -->
+<script src="js/vendor/three.min.js"></script>
+<script src="js/vendor/GLTFLoader.js"></script>
+<script src="js/tuning.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game3d.js"></script>
+<script>GAME3D.start();</script>
+</body>
+</html>

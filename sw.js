@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v65-boss-pet-polish';
+var CACHE = 'dinobob-v70-3d-juice';
 var FILES = [
   '.',
   'index.html',
@@ -279,7 +279,13 @@ var FILES = [
   'assets/sprites/char_bear_3d_4.webp', 'assets/sprites/char_bear_3d_5.webp',
   'assets/sprites/char_trixie_3d_0.webp', 'assets/sprites/char_trixie_3d_1.webp',
   'assets/sprites/char_trixie_3d_2.webp', 'assets/sprites/char_trixie_3d_3.webp',
-  'assets/sprites/char_trixie_3d_4.webp', 'assets/sprites/char_trixie_3d_5.webp'
+  'assets/sprites/char_trixie_3d_4.webp', 'assets/sprites/char_trixie_3d_5.webp',
+  // 3D prototype
+  '3d.html',
+  'js/game3d.js',
+  'js/vendor/three.min.js',
+  'js/vendor/GLTFLoader.js',
+  'assets/models/pet_ptero.glb'
 ];
 
 self.addEventListener('install', function (e) {

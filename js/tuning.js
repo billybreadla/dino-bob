@@ -170,6 +170,38 @@ var TUNING = {
   NAME_PET_TURTLE: 'Shelly',
   NAME_PET_FIREFLY: 'Glowbug',
   NAME_PET_BUNBUN: 'Bunbun',
-  PRICE_PET: 2500
+  PRICE_PET: 2500,
+
+  // ---------- 3D PROTOTYPE (graduating) ----------
+  // These tune the 3D prototype in 3d.html. Same idea as the rest of this file:
+  // change a number, save, refresh.
+  ARROW_3D_SPEED_MIN: 26,
+  ARROW_3D_SPEED_MAX: 52,
+  ARROW_3D_GRAVITY: 9.8,
+  ARROW_3D_MAX_YAW: 0.55,      // radians left/right you can aim (0.55 ≈ 31° — was tunnel-vision 17°)
+  ARROW_3D_MAX_PITCH: 0.52,    // radians up you can aim (0.52 ≈ 30°)
+  ARROWS_3D: 20,
+  ARROW_3D_EYE_HEIGHT: 1.65,
+  ARROW_3D_PREVIEW_DOTS: 34,
+  ARROW_3D_FAR_BONUS_METRES: 34,
+  ARROW_3D_PULL_FRACTION: 0.38, // pull distance as fraction of viewport's smaller side (0.38 = 38%)
+  ARROW_3D_DEAD_ZONE: 0.08,     // power below this is not a shot (shows hint instead)
+  PET_3D_URL: 'assets/models/pet_ptero.glb',
+  PET_3D_HEIGHT: 0.95,
+  // Aim help — gentle magnetism when your aim is close to a target
+  ARROW_3D_MAGNET_ENABLED: true,   // turn off for pure skill
+  ARROW_3D_MAGNET_STRENGTH: 0.14,  // 0 = none, 0.14 = 14% pull toward nearest target
+  ARROW_3D_MAGNET_RANGE: 1.9,      // how far off-target magnetism still helps (× target radius)
+  ARROW_3D_FOV_NARROW: 38,         // FOV when at full pull (38 vs 46 at rest)
+  ARROW_3D_CAM_SHAKE: 0.18,        // camera kick on fire
+  ARROW_3D_BOW_ENABLED: true,      // show bow mesh
+  // World feel — wind pushes arrows, ground shows depth
+  ARROW_3D_WIND_ENABLED: true,
+  ARROW_3D_WIND_MAX: 3.5,        // max sideways push (m/s drift over flight)
+  ARROW_3D_WIND_CHANCE: 0.6,     // 60% of rounds are windy
+  ARROW_3D_SHADOW_ENABLED: true,
+  ARROW_3D_PARALLAX: 0.35,        // extra shake on foreground vs background
+  ARROW_3D_PARTICLES: true,     // hit sparkles + dust puffs
+  ARROW_3D_PARTICLE_COUNT: 12,  // sparks per bullseye
 };
 
