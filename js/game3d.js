@@ -104,6 +104,21 @@ function buildBackgroundPlanes(biome){
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function pullDenom() { return Math.min(W.innerWidth, W.innerHeight) * K.PULL_FRACTION; }
   function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable
+  function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+  function mulberry32(seed){ return function(){ var t=seed+=0x6D2B79F5; t=Math.imul(t ^ t>>>15, t | 1); t^=t + Math.imul(t ^ t>>>7, t | 61); return ((t ^ t>>>14)>>>0)/4294967296; }; }
+  function seededTargets(seedStr){
+    var seed=0; for(var i=0;i<seedStr.length;i++) seed=(seed*31+seedStr.charCodeAt(i))>>>0;
+    var rnd=mulberry32(seed);
+    var out=[];
+    for(var k=0;k<4;k++){
+      var x=(rnd()-0.5)*8; // -4..4
+      var z=-(12 + rnd()*42); // -12..-54
+      var r=0.9 + rnd()*0.45; // 0.9..1.35
+      var mover = rnd()<0.5;
+      out.push({x:x, z:z, r:r, mover:mover});
+    }
+    return out;
+  }
   function el(id) { return D.getElementById(id); }
   function say(msg) { if (hud.msg) { hud.msg.textContent = msg; hud.msg.style.opacity = 1;
     clearTimeout(hud.msgT); hud.msgT = setTimeout(function () { hud.msg.style.opacity = 0; }, 1400); } }
@@ -325,12 +340,54 @@ scene.add(camera);
     pickups = [];
     obstacles.forEach(function (o) { scene.remove(o.obj); });
     obstacles = [];
-    targets = [
-      makeTarget(-2.2, -12, 1.15, false),
-      makeTarget(2.6, -27, 1.05, true),
-      makeTarget(-0.6, -41, 0.95, true),
-      makeTarget(4.2, -54, 1.30, false)
-    ];
+    var hash = W.location && W.location.hash || '';
+    var m = hash.match(/3d=([^&]+)/);
+    var daily = hash.match(/daily=([^&]+)/);
+    var useSeed = null;
+    if(m) try{ useSeed = decodeURIComponent(m[1]); }catch(e){}
+    else if(daily) useSeed = todayStr();
+    var layout = null;
+    if(useSeed){
+      if(m){
+        try{
+          var code = useSeed;
+          var json = atob(code.replace(/-/g,'+').replace(/_/g,'/'));
+          var arr = JSON.parse(json);
+          if(Array.isArray(arr) && arr.length){
+            layout = arr;
+          }
+        }catch(e){}
+        if(!layout){
+          try{ layout = seededTargets(useSeed); }catch(e){}
+        }
+      } else {
+        try{ layout = seededTargets(useSeed); }catch(e){}
+      }
+    }
+    if(layout && layout.length){
+      targets = [];
+      for(var _li=0; _li<layout.length && _li<4; _li++){
+        var _ld = layout[_li];
+        var _lx = typeof _ld.x==='number' ? _ld.x : 0;
+        var _lz = typeof _ld.z==='number' ? _ld.z : -(12+_li*14);
+        var _lr = typeof _ld.r==='number' ? _ld.r : 1.05;
+        var _lm = !!_ld.mover;
+        targets.push(makeTarget(_lx, _lz, _lr, _lm));
+      }
+      while(targets.length<4){
+        var _k=targets.length;
+        var _fb = seededTargets(useSeed+'_'+_k);
+        var _fd=_fb[0];
+        targets.push(makeTarget(_fd.x, _fd.z, _fd.r, _fd.mover));
+      }
+    } else {
+      targets = [
+        makeTarget(-2.2, -12, 1.15, false),
+        makeTarget(2.6, -27, 1.05, true),
+        makeTarget(-0.6, -41, 0.95, true),
+        makeTarget(4.2, -54, 1.30, false)
+      ];
+    }
     if (Math.random() < 0.6) {
       pickups.push(makeBalloon((Math.random() - 0.5) * 6, -18 - Math.random() * 30));
     }
@@ -1006,7 +1063,16 @@ function updateHitParticles(dt){
   function bindInput() {
     function xy(e) { var p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e); return { x: p.clientX, y: p.clientY }; }
     function down(e) {
-      if(e.target && e.target.id==='pauseBtn') return;
+      if(e.target){
+        var _tid=e.target.id;
+        if(_tid==='pauseBtn' || _tid==='share3dBtn' || _tid==='daily3dBtn' || _tid==='againBtn' || _tid==='resumeBtn' || _tid==='quitBtn') return;
+        if(e.target.closest){
+          var _btn=e.target.closest('button');
+          if(_btn) return;
+          var _chip=e.target.closest('.chip');
+          if(_chip && _chip.tagName==='BUTTON') return;
+        }
+      }
       if (e.pointerType === 'touch' || e.touches) e.preventDefault();
       if (W.AUDIO && AUDIO.unlock) AUDIO.unlock();
       if (e.pointerId !== undefined && canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -1158,6 +1224,20 @@ function updateHitParticles(dt){
     if(hudRoot) hudRoot.appendChild(hud.wind);
     var bestChip = document.createElement('div'); bestChip.className='chip'; bestChip.style.background='rgba(20,32,44,0.62)'; bestChip.style.display='none'; bestChip.innerHTML='<small>Best</small><span id="hudBest">0</span>'; if(hudRoot) hudRoot.insertBefore(bestChip, hudRoot.querySelector('#hudPhase')||hudRoot.firstChild); hud.best = bestChip.querySelector('#hudBest'); hud.bestChip = bestChip;
     try{ if(typeof SAVE!=='undefined' && SAVE.current){ var _p=SAVE.current(); if(_p && hud.best){ hud.best.textContent=_p.highScore; hud.bestChip.style.display=''; } } }catch(e){}
+    hud.shareBtn=el('share3dBtn'); hud.dailyBtn=el('daily3dBtn');
+    if(hud.shareBtn) hud.shareBtn.addEventListener('click', function(){
+      var data = targets.map(function(t){ return {x:Math.round(t.baseX*10)/10, z:Math.round(t.z), r:Math.round(t.r*100)/100, mover:t.mover}; });
+      var code = btoa(JSON.stringify(data)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      var url = W.location.href.split('#')[0] + '#3d=' + code;
+      if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ say('Link copied!'); }, function(){ prompt('Copy link', url); });
+      else prompt('Copy link', url);
+    });
+    if(hud.dailyBtn) hud.dailyBtn.addEventListener('click', function(){
+      W.location.hash = 'daily='+todayStr();
+      reset();
+      buildBackgroundPlanes(pickBiome());
+      say('Daily: '+todayStr());
+    });
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.outputEncoding = THREE.sRGBEncoding;   // textured models need this or they look muddy
     clock = new THREE.Clock();
