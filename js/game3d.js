@@ -64,6 +64,7 @@ var st = null, drag = null, raf = 0;
 var roundOver = false;
 var paused=false;
 var hud = {};
+var bgFar=null, bgMid=null; var currentBiome='meadow';
 
 function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
 function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
@@ -71,6 +72,33 @@ var hitParticles = []; // {obj, vel, life, maxLife}
 
   function rollWind(){ if(!K.WIND_ENABLED || Math.random()>K.WIND_CHANCE){ windX=0; return; } var s=Math.random()<0.5?1:-1; var r=Math.pow(Math.random(),3); windX = s * r * K.WIND_MAX; }
   function applyWind(vx, dt){ return vx + windX * dt * 0.9; }
+var BIOMES = ['meadow','mountain','sunset_beach','starlight','underwater','moon_cave'];
+function pickBiome(){ return BIOMES[Math.floor(Math.random()*BIOMES.length)]; }
+function buildBackgroundPlanes(biome){
+  if(bgFar) scene.remove(bgFar); if(bgMid) scene.remove(bgMid);
+  bgFar=null; bgMid=null;
+  if(!biome) biome = pickBiome();
+  currentBiome = biome;
+  var loader = new THREE.TextureLoader();
+  // far plane — 240x135 at z -180
+  var farUrl = 'assets/sprites/bg_'+biome+'_far.webp';
+  var farTex = loader.load(farUrl, function(tex){ if(THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; tex.needsUpdate=true; }, undefined, function(){ console.warn('bg failed', farUrl); });
+  if(THREE.SRGBColorSpace) farTex.colorSpace = THREE.SRGBColorSpace; else farTex.encoding = THREE.sRGBEncoding;
+  var farMat = new THREE.MeshBasicMaterial({map: farTex, transparent:true, opacity:0.92, fog:false});
+  bgFar = new THREE.Mesh(new THREE.PlaneGeometry(240, 135), farMat);
+  bgFar.position.set(0, 28, -180);
+  bgFar.lookAt(0, 8, 0);
+  scene.add(bgFar);
+  // mid plane — 160x90 at z -110, lower
+  var midUrl = 'assets/sprites/bg_'+biome+'_mid.webp';
+  var midTex = loader.load(midUrl, function(tex){ if(THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; tex.needsUpdate=true; }, undefined, function(){ console.warn('bg failed', midUrl); });
+  if(THREE.SRGBColorSpace) midTex.colorSpace = THREE.SRGBColorSpace; else midTex.encoding = THREE.sRGBEncoding;
+  var midMat = new THREE.MeshBasicMaterial({map: midTex, transparent:true, opacity:0.96, fog:false});
+  bgMid = new THREE.Mesh(new THREE.PlaneGeometry(160, 90), midMat);
+  bgMid.position.set(0, 14, -110);
+  bgMid.lookAt(0, 6, 0);
+  scene.add(bgMid);
+}
 
   // ---------- little helpers ----------
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -174,6 +202,7 @@ scene.add(camera);
     windFlag.visible = false;
     scene.add(windFlag);
     windFlagMesh = flag;
+    buildBackgroundPlanes(pickBiome());
   }
 
   // Trees and distance posts. They exist so your eye can measure depth.
@@ -941,6 +970,7 @@ function updateHitParticles(dt){
       }
       rainPos.needsUpdate=true;
     }
+    if(bgFar) { bgFar.position.x = Math.sin(Date.now()*0.00008)*2.5; bgFar.position.y = 28 + Math.sin(Date.now()*0.00011)*0.9; } if(bgMid) { bgMid.position.x = Math.sin(Date.now()*0.00012 +1)*1.8; }
     // HUD wind chip
     if(hud.wind){
       if(Math.abs(windX)>0.3){
@@ -1070,6 +1100,7 @@ function updateHitParticles(dt){
     rollWind();
     buildTargets();
     buildRain();
+    buildBackgroundPlanes(pickBiome());
     st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup' };
     drag = { active: false, sx: 0, sy: 0, dx: 0, dy: 0 };
     refreshHud();
