@@ -76,6 +76,41 @@ var hitParticles = []; // {obj, vel, life, maxLife}
   function say(msg) { if (hud.msg) { hud.msg.textContent = msg; hud.msg.style.opacity = 1;
     clearTimeout(hud.msgT); hud.msgT = setTimeout(function () { hud.msg.style.opacity = 0; }, 1400); } }
 
+function onRoundEnd(){
+  if(!st) return;
+  var score = st.score || 0;
+  // ensure SAVE is loaded
+  if(typeof SAVE==='undefined' || !SAVE.current) return;
+  try {
+    SAVE.load();
+    var p = SAVE.current();
+    if(!p){
+      // no profile yet — create a default one so 3D still saves
+      if(SAVE.profiles().length===0) SAVE.addProfile('Player','dinobob');
+      p = SAVE.current();
+      if(!p) return;
+    }
+    var isHigh = SAVE.recordRound(score);
+    var coins = Math.floor(score / (TUNING.SCORE_PER_COIN||10));
+    if(coins>0) SAVE.addCoins(coins);
+    SAVE.recordStat('score', score);
+    if(st.hits) SAVE.recordStat('bullseyes', st.hits); // approximate
+    // quest progress: simplest stat is rounds + score
+    if(SAVE.addQuestProgress) SAVE.addQuestProgress({rounds:1, score:score, coins:coins, bullseyes: st.hits||0});
+    var streak = SAVE.noteDailyActivity ? SAVE.noteDailyActivity() : null;
+    // daily best (family)
+    var isDaily = SAVE.recordDailyBest ? SAVE.recordDailyBest(score) : false;
+    // show HUD feedback
+    if(isHigh) { say('NEW BEST! +' + coins + ' coins'); if(AUDIO && AUDIO.newBest) try{AUDIO.newBest();}catch(e){} }
+    else if(coins>0) { say('+' + coins + ' coins'); }
+    if(streak && streak.firstToday && streak.bonus>0) { setTimeout(function(){ say('Streak Day '+streak.count+'! +'+streak.bonus+' coins'); }, 1800); }
+    if(isDaily) { setTimeout(function(){ say('NEW FAMILY BEST!'); }, 900); }
+    // also store best in hud for display
+    if(hud.best){ hud.best.textContent = p.highScore; hud.bestChip.style.display=''; }
+    SAVE.persist();
+  } catch(e){ console.warn('save fail', e); }
+}
+
   // ============================================================
   // BUILD THE WORLD
   // ============================================================
@@ -709,9 +744,9 @@ function updateHitParticles(dt){
     if (st.elapsed < moversAt) st.phase = 'warmup';
     else if (st.elapsed < chaosAt) st.phase = 'movers';
     else st.phase = 'chaos';
-    if (st.timeLeft <= 0 || st.arrowsLeft <= 0) {
-      roundOver = true;
-      say(st.score > 0 ? 'Time! ' + st.score + ' pts' : 'Out of arrows!');
+    if(st.timeLeft<=0 || st.arrowsLeft<=0){
+      roundOver=true;
+      onRoundEnd();
       refreshHud();
       return;
     }
@@ -1023,6 +1058,7 @@ function updateHitParticles(dt){
     st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup' };
     drag = { active: false, sx: 0, sy: 0, dx: 0, dy: 0 };
     refreshHud();
+    try{ var p=SAVE.current&&SAVE.current(); if(p && hud.best) { hud.best.textContent=p.highScore; hud.bestChip.style.display=''; } }catch(e){}
     // also refresh wind chip immediately
     if(hud.wind){
       if(Math.abs(windX)>0.3){ hud.wind.style.display=''; var wv=Math.round(Math.abs(windX)*10)/10; var dir=windX>0?'→ ':'← '; var elw=hud.wind.querySelector('#hudWind'); if(elw) elw.textContent=dir+wv+'m/s'; } else hud.wind.style.display='none';
@@ -1070,6 +1106,8 @@ function updateHitParticles(dt){
     hud.wind.innerHTML='<small>Wind</small><span id="hudWind"></span>';
     var hudRoot=document.querySelector('.hud');
     if(hudRoot) hudRoot.appendChild(hud.wind);
+    var bestChip = document.createElement('div'); bestChip.className='chip'; bestChip.style.background='rgba(20,32,44,0.62)'; bestChip.style.display='none'; bestChip.innerHTML='<small>Best</small><span id="hudBest">0</span>'; if(hudRoot) hudRoot.insertBefore(bestChip, hudRoot.querySelector('#hudPhase')||hudRoot.firstChild); hud.best = bestChip.querySelector('#hudBest'); hud.bestChip = bestChip;
+    try{ if(typeof SAVE!=='undefined' && SAVE.current){ var _p=SAVE.current(); if(_p && hud.best){ hud.best.textContent=_p.highScore; hud.bestChip.style.display=''; } } }catch(e){}
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.outputEncoding = THREE.sRGBEncoding;   // textured models need this or they look muddy
     clock = new THREE.Clock();
