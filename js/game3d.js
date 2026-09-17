@@ -62,7 +62,11 @@ var groundShadows = [];
 var rainSystem = null;
 var st = null, drag = null, raf = 0;
 var roundOver = false;
+var paused=false;
 var hud = {};
+
+function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
+function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
 var hitParticles = []; // {obj, vel, life, maxLife}
 
   function rollWind(){ if(!K.WIND_ENABLED || Math.random()>K.WIND_CHANCE){ windX=0; return; } var s=Math.random()<0.5?1:-1; var r=Math.pow(Math.random(),3); windX = s * r * K.WIND_MAX; }
@@ -79,6 +83,9 @@ var hitParticles = []; // {obj, vel, life, maxLife}
 function onRoundEnd(){
   if(!st) return;
   var score = st.score || 0;
+  // stash for results panel (default before SAVE path)
+  var _coinsTmp = Math.floor(score / (TUNING.SCORE_PER_COIN||10));
+  st._coinsEarned=_coinsTmp; st._isHigh=false; st._streakInfo=null;
   // ensure SAVE is loaded
   if(typeof SAVE==='undefined' || !SAVE.current) return;
   try {
@@ -98,6 +105,7 @@ function onRoundEnd(){
     // quest progress: simplest stat is rounds + score
     if(SAVE.addQuestProgress) SAVE.addQuestProgress({rounds:1, score:score, coins:coins, bullseyes: st.hits||0});
     var streak = SAVE.noteDailyActivity ? SAVE.noteDailyActivity() : null;
+    st._coinsEarned=coins; st._isHigh=isHigh; st._streakInfo=streak;
     // daily best (family)
     var isDaily = SAVE.recordDailyBest ? SAVE.recordDailyBest(score) : false;
     // show HUD feedback
@@ -735,7 +743,7 @@ function updateHitParticles(dt){
   // FRAME
   // ============================================================
   function update(dt) {
-    if (roundOver) return;
+    if(paused || roundOver) return;
     if (!st) return;
     st.elapsed += dt;
     st.timeLeft = Math.max(0, ((W.TUNING && TUNING.ROUND_SECONDS) || 60) - st.elapsed);
@@ -955,6 +963,7 @@ function updateHitParticles(dt){
   }
 
   function frame() {
+    if(paused){ renderer.render(scene,camera); raf=requestAnimationFrame(frame); return; }
     raf = requestAnimationFrame(frame);
     var dt = Math.min(clock.getDelta(), 0.05);
     update(dt);
@@ -967,6 +976,7 @@ function updateHitParticles(dt){
   function bindInput() {
     function xy(e) { var p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e); return { x: p.clientX, y: p.clientY }; }
     function down(e) {
+      if(e.target && e.target.id==='pauseBtn') return;
       if (e.pointerType === 'touch' || e.touches) e.preventDefault();
       if (W.AUDIO && AUDIO.unlock) AUDIO.unlock();
       if (e.pointerId !== undefined && canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -1024,7 +1034,7 @@ function updateHitParticles(dt){
         e.preventDefault();
         if (!drag.active) drag = { active: true, sx: 0, sy: 0, dx: 0, dy: pullDenom() * 0.4 };
         drag.dy += 18;
-      }
+      } else if(e.key==='p' || e.key==='P' || e.key==='Escape'){ e.preventDefault(); togglePause(); }
     });
   }
 
@@ -1035,6 +1045,11 @@ function updateHitParticles(dt){
     if (hud.combo) hud.combo.textContent = st.combo > 1 ? ('x' + st.combo) : '';
     if (hud.time) hud.time.textContent = Math.ceil(st.timeLeft);
     if (hud.phase) hud.phase.textContent = st.phase === 'warmup' ? 'Warm-up' : st.phase === 'movers' ? 'Moving!' : 'CHAOS!';
+    if(hud.overTitle) hud.overTitle.textContent = st.timeLeft<=0 ? 'Time!' : (st.arrowsLeft<=0?'Out of arrows!':'Round Over!');
+    if(hud.overCoins) hud.overCoins.textContent = st._coinsEarned||0;
+    if(hud.overHigh) hud.overHigh.style.display = st._isHigh?'':'none';
+    if(hud.overBest) try{ var p=SAVE.current&&SAVE.current(); hud.overBest.textContent=p?p.highScore:st.score; }catch(e){}
+    if(hud.overStreak) try{ var s=SAVE.streakInfo&&SAVE.streakInfo(); hud.overStreak.textContent=s.count?'🔥 Day '+s.count:''; }catch(e){}
     if (hud.over) hud.over.style.display = (st.arrowsLeft <= 0 || st.timeLeft <= 0 || roundOver) ? 'flex' : 'none';
     if (hud.final) hud.final.textContent = st.score;
   }
@@ -1098,6 +1113,10 @@ function updateHitParticles(dt){
       if (hudRootTmp2) hudRootTmp2.insertBefore(hud.phase, hudRootTmp2.querySelector('.spacer'));
     }
     hud.msg = el('hudMsg'); hud.over = el('overPanel'); hud.final = el('finalScore');
+    hud.overTitle=el('overTitle'); hud.overCoins=el('overCoins'); hud.overHigh=el('overHigh'); hud.overBest=el('overBest'); hud.overStreak=el('overStreak'); hud.pausePanel=el('pausePanel'); hud.pauseBtn=el('pauseBtn'); hud.resumeBtn=el('resumeBtn'); hud.quitBtn=el('quitBtn');
+    if(hud.pauseBtn) hud.pauseBtn.addEventListener('click', togglePause);
+    if(hud.resumeBtn) hud.resumeBtn.addEventListener('click', togglePause);
+    if(hud.quitBtn) hud.quitBtn.addEventListener('click', quitToMenu);
     // wind HUD chip — appears only when breezy
     hud.wind=document.createElement('div');
     hud.wind.className='chip';
@@ -1122,5 +1141,5 @@ function updateHitParticles(dt){
   }
 
   return { start: start, reset: reset, K: K, state: function () { return st; },
-           petReal: function () { return !!(pet && pet.real); } };
+           petReal: function () { return !!(pet && pet.real); }, togglePause: togglePause };
 })();

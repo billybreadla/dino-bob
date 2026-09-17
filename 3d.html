@@ -47,6 +47,7 @@
   <div class="chip"><small>Time</small><span id="hudTime">60</span>s</div>
   <div class="chip" id="hudCombo"></div>
   <div class="chip" id="hudPhase" style="opacity:0.85">Warm-up</div>
+  <button id="pauseBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(20,32,44,0.82)">⏸︎</button>
   <div class="spacer"></div>
   <div class="chip"><small>Prototype</small>3D</div>
 </div>
@@ -56,11 +57,21 @@
 
 <div id="overPanel">
   <div class="card">
-    <h2>Out of arrows!</h2>
+    <h2 id="overTitle">Out of arrows!</h2>
     <div class="big" id="finalScore">0</div>
-    <button id="againBtn">Shoot again</button>
+    <div id="overStats" style="font-size:15px; color:#5a6a7a; margin:6px 0 12px; line-height:1.5">
+      <div>Coins: <b id="overCoins">0</b> <span id="overHigh" style="display:none; color:#e8443a; font-weight:800">★ NEW BEST!</span></div>
+      <div>Best: <b id="overBest">0</b> • <span id="overStreak"></span></div>
+    </div>
+    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+      <button id="againBtn">Shoot again</button>
+      <a href="index.html" style="display:inline-flex; align-items:center; justify-content:center; font:inherit; font-weight:700; font-size:18px; border:0; cursor:pointer; background:#6a7783; color:#fff; border-radius:999px; padding:12px 24px; text-decoration:none">Arcade</a>
+    </div>
     <a href="index.html">back to the 2D game</a>
   </div>
+</div>
+<div id="pausePanel" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.55); z-index:20">
+  <div class="card"><h2>PAUSED</h2><div style="display:flex; gap:10px; justify-content:center; margin-top:14px"><button id="resumeBtn">Resume</button><button id="quitBtn" style="background:#6a7783">Quit</button></div></div>
 </div>
 
 <!-- Double-clicking this file works, but Chrome will not read the .glb pet
