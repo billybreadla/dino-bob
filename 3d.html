@@ -30,7 +30,10 @@
   #pausePanel{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.62); backdrop-filter:blur(4px); z-index:20; }
   #pausePanel .card{ border-color:rgba(255,210,58,0.25); }
   .chip[style*="255,60,40"]{ background:linear-gradient(180deg,#ff8a3a,#e23b3b)!important; border-color:#ffe27a; box-shadow:0 3px 0 #9a2a1a; }
-#vignette{ position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 68%, rgba(26,24,34,0.38) 100%); }
+ #vignette{ position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 68%, rgba(26,24,34,0.38) 100%); }
+.float-score{ position:fixed; pointer-events:none; font-family:'Lilita One',sans-serif; font-size:28px; font-weight:400; color:#fff; text-shadow:0 3px 0 rgba(0,0,0,0.35), 0 8px 16px rgba(0,0,0,0.25); opacity:0; transition:none; will-change:transform, opacity; z-index:12; }
+.float-score.bullseye{ color:#ffd23a; font-size:34px; text-shadow:0 3px 0 #b07f12, 0 0 12px rgba(255,210,58,0.6); }
+.float-score.pop{ color:#ff5fa2; }
 </style>
 </head>
 <body>

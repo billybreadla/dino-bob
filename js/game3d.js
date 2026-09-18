@@ -71,6 +71,7 @@ var bgFar=null, bgMid=null; var horizonHaze=null; var currentBiome='meadow';
 function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
 function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
 var hitParticles = []; // {obj, vel, life, maxLife}
+var coinParticles = []; // {obj, vel, life, targetY}
 
   function rollWind(){ if(!K.WIND_ENABLED || Math.random()>K.WIND_CHANCE){ windX=0; return; } var s=Math.random()<0.5?1:-1; var r=Math.pow(Math.random(),3); windX = s * r * K.WIND_MAX; }
   function applyWind(vx, dt){ return vx + windX * dt * 0.9; }
@@ -634,6 +635,91 @@ function spawnBalloonShreds(x,y,z){
   hitParticles.push({obj:line, vel:new THREE.Vector3(0,-1.2,0), life:0.45, maxLife:0.45, isString:true});
 }
 
+function spawnCoinBurst(x,y,z, n){
+  n = n || 5;
+  var cols = (typeof TUNING!=='undefined' && TUNING.SCORE_PER_COIN) ? TUNING.SCORE_PER_COIN : 10;
+  var coins = Math.max(1, Math.min(6, Math.floor(n/10)+1)); // 1 coin per ~10 pts, cap 6
+  for(var i=0;i<coins;i++){
+    var geo = new THREE.CylinderGeometry(0.14,0.14,0.04,12);
+    var mat = new THREE.MeshLambertMaterial({color:0xffd23a, emissive:0xffb800, emissiveIntensity:0.18});
+    var m = new THREE.Mesh(geo, mat);
+    m.rotation.x = Math.PI/2;
+    m.rotation.z = Math.random()*Math.PI*2;
+    m.position.set(x + (Math.random()-0.5)*0.7, y + Math.random()*0.5, z+0.3);
+    scene.add(m);
+    var vel = new THREE.Vector3((Math.random()-0.5)*1.8, 2.2+Math.random()*1.6, (Math.random()-0.5)*1.2);
+    coinParticles.push({obj:m, vel:vel, life:1.25+Math.random()*0.35, maxLife:1.25+Math.random()*0.35, phase:0});
+  }
+  // also float +N text via say is already done, but add sparkle burst at impact
+  for(var s=0;s<4;s++){
+    var sp=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9}));
+    var sv=new THREE.Vector3((Math.random()-0.5)*2.2, 1.5+Math.random()*1.8, (Math.random()-0.5)*1.2);
+    sp.position.set(x,y,z+0.35);
+    scene.add(sp);
+    hitParticles.push({obj:sp, vel:sv, life:0.45, maxLife:0.45});
+  }
+}
+
+function worldToScreen(x,y,z){
+  if(!W.innerWidth || !W.innerHeight) return {x:0,y:0,visible:false};
+  var v = new THREE.Vector3(x,y,z);
+  v.project(camera);
+  var sx = (v.x*0.5+0.5)*W.innerWidth;
+  var sy = ( -v.y*0.5+0.5)*W.innerHeight;
+  return {x:sx, y:sy, visible: v.z<1};
+}
+function spawnFloatScore(worldX, worldY, worldZ, text, kind){
+  var p = worldToScreen(worldX, worldY, worldZ+0.4);
+  if(!p.visible) return;
+  var el = D.createElement('div');
+  el.className='float-score ' + (kind||'');
+  el.textContent=text;
+  el.style.left = p.x+'px';
+  el.style.top = p.y+'px';
+  el.style.transform='translate(-50%,-50%) scale(0.7)';
+  el.style.opacity='0';
+  D.body.appendChild(el);
+  // animate
+  requestAnimationFrame(function(){
+    el.style.transition='transform 0.85s cubic-bezier(0.2,0.8,0.3,1), opacity 0.85s ease';
+    el.style.transform='translate(-50%,-140%) scale(1.05)';
+    el.style.opacity='1';
+    setTimeout(function(){ el.style.opacity='0'; el.style.transform='translate(-50%,-170%) scale(0.95)'; }, 520);
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 950);
+  });
+}
+
+function updateCoinParticles(dt){
+  for(var i=coinParticles.length-1;i>=0;i--){
+    var p=coinParticles[i];
+    p.life-=dt;
+    if(p.life<=0){ scene.remove(p.obj); coinParticles.splice(i,1); continue; }
+    var t=p.life/p.maxLife;
+    if(p.life < 0.55){
+      // home to HUD: lerp toward camera + up
+      var target = new THREE.Vector3(camera.position.x*0.35, camera.position.y+0.9, camera.position.z+1.2);
+      // simple lerp 30% per frame
+      p.obj.position.x += (target.x - p.obj.position.x) * Math.min(1, dt*6);
+      p.obj.position.y += (target.y - p.obj.position.y) * Math.min(1, dt*6);
+      p.obj.position.z += (target.z - p.obj.position.z) * Math.min(1, dt*6);
+      p.obj.scale.setScalar(0.7 + t*0.6);
+      p.obj.rotation.y += dt*10;
+      p.obj.material.opacity = t*0.95;
+      // near HUD pop
+      if(p.life < 0.15){ p.obj.scale.setScalar(1.4 - t); }
+    } else {
+      p.vel.y -= 7.5*dt;
+      p.obj.position.x += p.vel.x*dt;
+      p.obj.position.y += p.vel.y*dt;
+      p.obj.position.z += p.vel.z*dt;
+      p.obj.rotation.y += dt*8;
+      p.obj.rotation.x += dt*5;
+    }
+    p.phase += dt*12;
+    p.obj.rotation.z += dt*6;
+  }
+}
+
 function spawnFireworks(n){
   if(!K.PARTICLES) return;
   for(var f=0;f<n;f++){
@@ -865,6 +951,8 @@ function updateHitParticles(dt){
       if (pet) pet.cheer = 1.1;
       say('BULLSEYE! +' + pts + why);
       spawnBullseyeParticles(t.obj.position.x, t.obj.position.y, t.z+0.08, t.r);
+      spawnCoinBurst(t.obj.position.x, t.obj.position.y, t.z+0.08, pts);
+      spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, 'bullseye');
       if(navigator.vibrate) navigator.vibrate(18);
     } else {
       if (t.mover) { pts *= (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2; why += ' MOVING x2'; }
@@ -872,6 +960,7 @@ function updateHitParticles(dt){
       st.combo = 0;
       if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
       say('+' + pts + ' at ' + Math.round(-t.z) + 'm' + why);
+      spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, '');
       if(navigator.vibrate) navigator.vibrate(10);
     }
     st.score += pts;
@@ -1008,6 +1097,8 @@ function updateHitParticles(dt){
         var comboMultB = Math.min(maxB, 1 + Math.floor(st.combo / stepB));
         var balloonPts = (W.TUNING && TUNING.SCORE_BALLOON) || 25;
         balloonPts *= comboMultB;
+        spawnCoinBurst(pp.obj.position.x, pp.obj.position.y, pp.z, balloonPts);
+        spawnFloatScore(pp.obj.position.x, pp.obj.position.y, pp.z, 'POP! +'+balloonPts, 'pop');
         st.score += balloonPts;
         st.hits++;
         var popMsg = 'POP! +' + balloonPts;
@@ -1110,6 +1201,7 @@ function updateHitParticles(dt){
     }
 
     updateHitParticles(dt);
+    updateCoinParticles(dt);
     updatePreview();
     updatePet(dt);
     updateBow(dt);
@@ -1228,6 +1320,7 @@ function updateHitParticles(dt){
     arrows.forEach(function (a) { if (a.obj.parent) a.obj.parent.remove(a.obj); if(a.trail) scene.remove(a.trail); });
     arrows = [];
     hitParticles.forEach(p=>scene.remove(p.obj)); hitParticles=[];
+    coinParticles.forEach(p=>scene.remove(p.obj)); coinParticles=[];
     roundOver = false;
     rollWind();
     buildTargets();
