@@ -138,11 +138,21 @@ function buildBackgroundPlanes(biome){
   // ---------- little helpers ----------
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function pullDenom() { return Math.min(W.innerWidth, W.innerHeight) * K.PULL_FRACTION; }
-  function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable
+  function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable — MUST match live arrow step in update()
   // Zero-padded YYYY-MM-DD so 2D (SAVE.todayStr) and 3D share identical daily seeds.
   function todayStr(){ var d=new Date(); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; }
   // Identical to GAME mulberry32 in js/game.js:76 — keep in sync so a seeded daily layout is byte-identical.
   function mulberry32(seed){ var t=seed>>>0; return function(){ t=(t+0x6D2B79F5)|0; var z=t; z=Math.imul(z ^ z>>>15, z|1); z^=z + Math.imul(z ^ z>>>7, z|61); return ((z ^ z>>>14)>>>0)/4294967296; }; }
+  function rng(){ return (st && st.rand) ? st.rand() : Math.random(); }
+  function rand(a,b){ return a + rng()*(b-a); }
+  function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
+  function liveTargets(){ return targets.filter(function(t){ return !t.dead; }); }
+  function livePickups(){ return pickups.filter(function(p){ return !p.dead; }); }
+  // Current arrow + perk so 3D obeys the same gravityFactor/speedFactor as 2D (DATA.arrows).
+  function currentArrow(){ try{ var p=(typeof SAVE!=='undefined'&&SAVE.current)?SAVE.current():null; var id=p&&p.equipped&&p.equipped.arrow||'wooden'; return (typeof DATA!=='undefined'&&DATA.arrowById)?DATA.arrowById(id):{id:'wooden', gravityFactor:1, speedFactor:1, scoreBonus:0}; }catch(e){ return {id:'wooden', gravityFactor:1, speedFactor:1, scoreBonus:0}; } }
+  function currentPerk(){ try{ var p=(typeof SAVE!=='undefined'&&SAVE.current)?SAVE.current():null; var cid=p&&p.equipped&&p.equipped.character||'dinobob'; var ch=(typeof DATA!=='undefined'&&DATA.characterById)?DATA.characterById(cid):null; return (ch&&ch.perk)||{}; }catch(e){ return {}; } }
+  function effectiveGravity(){ var a=currentArrow(), pk=currentPerk(); return K.GRAVITY * (a.gravityFactor||1) * (1 - (pk.gravityCut||0)); }
+  function effectiveSpeed(power){ var a=currentArrow(), pk=currentPerk(); var base=K.ARROW_SPEED_MIN + (K.ARROW_SPEED_MAX - K.ARROW_SPEED_MIN) * power; return base * (a.speedFactor||1) * (1 + (pk.speedBonus||0)); }
   function seededTargets(seedStr){
     var seed=0; for(var i=0;i<seedStr.length;i++) seed=(seed*31+seedStr.charCodeAt(i))>>>0;
     var rnd=mulberry32(seed);
@@ -341,8 +351,8 @@ scene.add(camera);
 
     var targetObj = {
       obj: group, baseX: x, z: z, r: radius,
-      mover: !!mover, phase: Math.random() * 6.28,
-      speed: 0.5 + Math.random() * 0.5, amp: mover ? 2.6 + Math.random() * 2.2 : 0,
+      mover: !!mover, phase: rng() * 6.28,
+      speed: 0.5 + rng() * 0.5, amp: mover ? 2.6 + rng() * 2.2 : 0,
       dead: false
     };
     if(K.SHADOW_ENABLED){
@@ -363,16 +373,69 @@ scene.add(camera);
     g.add(blob);
     g.add(knot);
     g.add(str);
-    g.position.set(x, 1.9 + Math.random() * 0.6, z);
+    g.position.set(x, 1.9 + rng() * 0.6, z);
     scene.add(g);
-    return { obj: g, type: 'balloon', r: 0.55, z: z, baseY: g.position.y, bobPhase: Math.random() * 6.28, dead: false };
+    return { obj: g, type: 'balloon', r: 0.55, z: z, baseY: g.position.y, bobPhase: rng() * 6.28, dead: false };
   }
 
   function makeShield(target) {
     var sh = new THREE.Mesh(new THREE.CircleGeometry(0.52, 12), new THREE.MeshLambertMaterial({ color: 0x8b5a2b, side: THREE.DoubleSide }));
     sh.position.set(target.obj.position.x + 0.9, target.obj.position.y, target.obj.position.z + 0.35);
     scene.add(sh);
-    return { obj: sh, host: target, angle: Math.random() * 6.28, orbitR: 0.95 };
+    return { obj: sh, host: target, angle: rng() * 6.28, orbitR: 0.95 };
+  }
+  function makeFruit3D(){
+    var kinds = (W.TUNING && TUNING.FRUIT_VALUES) ? Object.keys(TUNING.FRUIT_VALUES) : ['cherry'];
+    var kind = pick(kinds);
+    var val = (W.TUNING && TUNING.FRUIT_VALUES && TUNING.FRUIT_VALUES[kind]) || 50;
+    var colMap = {cherry:0xe8443a, strawberry:0xff5a6b, apple:0x6cc24a, orange:0xffa126, pear:0xc8e645, grapes:0x9b5fe8, watermelon:0x2e8b57, pineapple:0xffd23a, banana:0xffe135};
+    var col = colMap[kind] || 0xff8b3d;
+    var x = (rng()-0.5)*6;
+    var z = -18 - rng()*30;
+    var grp = new THREE.Group();
+    var mesh = new THREE.Mesh(new THREE.SphereGeometry(0.35,12,8), new THREE.MeshLambertMaterial({color:col}));
+    grp.add(mesh);
+    grp.position.set(x, 1.6 + rng()*0.6, z);
+    scene.add(grp);
+    return {obj: grp, type:'fruit', kind: kind, value: val, r:0.35, z:z, baseY: grp.position.y, bobPhase: rng()*6.28, dead:false};
+  }
+  function makeGolden3D(){
+    var x=(rng()-0.5)*6;
+    var z=-18 - rng()*30;
+    var grp=new THREE.Group();
+    var mesh=new THREE.Mesh(new THREE.SphereGeometry(0.42,14,10), new THREE.MeshBasicMaterial({color:0xffcf3d}));
+    grp.add(mesh);
+    grp.position.set(x, 1.9 + rng()*0.6, z);
+    scene.add(grp);
+    return {obj:grp, type:'golden', r:0.42, z:z, baseY: grp.position.y, bobPhase: rng()*6.28, dead:false};
+  }
+  function makePowerup3D(){
+    var x=(rng()-0.5)*6;
+    var z=-18 - rng()*30;
+    var grp=new THREE.Group();
+    var geo=new THREE.TorusGeometry(0.32,0.09,8,16);
+    var mesh=new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:0x62e6ff}));
+    mesh.rotation.x=Math.PI/2;
+    grp.add(mesh);
+    grp.position.set(x, 1.8 + rng()*0.6, z);
+    scene.add(grp);
+    return {obj:grp, type:'powerup', r:0.32, z:z, baseY: grp.position.y, bobPhase: rng()*6.28, dead:false, kind: rng()<0.5?'arrows':'slowmo'};
+  }
+  function makeDoodle3D(){
+    try{
+      if(typeof SPRITES==='undefined' || !SPRITES.doodles) return null;
+      var list=SPRITES.doodles();
+      if(!list || !list.length) return null;
+      var entry=pick(list);
+      var x=(rng()-0.5)*6;
+      var z=-12 - rng()*42;
+      var grp=new THREE.Group();
+      var mesh=new THREE.Mesh(new THREE.SphereGeometry(0.44,12,8), new THREE.MeshLambertMaterial({color:0x9fd636}));
+      grp.add(mesh);
+      grp.position.set(x, 1.7, z);
+      scene.add(grp);
+      return {obj:grp, type:'doodle', r:0.44, z:z, baseY: grp.position.y, bobPhase: rng()*6.28, dead:false, doodle:true, sprite:entry.sprite, points: entry.points||40};
+    }catch(e){ return null; }
   }
 
   function buildTargets() {
@@ -474,14 +537,84 @@ scene.add(camera);
         makeTarget(4.2, -54, 1.30, false)
       ];
     }
-    if (Math.random() < 0.6) {
-      pickups.push(makeBalloon((Math.random() - 0.5) * 6, -18 - Math.random() * 30));
+    // if seeded, ensure st.rand is pinned so spawner is deterministic
+    try{
+      if(useSeed && st && !st.rand){
+        var _seedVal=0; for(var _si=0;_si<useSeed.length;_si++) _seedVal=(_seedVal*31+useSeed.charCodeAt(_si))>>>0;
+        st.rand = mulberry32(_seedVal);
+      } else if(useSeed && !st){
+        W._pending3DSeed = useSeed;
+      }
+    }catch(e){}
+    if (rng() < 0.6) {
+      pickups.push(makeBalloon((rng() - 0.5) * 6, -18 - rng() * 30));
     }
     for (var _oi = 0; _oi < targets.length; _oi++) {
       var _t = targets[_oi];
-      if (_t.mover && Math.random() < ((W.TUNING && TUNING.OBSTACLE_CHANCE) || 0.4)) {
+      if (_t.mover && rng() < ((W.TUNING && TUNING.OBSTACLE_CHANCE) || 0.4)) {
         obstacles.push(makeShield(_t));
       }
+    }
+  }
+
+  function spawner(dt){
+    if(!st) return;
+    st.spawnCooldown -= dt;
+    if(st.bossRage) st.spawnCooldown -= dt * 0.67;
+    if(st.spawnCooldown > 0) return;
+    var totalLive = liveTargets().length + livePickups().length;
+    if(totalLive >= 10){ st.spawnCooldown = 0.5; return; }
+    var ph = st.phase==='warmup'?1: st.phase==='movers'?2:3;
+    var liveBull = liveTargets().length;
+    var want = ph===1?3: ph===2?3:4;
+    if(liveBull < want){
+      // doodle chance (phase 2+, at most 2, ~10%)
+      if(ph>=2){
+        try{
+          var doodlesLive = pickups.filter(function(p){ return !p.dead && p.type==='doodle'; }).length;
+          if(doodlesLive < 2 && typeof SPRITES!=='undefined' && SPRITES.doodles && SPRITES.doodles().length && rng()<0.1){
+            var d = makeDoodle3D();
+            if(d){ pickups.push(d); st.spawnCooldown=0.35; return; }
+          }
+        }catch(e){}
+      }
+      var x=(rng()-0.5)*8;
+      var z=-(12 + rng()*48);
+      var r=0.9 + rng()*0.45;
+      var mover=rng()<0.5;
+      var t=makeTarget(x,z,r,mover);
+      targets.push(t);
+      if(ph>=2 && mover && rng() < ((W.TUNING && TUNING.OBSTACLE_CHANCE)||0.4)){
+        obstacles.push(makeShield(t));
+      }
+      st.spawnCooldown=0.35;
+      return;
+    }
+    var hasGolden = pickups.some(function(p){ return !p.dead && p.type==='golden'; });
+    var hasPowerup = pickups.some(function(p){ return !p.dead && p.type==='powerup'; });
+    if(ph>=2 && !hasGolden && rng()<0.02){
+      pickups.push(makeGolden3D());
+      st.spawnCooldown=3;
+      return;
+    }
+    if(!hasPowerup && rng()<0.015){
+      pickups.push(makePowerup3D());
+      st.spawnCooldown=3;
+      return;
+    }
+    var balloons = pickups.filter(function(p){ return !p.dead && p.type==='balloon'; }).length;
+    var roll=rng();
+    if(ph===1){
+      if(balloons<1 && roll<0.4){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=2.5; }
+      else st.spawnCooldown=1;
+    } else if(ph===2){
+      if(balloons<2 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.6; }
+      else if(roll<0.55){ pickups.push(makeFruit3D()); st.spawnCooldown=2.2; }
+      else st.spawnCooldown=0.9;
+    } else {
+      if(balloons<3 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.0; }
+      else if(roll<0.65){ pickups.push(makeFruit3D()); st.spawnCooldown=1.2; }
+      else st.spawnCooldown=0.6;
     }
   }
 
@@ -641,10 +774,10 @@ scene.add(camera);
     var denom2 = pullDenom();
     var lean = (drag && drag.active) ? -(drag.dx / denom2) * 0.12 : 0;
     bowMesh.position.x += (lean - bowMesh.position.x) * Math.min(1, dt * 8);
-    // auto-fade when aiming so you can see the target (Solution 1)
+    // auto-fade when aiming so you can see the target — fades early so you don't need to over-pull
     var targetFade = 0;
     if (K.BOW_FADE && drag && drag.active) {
-      targetFade = Math.max(0, Math.min(1, (power - 0.12) / 0.55)) * 0.88;
+      targetFade = Math.max(0, Math.min(1, (power - 0.04) / 0.22)) * 0.92;
     }
     bowMesh.userData.fade += (targetFade - bowMesh.userData.fade) * Math.min(1, dt * 7);
     var fade = bowMesh.userData.fade;
@@ -909,14 +1042,15 @@ function updateHitParticles(dt){
   function aimFromDrag() {
     var denom = Math.max(80, pullDenom()); // clamp min 80px so tiny phones still work
     var len = Math.min(Math.sqrt(drag.dx*drag.dx + drag.dy*drag.dy), denom);
-    var power = len / denom;
+    var raw = len / denom;
+    var power = Math.pow(raw, 0.72); // 25% pull → 40% power, so you don't need to over-pull to reach far targets
     var yaw = -(drag.dx / denom) * K.MAX_YAW;
     var pitch = (drag.dy / denom) * K.MAX_PITCH;
     yaw = clamp(yaw, -K.MAX_YAW, K.MAX_YAW);
-    pitch = clamp(pitch, -K.MAX_PITCH*0.4, K.MAX_PITCH);
+    pitch = clamp(pitch, -K.MAX_PITCH*0.35, K.MAX_PITCH);
     var mag = applyMagnetism(yaw, pitch);
     yaw = mag.yaw; pitch = mag.pitch;
-    var speed = K.ARROW_SPEED_MIN + (K.ARROW_SPEED_MAX - K.ARROW_SPEED_MIN) * power;
+    var speed = effectiveSpeed(power);
     return { power:power, yaw:yaw, pitch:pitch, denom:denom, vx:Math.sin(yaw)*Math.cos(pitch)*speed, vy:Math.sin(pitch)*speed, vz:-Math.cos(yaw)*Math.cos(pitch)*speed };
   }
 
@@ -961,8 +1095,9 @@ function updateHitParticles(dt){
     var pos = previewDots.geometry.attributes.position;
     var x = 0, y = K.EYE_HEIGHT, z = 0.6;
     var vx = a.vx, vy = a.vy, vz = a.vz, dt = physicsDt();
+    var grav = effectiveGravity();
     for (var i = 0; i < K.PREVIEW_DOTS; i++) {
-      vy -= K.GRAVITY * dt;
+      vy -= grav * dt;
       vx += windX * dt * 0.65;
       x += vx * dt; y += vy * dt; z += vz * dt;
       if (y < 0.02) y = 0.02;
@@ -975,7 +1110,7 @@ function updateHitParticles(dt){
       var rvx = a.vx, rvy = a.vy, rvz = a.vz;
       var rPos = previewRibbon.geometry.attributes.position;
       for (var k = 0; k < 24; k++) {
-        rvy -= K.GRAVITY * dt;
+        rvy -= grav * dt;
         rvx += windX * dt * 0.65;
         rx += rvx * dt; ry += rvy * dt; rz += rvz * dt;
         if (ry < 0.02) ry = 0.02;
@@ -1027,7 +1162,8 @@ function updateHitParticles(dt){
     var mesh = makeArrowMesh();
     mesh.position.set(0, K.EYE_HEIGHT, 0.6);
     scene.add(mesh);
-    var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0 };
+    // Lock gravity at shoot so preview vs live never diverge even if arrow type switches mid-flight.
+    var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0, grav: effectiveGravity() };
     arrows.push(ar);
     var trailGeo=new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12*3),3)); var trail=new THREE.Points(trailGeo, new THREE.PointsMaterial({color:0xffffff, size:0.12, transparent:true, opacity:0.65, sizeAttenuation:true})); scene.add(trail); ar.trail=trail; ar.trailPos=[];
     if (W.AUDIO && AUDIO.shoot) AUDIO.shoot();
@@ -1046,12 +1182,18 @@ function updateHitParticles(dt){
   // ============================================================
   // SCORING
   // ============================================================
+  // Ray-disc: hx/hy are already in target local space (plane z=t.z, normal +Z towards camera).
+  // If a future boss tilts the disc, switch to ray-plane with dot(normal) instead of z-test.
   function scoreHit(t, hx, hy) {
-    var dist = Math.sqrt(hx * hx + hy * hy);
-    var ring = clamp(Math.floor(dist / t.r * 4), 0, 3);
     var rings = (W.TUNING && TUNING.SCORE_BULLSEYE_RINGS) || [100, 50, 25, 10];
+    var d = Math.sqrt(hx*hx + hy*hy) / (t.r || 1);
+    // Exact 2D parity: 0.25/0.5/0.75 thresholds from js/game.js:1129 (not floor*4 rounding).
+    var ring = d < 0.25 ? 0 : d < 0.5 ? 1 : d < 0.75 ? 2 : 3;
     var pts = rings[ring];
     var why = '';
+    var isFar = -t.z > K.FAR_BONUS_METRES;
+    var farMult = (W.TUNING && TUNING.FAR_TARGET_MULTIPLIER) || 2;
+    var moveMult = (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2;
     var comboMult = 1;
     if (ring === 0) {
       st.combo++;
@@ -1059,10 +1201,10 @@ function updateHitParticles(dt){
       var max = (W.TUNING && TUNING.COMBO_MAX) || 5;
       comboMult = Math.min(max, 1 + Math.floor(st.combo / step));
       if (comboMult > 1) { pts *= comboMult; why += ' x' + comboMult; }
-      if (t.mover) { pts *= (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2; why += ' MOVING x2'; }
-      if (-t.z > K.FAR_BONUS_METRES) { pts *= (W.TUNING && TUNING.FAR_TARGET_MULTIPLIER) || 2; why += ' FAR x2'; }
+      if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
+      if (isFar) { pts *= farMult; why += ' FAR x2'; }
       if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye();
-      if(W.AUDIO && AUDIO.zap && -t.z>34) try{AUDIO.zap();}catch(e){}
+      if(W.AUDIO && AUDIO.zap && isFar) try{AUDIO.zap();}catch(e){}
       if (pet) pet.cheer = 1.1;
       say('BULLSEYE! +' + pts + why);
       spawnBullseyeParticles(t.obj.position.x, t.obj.position.y, t.z+0.08, t.r);
@@ -1070,14 +1212,17 @@ function updateHitParticles(dt){
       spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, 'bullseye');
       if(navigator.vibrate) navigator.vibrate(18);
     } else {
-      if (t.mover) { pts *= (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2; why += ' MOVING x2'; }
-      if (-t.z > K.FAR_BONUS_METRES) { pts *= (W.TUNING && TUNING.FAR_TARGET_MULTIPLIER) || 2; why += ' FAR x2'; }
+      if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
+      if (isFar) { pts *= farMult; why += ' FAR x2'; }
       st.combo = 0;
       if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
       say('+' + pts + ' at ' + Math.round(-t.z) + 'm' + why);
       spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, '');
       if(navigator.vibrate) navigator.vibrate(10);
     }
+    // Include arrow scoreBonus like 2D award() does (DATA.arrows[].scoreBonus)
+    var ab = currentArrow().scoreBonus || 0;
+    if(ab) { var extra = Math.round(pts * ab); pts += extra; }
     st.score += pts;
     st.hits++;
     refreshHud();
@@ -1102,9 +1247,12 @@ function updateHitParticles(dt){
       refreshHud();
       return;
     }
+    // phased respawning — mirrors game.js spawner but scaled to 3D counts
+    try{ spawner(dt); }catch(e){}
     var i, t;
     for (i = 0; i < targets.length; i++) {
       t = targets[i];
+      if (t.dead) continue;
       if (!t.mover) continue;
       if (st.phase === 'warmup') continue;
       var speedMul = st.phase === 'chaos' ? 1.7 : 1.0;
@@ -1114,6 +1262,7 @@ function updateHitParticles(dt){
     // ground contact shadows — follow targets, fade when high, breathe a little
     for (i = 0; i < targets.length; i++) {
       t = targets[i];
+      if (t.dead) { var _shd=groundShadows[i]; if(_shd) _shd.material.opacity=0; continue; }
       var sh = groundShadows[i];
       if(!sh) continue;
       sh.position.x = t.obj.position.x;
@@ -1153,7 +1302,9 @@ function updateHitParticles(dt){
         continue;
       }
       var px = ar.x, py = ar.y, pz = ar.z;
-      ar.vy -= K.GRAVITY * dt;
+      // Preview = truth: live arrows use same gravity/wind as preview (via effectiveGravity).
+      var gravLive = (ar.grav !== undefined) ? ar.grav : effectiveGravity();
+      ar.vy -= gravLive * dt;
       ar.vx += windX * dt * 0.65;
       ar.x += ar.vx * dt; ar.y += ar.vy * dt; ar.z += ar.vz * dt;
       if(ar.trail && ar.trailPos){ ar.trailPos.unshift({x:ar.x,y:ar.y,z:ar.z}); if(ar.trailPos.length>12) ar.trailPos.pop(); var pos=ar.trail.geometry.attributes.position; for(var ti=0;ti<12;ti++){ if(ti<ar.trailPos.length) pos.setXYZ(ti, ar.trailPos[ti].x, ar.trailPos[ti].y, ar.trailPos[ti].z); else pos.setXYZ(ti, ar.x,ar.y,ar.z); } pos.needsUpdate=true; ar.trail.material.opacity = ar.stuck?0:0.65; }
@@ -1188,6 +1339,7 @@ function updateHitParticles(dt){
       // did it cross a target's plane this step?
       for (var j = 0; j < targets.length; j++) {
         t = targets[j];
+        if (t.dead) continue;
         if ((pz > t.z) === (ar.z > t.z)) continue;            // no crossing
         var u = (t.z - pz) / (ar.z - pz || 1e-6);
         var hx = px + (ar.x - px) * u - t.obj.position.x;
@@ -1199,6 +1351,7 @@ function updateHitParticles(dt){
         t.obj.add(ar.obj);                                    // ride along if it moves
         ar.obj.position.set(hx, hy, 0.08);
         scoreHit(t, hx, hy);
+        t.dead = true;
         break;
       }
       if (ar.stuck) continue;
@@ -1211,24 +1364,72 @@ function updateHitParticles(dt){
         var hxP = px + (ar.x - px) * up - pp.obj.position.x;
         var hyP = py + (ar.y - py) * up - pp.obj.position.y;
         if (Math.sqrt(hxP * hxP + hyP * hyP) > pp.r) continue;
-        scene.remove(pp.obj);
-        spawnBalloonShreds(pp.obj.position.x, pp.obj.position.y, pp.z);
+        var _px = pp.obj.position.x, _py = pp.obj.position.y, _pz = pp.z;
+        pp.dead = true;
+        try{ scene.remove(pp.obj); }catch(e){}
+        // dispose pickup mesh
+        try{
+          pp.obj.traverse(function(c){ if(c.geometry) try{c.geometry.dispose();}catch(e){} if(c.material){ var ms=Array.isArray(c.material)?c.material:[c.material]; ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } });
+        }catch(e){}
         pickups.splice(j2, 1);
         j2--;
         var stepB = (W.TUNING && TUNING.COMBO_STEP) || 2;
         var maxB = (W.TUNING && TUNING.COMBO_MAX) || 5;
         var comboMultB = Math.min(maxB, 1 + Math.floor(st.combo / stepB));
-        var balloonPts = (W.TUNING && TUNING.SCORE_BALLOON) || 25;
-        balloonPts *= comboMultB;
-        spawnCoinBurst(pp.obj.position.x, pp.obj.position.y, pp.z, balloonPts);
-        spawnFloatScore(pp.obj.position.x, pp.obj.position.y, pp.z, 'POP! +'+balloonPts, 'pop');
-        st.score += balloonPts;
+        var pts = 25, label='POP!';
+        var audioKind='pop';
+        if(pp.type==='fruit'){
+          pts = pp.value || 50;
+          pts = Math.round(pts * comboMultB);
+          label='FRUIT! +'+pts;
+          audioKind='pop';
+          spawnCoinBurst(_px, _py, _pz, pts);
+          spawnFloatScore(_px, _py, _pz, '+'+pts, 'fruit');
+          spawnBalloonShreds(_px, _py, _pz);
+        } else if(pp.type==='golden'){
+          pts = (W.TUNING && TUNING.SCORE_GOLDEN) || 500;
+          pts = Math.round(pts * comboMultB);
+          label='GOLDEN! +'+pts;
+          audioKind='chest';
+          spawnCoinBurst(_px, _py, _pz, pts);
+          spawnFloatScore(_px, _py, _pz, '+'+pts, 'golden');
+          spawnBalloonShreds(_px, _py, _pz);
+          if(W.AUDIO && AUDIO.voice) try{AUDIO.voice('golden');}catch(e){}
+        } else if(pp.type==='powerup'){
+          pts = 30 * comboMultB;
+          label='POWER! +'+pts;
+          audioKind='coin';
+          if(pp.kind==='arrows'){ st.arrowsLeft += (W.TUNING && TUNING.POWERUP_ARROWS)||3; label+=' +'+((W.TUNING && TUNING.POWERUP_ARROWS)||3)+' arrows'; }
+          spawnCoinBurst(_px, _py, _pz, pts);
+          spawnFloatScore(_px, _py, _pz, '+'+pts, 'powerup');
+          spawnBalloonShreds(_px, _py, _pz);
+        } else if(pp.type==='doodle'){
+          pts = pp.points || 40;
+          pts = Math.round(pts * comboMultB);
+          label="DOODLE! +"+pts;
+          audioKind='pop';
+          spawnCoinBurst(_px, _py, _pz, pts);
+          spawnFloatScore(_px, _py, _pz, '+'+pts, 'doodle');
+          spawnBalloonShreds(_px, _py, _pz);
+        } else {
+          // balloon
+          pts = (W.TUNING && TUNING.SCORE_BALLOON) || 25;
+          pts = Math.round(pts * comboMultB);
+          label='POP! +'+pts;
+          spawnCoinBurst(_px, _py, _pz, pts);
+          spawnFloatScore(_px, _py, _pz, 'POP! +'+pts, 'pop');
+          spawnBalloonShreds(_px, _py, _pz);
+        }
+        if(comboMultB>1 && pp.type!=='powerup') label+=' x'+comboMultB;
+        st.score += pts;
         st.hits++;
-        var popMsg = 'POP! +' + balloonPts;
-        if (comboMultB > 1) popMsg += ' x' + comboMultB;
-        say(popMsg);
-        if (W.AUDIO && AUDIO.pop) { try{ AUDIO.pop(); if(-pp.z>30 && AUDIO.zap) AUDIO.zap(); }catch(e){} }
-        else if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+        say(label);
+        try{
+          if(audioKind==='chest' && W.AUDIO && AUDIO.chest) AUDIO.chest();
+          else if(audioKind==='coin' && W.AUDIO && AUDIO.coin) AUDIO.coin();
+          else if(W.AUDIO && AUDIO.pop){ AUDIO.pop(); if(-_pz>30 && AUDIO.zap) AUDIO.zap(); }
+          else if(W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+        }catch(e){}
         st.combo++;
         if (pet) pet.cheer = 0.8;
         refreshHud();
@@ -1483,10 +1684,35 @@ function updateHitParticles(dt){
     roundOver = false;
     rollWind();
     try{ ensureWindHum(); }catch(e){}
+    // st must exist before buildTargets if we want deterministic initial balloons/shields, but minimal fix is to keep order and pin rand after.
+    // Create st with spawner fields before buildTargets would be ideal, so we create a temp st, build, then keep it.
+    // Simplified: create st first, then buildTargets can use rng().
+    st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup', spawnCooldown: 0, bossSpawned: false, bossRage: false, rand: null };
+    try{
+      // if a previous buildTargets (before st existed) stashed a pending seed, apply it
+      if(W._pending3DSeed && !st.rand){
+        var _pv=W._pending3DSeed; var _sv=0; for(var _pi2=0;_pi2<_pv.length;_pi2++) _sv=(_sv*31+_pv.charCodeAt(_pi2))>>>0;
+        st.rand = mulberry32(_sv);
+        W._pending3DSeed=null;
+      } else {
+        var _hash=W.location && W.location.hash||'';
+        var _m=_hash.match(/3d=([^&]+)/);
+        var _daily=_hash.match(/daily=([^&]+)/);
+        var _use=null;
+        if(_m) try{_use=decodeURIComponent(_m[1]);}catch(e){}
+        else if(_daily) _use=todayStr();
+        if(_use){
+          var _sv2=0; for(var _si2=0;_si2<_use.length;_si2++) _sv2=(_sv2*31+_use.charCodeAt(_si2))>>>0;
+          st.rand=mulberry32(_sv2);
+        }
+      }
+    }catch(e){}
     buildTargets();
     buildRain();
     buildBackgroundPlanes(pickBiome());
-    st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup' };
+    // ensure cooldown is reset after buildTargets (spawner starts fresh)
+    st.spawnCooldown = 0;
+    st.bossSpawned = false;
     drag = { active: false, sx: 0, sy: 0, dx: 0, dy: 0 };
     refreshHud();
     try{ var p=SAVE.current&&SAVE.current(); if(p && hud.best) { hud.best.textContent=p.highScore; hud.bestChip.style.display=''; } }catch(e){}
