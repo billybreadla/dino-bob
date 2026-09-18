@@ -80,8 +80,28 @@ function ensureWindHum(){ if(!K.WIND_ENABLED || Math.abs(windX)<0.4) { if(windGa
 var BIOMES = ['meadow','mountain','sunset_beach','starlight','underwater','moon_cave'];
 function pickBiome(){ return BIOMES[Math.floor(Math.random()*BIOMES.length)]; }
 function buildBackgroundPlanes(biome){
-  if(bgFar) scene.remove(bgFar); if(bgMid) scene.remove(bgMid);
-  bgFar=null; bgMid=null;
+  if(bgFar){
+    scene.remove(bgFar);
+    try{
+      if(bgFar.material){
+        if(bgFar.material.map) bgFar.material.map.dispose();
+        bgFar.material.dispose();
+      }
+      if(bgFar.geometry) bgFar.geometry.dispose();
+    }catch(e){}
+    bgFar=null;
+  }
+  if(bgMid){
+    scene.remove(bgMid);
+    try{
+      if(bgMid.material){
+        if(bgMid.material.map) bgMid.material.map.dispose();
+        bgMid.material.dispose();
+      }
+      if(bgMid.geometry) bgMid.geometry.dispose();
+    }catch(e){}
+    bgMid=null;
+  }
   if(!biome) biome = pickBiome();
   currentBiome = biome;
   if(scene && scene.fog){
@@ -358,12 +378,55 @@ scene.add(camera);
   }
 
   function buildTargets() {
-    targets.forEach(function (t) { scene.remove(t.obj); });
-    groundShadows.forEach(function(s){ scene.remove(s); });
+    function disposeHierarchy(obj){
+      if(!obj) return;
+      try{
+        obj.traverse(function(child){
+          if(child.geometry) try{ child.geometry.dispose(); }catch(e){}
+          if(child.material){
+            var mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(function(m){
+              if(m.map) try{ m.map.dispose(); }catch(e){}
+              try{ m.dispose(); }catch(e){}
+            });
+          }
+        });
+      }catch(e){}
+    }
+    targets.forEach(function (t) {
+      if(!t.obj) return;
+      var detached=[];
+      try{ t.obj.children.slice().forEach(function(ch){ if(ch.userData && ch.userData.isArrow) detached.push(ch); }); }catch(e){}
+      detached.forEach(function(ch){ try{ t.obj.remove(ch); scene.add(ch); }catch(e){} });
+      scene.remove(t.obj);
+      disposeHierarchy(t.obj);
+    });
+    targets = [];
+    groundShadows.forEach(function(s){
+      scene.remove(s);
+      try{
+        if(s.geometry) s.geometry.dispose();
+        if(s.material){
+          if(s.material.map) s.material.map.dispose();
+          s.material.dispose();
+        }
+      }catch(e){}
+    });
     groundShadows = [];
-    pickups.forEach(function (p) { scene.remove(p.obj); });
+    pickups.forEach(function (p) {
+      if(!p.obj) return;
+      scene.remove(p.obj);
+      disposeHierarchy(p.obj);
+    });
     pickups = [];
-    obstacles.forEach(function (o) { scene.remove(o.obj); });
+    obstacles.forEach(function (o) {
+      if(!o.obj) return;
+      var detached2=[];
+      try{ o.obj.children.slice().forEach(function(ch){ if(ch.userData && ch.userData.isArrow) detached2.push(ch); }); }catch(e){}
+      detached2.forEach(function(ch){ try{ o.obj.remove(ch); scene.add(ch); }catch(e){} });
+      scene.remove(o.obj);
+      disposeHierarchy(o.obj);
+    });
     obstacles = [];
     var hash = W.location && W.location.hash || '';
     var m = hash.match(/3d=([^&]+)/);
@@ -434,8 +497,11 @@ scene.add(camera);
     previewDots.visible = false;
     previewDots.frustumCulled = false;
     scene.add(previewDots);
-    // ribbon is the main trajectory guide — dots stay as fallback
-    previewRibbon = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+    // ribbon is the main trajectory guide — dots stay as fallback (pre-allocated to avoid per-frame alloc)
+    var ribbonGeo = new THREE.BufferGeometry();
+    ribbonGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(24*3), 3));
+    ribbonGeo.setDrawRange(0, 0);
+    previewRibbon = new THREE.Line(ribbonGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
     previewRibbon.visible = false;
     previewRibbon.frustumCulled = false;
     scene.add(previewRibbon);
@@ -496,7 +562,7 @@ scene.add(camera);
         mats.forEach(function (mat) {
           if (mat.metalness !== undefined) mat.metalness = Math.min(mat.metalness, 0.05);
           if (mat.roughness !== undefined) mat.roughness = 0.85;
-          if (mat.map) mat.map.encoding = THREE.sRGBEncoding;
+          if (mat.map) { if (THREE.SRGBColorSpace) mat.map.colorSpace = THREE.SRGBColorSpace; else mat.map.encoding = THREE.sRGBEncoding; }
           mat.needsUpdate = true;
         });
       });
@@ -537,7 +603,14 @@ scene.add(camera);
   }
 
   function buildRain(){
-    if(rainSystem) { scene.remove(rainSystem); rainSystem=null; }
+    if(rainSystem){
+      scene.remove(rainSystem);
+      try{
+        if(rainSystem.geometry) rainSystem.geometry.dispose();
+        if(rainSystem.material) rainSystem.material.dispose();
+      }catch(e){}
+      rainSystem=null;
+    }
     if(!K.WIND_ENABLED) return;
     if(Math.random()>0.4) return;
     var geo=new THREE.BufferGeometry();
@@ -695,7 +768,11 @@ function updateCoinParticles(dt){
   for(var i=coinParticles.length-1;i>=0;i--){
     var p=coinParticles[i];
     p.life-=dt;
-    if(p.life<=0){ scene.remove(p.obj); coinParticles.splice(i,1); continue; }
+    if(p.life<=0){
+      scene.remove(p.obj);
+      try{ if(p.obj.geometry) p.obj.geometry.dispose(); if(p.obj.material){ var ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material]; ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } }catch(e){}
+      coinParticles.splice(i,1); continue;
+    }
     var t=p.life/p.maxLife;
     if(p.life < 0.55){
       // home to HUD: lerp toward camera + up
@@ -751,7 +828,24 @@ function updateHitParticles(dt){
   for(var i=hitParticles.length-1;i>=0;i--){
     var p=hitParticles[i];
     p.life-=dt;
-    if(p.life<=0){ scene.remove(p.obj); hitParticles.splice(i,1); continue; }
+    if(p.life<=0){
+      scene.remove(p.obj);
+      try{
+        if(p.obj.geometry) p.obj.geometry.dispose();
+        if(p.obj.material){
+          var ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
+          ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} });
+        }
+        if(p.obj.traverse) p.obj.traverse(function(c){
+          if(c!==p.obj && c.geometry) try{c.geometry.dispose();}catch(e){}
+          if(c!==p.obj && c.material){
+            var ms2=Array.isArray(c.material)?c.material:[c.material];
+            ms2.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} });
+          }
+        });
+      }catch(e){}
+      hitParticles.splice(i,1); continue;
+    }
     var t=p.life/p.maxLife;
     if(p.isRing){
       var s=1 + (1-t)*2.2;
@@ -860,19 +954,21 @@ function updateHitParticles(dt){
       pos.setXYZ(i, x, y, z);
     }
     pos.needsUpdate = true;
-    // ribbon — 24 points along same physics arc (main guide)
+    // ribbon — 24 points along same physics arc (main guide) — reused buffer, zero alloc
     if (previewRibbon) {
       var rx = 0, ry = K.EYE_HEIGHT, rz = 0.6;
       var rvx = a.vx, rvy = a.vy, rvz = a.vz;
-      var pts = [];
+      var rPos = previewRibbon.geometry.attributes.position;
       for (var k = 0; k < 24; k++) {
         rvy -= K.GRAVITY * dt;
         rvx += windX * dt * 0.65;
         rx += rvx * dt; ry += rvy * dt; rz += rvz * dt;
         if (ry < 0.02) ry = 0.02;
-        pts.push(new THREE.Vector3(rx, ry, rz));
+        rPos.setXYZ(k, rx, ry, rz);
       }
-      previewRibbon.geometry.setFromPoints(pts);
+      rPos.needsUpdate = true;
+      previewRibbon.geometry.setDrawRange(0, 24);
+      previewRibbon.geometry.computeBoundingSphere();
       previewRibbon.visible = true;
       previewRibbon.material.opacity = 0.35 + a.power * 0.5;
       // ribbon is main guide — hide dots when ribbon is on
@@ -903,6 +999,7 @@ function updateHitParticles(dt){
     fletch.rotation.x = Math.PI / 2;
     fletch.position.z = 0.5;
     g.add(shaft); g.add(head); g.add(fletch);
+    g.userData.isArrow = true;
     return g;
   }
 
@@ -1028,7 +1125,15 @@ function updateHitParticles(dt){
       var ar = arrows[i];
       ar.life += dt;
       if (ar.stuck) {
-        if (ar.life > 6) { scene.remove(ar.obj); if(ar.trail) scene.remove(ar.trail); arrows.splice(i--, 1); }
+        if (ar.life > 6) {
+          if(ar.obj.parent) ar.obj.parent.remove(ar.obj); else scene.remove(ar.obj);
+          try{ ar.obj.traverse(function(c){ if(c.geometry) try{c.geometry.dispose();}catch(e){} if(c.material){ var ms=Array.isArray(c.material)?c.material:[c.material]; ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } }); }catch(e){}
+          if(ar.trail){
+            if(ar.trail.parent) ar.trail.parent.remove(ar.trail); else scene.remove(ar.trail);
+            try{ if(ar.trail.geometry) ar.trail.geometry.dispose(); if(ar.trail.material) ar.trail.material.dispose(); }catch(e){}
+          }
+          arrows.splice(i--, 1);
+        }
         else if(ar.trail) ar.trail.material.opacity=0;
         continue;
       }
@@ -1124,7 +1229,15 @@ function updateHitParticles(dt){
         say('MISS at ' + Math.round(-ar.z) + 'm');
         spawnDustPuff(ar.x, ar.z);
       }
-      if (ar.z < -120) { scene.remove(ar.obj); if(ar.trail) scene.remove(ar.trail); arrows.splice(i--, 1); continue; }
+      if (ar.z < -120) {
+        if(ar.obj.parent) ar.obj.parent.remove(ar.obj); else scene.remove(ar.obj);
+        try{ ar.obj.traverse(function(c){ if(c.geometry) try{c.geometry.dispose();}catch(e){} if(c.material){ var ms=Array.isArray(c.material)?c.material:[c.material]; ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } }); }catch(e){}
+        if(ar.trail){
+          if(ar.trail.parent) ar.trail.parent.remove(ar.trail); else scene.remove(ar.trail);
+          try{ if(ar.trail.geometry) ar.trail.geometry.dispose(); if(ar.trail.material) ar.trail.material.dispose(); }catch(e){}
+        }
+        arrows.splice(i--, 1); continue;
+      }
 
       ar.obj.position.set(ar.x, ar.y, ar.z);
       pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
@@ -1321,10 +1434,37 @@ function updateHitParticles(dt){
   }
 
   function reset() {
-    arrows.forEach(function (a) { if (a.obj.parent) a.obj.parent.remove(a.obj); if(a.trail) scene.remove(a.trail); });
+    arrows.forEach(function (a) {
+      if(a.obj.parent) a.obj.parent.remove(a.obj); else scene.remove(a.obj);
+      try{ a.obj.traverse(function(c){ if(c.geometry) try{c.geometry.dispose();}catch(e){} if(c.material){ var ms=Array.isArray(c.material)?c.material:[c.material]; ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } }); }catch(e){}
+      if(a.trail){
+        if(a.trail.parent) a.trail.parent.remove(a.trail); else scene.remove(a.trail);
+        try{ if(a.trail.geometry) a.trail.geometry.dispose(); if(a.trail.material) a.trail.material.dispose(); }catch(e){}
+      }
+    });
     arrows = [];
-    hitParticles.forEach(p=>scene.remove(p.obj)); hitParticles=[];
-    coinParticles.forEach(p=>scene.remove(p.obj)); coinParticles=[];
+    hitParticles.forEach(function(p){
+      scene.remove(p.obj);
+      try{
+        if(p.obj.geometry) p.obj.geometry.dispose();
+        if(p.obj.material){
+          var ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
+          ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} });
+        }
+        // also traverse if group
+        if(p.obj.traverse) p.obj.traverse(function(c){ if(c!==p.obj && c.geometry) try{c.geometry.dispose();}catch(e){} if(c!==p.obj && c.material){ var ms2=Array.isArray(c.material)?c.material:[c.material]; ms2.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} }); } });
+      }catch(e){}
+    }); hitParticles=[];
+    coinParticles.forEach(function(p){
+      scene.remove(p.obj);
+      try{
+        if(p.obj.geometry) p.obj.geometry.dispose();
+        if(p.obj.material){
+          var ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
+          ms.forEach(function(m){ if(m.map) try{m.map.dispose();}catch(e){} try{m.dispose();}catch(e){} });
+        }
+      }catch(e){}
+    }); coinParticles=[];
     roundOver = false;
     rollWind();
     try{ ensureWindHum(); }catch(e){}
@@ -1346,7 +1486,11 @@ function updateHitParticles(dt){
   function start() {
     // Without this, sRGB output washes every flat colour out to pastel.
     // With it, three converts our hex colours properly and the palette holds.
-    if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
+    // r160: ColorManagement.legacyMode -> ColorManagement.enabled (keep both for compat)
+    if (THREE.ColorManagement) {
+      if ('legacyMode' in THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
+      if ('enabled' in THREE.ColorManagement) THREE.ColorManagement.enabled = true;
+    }
     canvas = el('c3d');
     hud.score = el('hudScore'); hud.arrows = el('hudArrows'); hud.combo = el('hudCombo');
     hud.time = el('hudTime'); hud.phase = el('hudPhase');
@@ -1403,7 +1547,7 @@ function updateHitParticles(dt){
       say('Daily: '+todayStr());
     });
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.outputEncoding = THREE.sRGBEncoding;   // textured models need this or they look muddy
+    if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace; else renderer.outputEncoding = THREE.sRGBEncoding;   // textured models need this or they look muddy (r152+ uses outputColorSpace)
     clock = new THREE.Clock();
     buildScene();
     reset();

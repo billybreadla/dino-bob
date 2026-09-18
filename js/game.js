@@ -38,6 +38,20 @@ var GAME = (function () {
   var PHOTO_ZOOM_BTN = { x: W / 2 - 225, y: H - 98, w: 150, h: 64 };
   var PHOTO_EXIT_BTN = { x: W / 2 + 75, y: H - 98, w: 150, h: 64 };
   var PHOTO_SHUTTER = { x: W / 2, y: H - 66, r: 44 };
+  var resizeWired = false;
+  function resize2d() {
+    if (!canvas || !ctx) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var nw = Math.round(W * dpr);
+    var nh = Math.round(H * dpr);
+    if (canvas.width !== nw || canvas.height !== nh) {
+      canvas.width = nw;
+      canvas.height = nh;
+    }
+    // CSS size stays via #game-canvas { max-width:100%; max-height:100%; aspect-ratio:16/9 }.
+    // Backing store is dpr-scaled; the setTransform keeps all draws in 1600x900 logical coords.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 
   function requestFrame() {
     if (!raf && running && (!paused || photoMode)) raf = requestAnimationFrame(frame);
@@ -3907,6 +3921,7 @@ var GAME = (function () {
   }
 
   function render() {
+    resize2d();
     ctx.save();
     // one shake vector per frame, shared by every layer: the global translate
     // is the x1.0 baseline and depth layers add their own multiple on top
@@ -4465,11 +4480,13 @@ var GAME = (function () {
       canvas = canvasEl;
       ctx = canvas.getContext('2d');
       // Retina-sharp backing store; the dpr transform keeps every draw call in
-      // world space (1600×900), so gameplay/render code is untouched.
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // world space (1600x900), so gameplay/render code is untouched.
+      resize2d();
+      if (!resizeWired) {
+        resizeWired = true;
+        window.addEventListener('resize', resize2d);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', resize2d);
+      }
       onEnd = endCb;
       st = newRound(options);
       running = true;
