@@ -39,8 +39,9 @@ var GAME3D = (function () {
       MAGNET_RANGE: t.ARROW_3D_MAGNET_RANGE || 1.9,
       FOV_NARROW: t.ARROW_3D_FOV_NARROW || 38,
       CAM_SHAKE: t.ARROW_3D_CAM_SHAKE || 0.18,
-      BOW_ENABLED: (t.ARROW_3D_BOW_ENABLED !== false),
-      WIND_ENABLED: (t.ARROW_3D_WIND_ENABLED !== false),
+       BOW_ENABLED: (t.ARROW_3D_BOW_ENABLED !== false),
+       BOW_FADE: (t.ARROW_3D_BOW_FADE !== false),
+       WIND_ENABLED: (t.ARROW_3D_WIND_ENABLED !== false),
       WIND_MAX: t.ARROW_3D_WIND_MAX || 3.5,
       WIND_CHANCE: t.ARROW_3D_WIND_CHANCE || 0.6,
       SHADOW_ENABLED: (t.ARROW_3D_SHADOW_ENABLED !== false),
@@ -577,8 +578,8 @@ scene.add(camera);
   function buildBow() {
     bowMesh = new THREE.Group();
     bowMesh.position.set(0, K.EYE_HEIGHT - 0.15, 0.35);
-    var limbMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-    var gripMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+    var limbMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b, transparent:true, opacity:0.96 });
+    var gripMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a, transparent:true, opacity:0.96 });
     // upper limb — angled 12° outward
     var upper = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.65, 8), limbMat);
     upper.position.set(0, 0.325, 0);
@@ -592,10 +593,12 @@ scene.add(camera);
     // string — 3 points: top, nock, bottom (nock pulls back with power)
     var sg = new THREE.BufferGeometry();
     sg.setFromPoints([new THREE.Vector3(0, 0.6, 0), new THREE.Vector3(0, 0, 0.02), new THREE.Vector3(0, -0.6, 0)]);
-    bowString = new THREE.Line(sg, new THREE.LineBasicMaterial({ color: 0xeee8d5 }));
+    bowString = new THREE.Line(sg, new THREE.LineBasicMaterial({ color: 0xeee8d5, transparent:true, opacity:0.96 }));
     bowMesh.add(upper); bowMesh.add(lower); bowMesh.add(grip); bowMesh.add(bowString);
     bowMesh.visible = K.BOW_ENABLED;
     bowMesh.userData.punch = 0;
+    bowMesh.userData.mats = [limbMat, gripMat, bowString.material];
+    bowMesh.userData.fade = 0;
     scene.add(bowMesh);
   }
 
@@ -638,14 +641,29 @@ scene.add(camera);
     var denom2 = pullDenom();
     var lean = (drag && drag.active) ? -(drag.dx / denom2) * 0.12 : 0;
     bowMesh.position.x += (lean - bowMesh.position.x) * Math.min(1, dt * 8);
-    // scale punch decay (recoil snap)
+    // auto-fade when aiming so you can see the target (Solution 1)
+    var targetFade = 0;
+    if (K.BOW_FADE && drag && drag.active) {
+      targetFade = Math.max(0, Math.min(1, (power - 0.12) / 0.55)) * 0.88;
+    }
+    bowMesh.userData.fade += (targetFade - bowMesh.userData.fade) * Math.min(1, dt * 7);
+    var fade = bowMesh.userData.fade;
+    var mats = bowMesh.userData.mats;
+    if (mats) {
+      for (var mi = 0; mi < mats.length; mi++) {
+        mats[mi].opacity = 0.96 * (1 - fade);
+        mats[mi].depthWrite = fade < 0.5;
+      }
+    }
+    var fadeScale = 1 - fade * 0.28;
+    // scale punch decay (recoil snap) combined with fade shrink
     if (bowMesh.userData.punch) {
       bowMesh.userData.punch *= Math.max(0, 1 - dt * 10);
       if (bowMesh.userData.punch < 0.01) bowMesh.userData.punch = 0;
-      var s = 1 + bowMesh.userData.punch * 0.12;
+      var s = (1 + bowMesh.userData.punch * 0.12) * fadeScale;
       bowMesh.scale.set(s, s, s);
     } else {
-      bowMesh.scale.set(1, 1, 1);
+      bowMesh.scale.set(fadeScale, fadeScale, fadeScale);
     }
   }
 
