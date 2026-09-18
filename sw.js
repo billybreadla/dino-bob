@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v79-3d-audio';
+var CACHE = 'dinobob-v80-r160';
 var FILES = [
   '.',
   'index.html',
@@ -280,11 +280,15 @@ var FILES = [
   'assets/sprites/char_trixie_3d_0.webp', 'assets/sprites/char_trixie_3d_1.webp',
   'assets/sprites/char_trixie_3d_2.webp', 'assets/sprites/char_trixie_3d_3.webp',
   'assets/sprites/char_trixie_3d_4.webp', 'assets/sprites/char_trixie_3d_5.webp',
-  // 3D prototype
+  // 3D prototype — Three r160 (UMD + ES modules, offline via importmap)
   '3d.html',
   'js/game3d.js',
   'js/vendor/three.min.js',
+  'js/vendor/three.module.js',
   'js/vendor/GLTFLoader.js',
+  'js/vendor/GLTFLoader.module.js',
+  'js/vendor/loaders/GLTFLoader.js',
+  'js/vendor/utils/BufferGeometryUtils.js',
   'assets/models/pet_ptero.glb'
 ];
 

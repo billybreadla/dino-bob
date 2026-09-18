@@ -1,184 +1,72 @@
-/**
- * @license
- * Copyright 2010-2023 Three.js Authors
- * SPDX-License-Identifier: MIT
- * Three r160 GLTFLoader — UMD wrapper for dino-bob offline fallback
- * Generated from examples/jsm/loaders/GLTFLoader.js (r160)
- */
-(function(){
-if(typeof THREE==='undefined'){console.warn('THREE not loaded before GLTFLoader'); return;}
-const {
-  AnimationClip,
-  Bone,
-  Box3,
-  BufferAttribute,
-  BufferGeometry,
-  ClampToEdgeWrapping,
-  Color,
-  ColorManagement,
-  DirectionalLight,
-  DoubleSide,
-  FileLoader,
-  FrontSide,
-  Group,
-  ImageBitmapLoader,
-  InstancedMesh,
-  InterleavedBuffer,
-  InterleavedBufferAttribute,
-  Interpolant,
-  InterpolateDiscrete,
-  InterpolateLinear,
-  Line,
-  LineBasicMaterial,
-  LineLoop,
-  LineSegments,
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  LinearMipmapNearestFilter,
-  LinearSRGBColorSpace,
-  Loader,
-  LoaderUtils,
-  Material,
-  MathUtils,
-  Matrix4,
-  Mesh,
-  MeshBasicMaterial,
-  MeshPhysicalMaterial,
-  MeshStandardMaterial,
-  MirroredRepeatWrapping,
-  NearestFilter,
-  NearestMipmapLinearFilter,
-  NearestMipmapNearestFilter,
-  NumberKeyframeTrack,
-  Object3D,
-  OrthographicCamera,
-  PerspectiveCamera,
-  PointLight,
-  Points,
-  PointsMaterial,
-  PropertyBinding,
-  Quaternion,
-  QuaternionKeyframeTrack,
-  RepeatWrapping,
-  Skeleton,
-  SkinnedMesh,
-  Sphere,
-  SpotLight,
-  Texture,
-  TextureLoader,
-  TriangleFanDrawMode,
-  TriangleStripDrawMode,
-  Vector2,
-  Vector3,
-  VectorKeyframeTrack,
-  SRGBColorSpace,
-  InstancedBufferAttribute
-} = THREE;
-const TrianglesDrawMode = THREE.TrianglesDrawMode;
-function toTrianglesDrawMode( geometry, drawMode ) {
+import {
+	AnimationClip,
+	Bone,
+	Box3,
+	BufferAttribute,
+	BufferGeometry,
+	ClampToEdgeWrapping,
+	Color,
+	ColorManagement,
+	DirectionalLight,
+	DoubleSide,
+	FileLoader,
+	FrontSide,
+	Group,
+	ImageBitmapLoader,
+	InstancedMesh,
+	InterleavedBuffer,
+	InterleavedBufferAttribute,
+	Interpolant,
+	InterpolateDiscrete,
+	InterpolateLinear,
+	Line,
+	LineBasicMaterial,
+	LineLoop,
+	LineSegments,
+	LinearFilter,
+	LinearMipmapLinearFilter,
+	LinearMipmapNearestFilter,
+	LinearSRGBColorSpace,
+	Loader,
+	LoaderUtils,
+	Material,
+	MathUtils,
+	Matrix4,
+	Mesh,
+	MeshBasicMaterial,
+	MeshPhysicalMaterial,
+	MeshStandardMaterial,
+	MirroredRepeatWrapping,
+	NearestFilter,
+	NearestMipmapLinearFilter,
+	NearestMipmapNearestFilter,
+	NumberKeyframeTrack,
+	Object3D,
+	OrthographicCamera,
+	PerspectiveCamera,
+	PointLight,
+	Points,
+	PointsMaterial,
+	PropertyBinding,
+	Quaternion,
+	QuaternionKeyframeTrack,
+	RepeatWrapping,
+	Skeleton,
+	SkinnedMesh,
+	Sphere,
+	SpotLight,
+	Texture,
+	TextureLoader,
+	TriangleFanDrawMode,
+	TriangleStripDrawMode,
+	Vector2,
+	Vector3,
+	VectorKeyframeTrack,
+	SRGBColorSpace,
+	InstancedBufferAttribute
+} from 'three';
+import { toTrianglesDrawMode } from '../utils/BufferGeometryUtils.js';
 
-	if ( drawMode === TrianglesDrawMode ) {
-
-		console.warn( 'THREE.BufferGeometryUtils.toTrianglesDrawMode(): Geometry already defined as triangles.' );
-		return geometry;
-
-	}
-
-	if ( drawMode === TriangleFanDrawMode || drawMode === TriangleStripDrawMode ) {
-
-		let index = geometry.getIndex();
-
-		// generate index if not present
-
-		if ( index === null ) {
-
-			const indices = [];
-
-			const position = geometry.getAttribute( 'position' );
-
-			if ( position !== undefined ) {
-
-				for ( let i = 0; i < position.count; i ++ ) {
-
-					indices.push( i );
-
-				}
-
-				geometry.setIndex( indices );
-				index = geometry.getIndex();
-
-			} else {
-
-				console.error( 'THREE.BufferGeometryUtils.toTrianglesDrawMode(): Undefined position attribute. Processing not possible.' );
-				return geometry;
-
-			}
-
-		}
-
-		//
-
-		const numberOfTriangles = index.count - 2;
-		const newIndices = [];
-
-		if ( drawMode === TriangleFanDrawMode ) {
-
-			// gl.TRIANGLE_FAN
-
-			for ( let i = 1; i <= numberOfTriangles; i ++ ) {
-
-				newIndices.push( index.getX( 0 ) );
-				newIndices.push( index.getX( i ) );
-				newIndices.push( index.getX( i + 1 ) );
-
-			}
-
-		} else {
-
-			// gl.TRIANGLE_STRIP
-
-			for ( let i = 0; i < numberOfTriangles; i ++ ) {
-
-				if ( i % 2 === 0 ) {
-
-					newIndices.push( index.getX( i ) );
-					newIndices.push( index.getX( i + 1 ) );
-					newIndices.push( index.getX( i + 2 ) );
-
-				} else {
-
-					newIndices.push( index.getX( i + 2 ) );
-					newIndices.push( index.getX( i + 1 ) );
-					newIndices.push( index.getX( i ) );
-
-				}
-
-			}
-
-		}
-
-		if ( ( newIndices.length / 3 ) !== numberOfTriangles ) {
-
-			console.error( 'THREE.BufferGeometryUtils.toTrianglesDrawMode(): Unable to generate correct amount of triangles.' );
-
-		}
-
-		// build final geometry
-
-		const newGeometry = geometry.clone();
-		newGeometry.setIndex( newIndices );
-		newGeometry.clearGroups();
-
-		return newGeometry;
-
-	} else {
-
-		console.error( 'THREE.BufferGeometryUtils.toTrianglesDrawMode(): Unknown draw mode:', drawMode );
-		return geometry;
-
-	}
-
-}
 class GLTFLoader extends Loader {
 
 	constructor( manager ) {
@@ -4772,5 +4660,4 @@ function addPrimitiveAttributes( geometry, primitiveDef, parser ) {
 
 }
 
-THREE.GLTFLoader = GLTFLoader;
-})();
+export { GLTFLoader };
