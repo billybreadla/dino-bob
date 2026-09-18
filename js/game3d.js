@@ -66,7 +66,7 @@ var st = null, drag = null, raf = 0;
 var roundOver = false;
 var paused=false;
 var hud = {};
-var bgFar=null, bgMid=null; var currentBiome='meadow';
+var bgFar=null, bgMid=null; var horizonHaze=null; var currentBiome='meadow';
 
 function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
 function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
@@ -81,6 +81,15 @@ function buildBackgroundPlanes(biome){
   bgFar=null; bgMid=null;
   if(!biome) biome = pickBiome();
   currentBiome = biome;
+  if(scene && scene.fog){
+    scene.fog.near = biome==='starlight'||biome==='moon_cave' ? 22 : 26;
+    scene.fog.far = biome==='starlight'||biome==='moon_cave' ? 88 : 96;
+    if(scene.fog.color){
+      if(biome==='starlight') scene.fog.color.setHex(0x24314e);
+      else if(biome==='moon_cave') scene.fog.color.setHex(0x2a2a45);
+      else scene.fog.color.setHex(0x8ecfe8);
+    }
+  }
   var loader = new THREE.TextureLoader();
   // far plane — 240x135 at z -180
   var farUrl = 'assets/sprites/bg_'+biome+'_far.webp';
@@ -178,10 +187,10 @@ function onRoundEnd(){
     camera.position.set(0, K.EYE_HEIGHT, 2.2);
     camera.lookAt(0, K.EYE_HEIGHT - 0.05, -20);
 
-    var sun = new THREE.DirectionalLight(0xfff3d6, 1.15);
+    var sun = new THREE.DirectionalLight(0xfff1d0, 1.05);
     sun.position.set(-6, 12, 4);           // key light upper-left, same contract as the 2D art
     scene.add(sun);
-    scene.add(new THREE.HemisphereLight(0xbfe6ff, 0x4a7a3a, 0.75));
+    scene.add(new THREE.HemisphereLight(0xd6ecff, 0x6fae5a, 0.68));
 
 scene.add(camera);
 
@@ -200,6 +209,15 @@ scene.add(camera);
     grid.material.transparent = true;
     grid.position.y = 0.01;
     scene.add(grid);
+
+    // horizon haze — soft wash where ground meets sky, strongest depth cue after fog
+    var hazeGeo = new THREE.PlaneGeometry(240, 18);
+    var hazeMat = new THREE.MeshBasicMaterial({ color:0xc9ecfa, transparent:true, opacity:0.42, fog:false, side:THREE.DoubleSide });
+    var haze = new THREE.Mesh(hazeGeo, hazeMat);
+    haze.position.set(0, 7.2, -62);
+    haze.lookAt(0, 7.2, 0);
+    scene.add(haze);
+    horizonHaze = haze;
 
     buildScenery();
     buildTargets();

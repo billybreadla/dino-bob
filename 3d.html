@@ -5,37 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Dino Bob 3D — Prototype</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #8ecfe8;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
-  #c3d { display: block; width: 100vw; height: 100vh; touch-action: none; }
-
-  .hud { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 18px;
-    padding: 14px 18px; pointer-events: none; align-items: flex-start; }
-  .chip { background: rgba(20, 32, 44, 0.62); color: #fff; border-radius: 14px;
-    padding: 8px 14px; font-weight: 700; font-size: 20px; line-height: 1.1;
-    box-shadow: 0 3px 10px rgba(0,0,0,.25); }
-  .chip small { display: block; font-size: 11px; font-weight: 600; opacity: .75;
-    letter-spacing: .08em; text-transform: uppercase; }
-  #hudCombo { color: #ffcf3d; min-width: 0; }
-  .spacer { flex: 1; }
-
-  #hudMsg { position: fixed; left: 0; right: 0; top: 34%; text-align: center;
-    font-size: 34px; font-weight: 800; color: #fff; text-shadow: 0 3px 12px rgba(0,0,0,.55);
-    opacity: 0; transition: opacity .25s; pointer-events: none; }
-
-  #hint { position: fixed; left: 0; right: 0; bottom: 16px; text-align: center;
-    color: #fff; font-size: 15px; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,.5);
-    pointer-events: none; opacity: .9; }
-
-  #overPanel { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(12, 22, 32, .62); }
-  .card { background: #fffdf6; border-radius: 22px; padding: 26px 34px; text-align: center;
-    box-shadow: 0 14px 40px rgba(0,0,0,.35); }
-  .card h2 { margin: 0 0 6px; font-size: 26px; }
-  .card .big { font-size: 54px; font-weight: 800; color: #e8443a; line-height: 1; margin: 6px 0 14px; }
-  .card button { font: inherit; font-weight: 700; font-size: 18px; border: 0; cursor: pointer;
-    background: #e8443a; color: #fff; border-radius: 999px; padding: 12px 30px; }
-  .card a { display: block; margin-top: 12px; font-size: 14px; color: #6a7783; }
+  @import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap');
+  :root { --ink:#1a1822; --yellow:#ffd23a; --gold:#e8a91d; --green:#6cc24a; --panel:#242031; }
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--ink); font-family:'Nunito',sans-serif; -webkit-user-select:none; user-select:none; }
+  #c3d { display:block; width:100vw; height:100vh; touch-action:none; }
+  .hud { position:fixed; top:0; left:0; right:0; display:flex; gap:10px; padding:12px 14px; pointer-events:none; align-items:flex-start; flex-wrap:wrap; }
+  .chip { background:rgba(26,24,34,0.88); color:#fff; font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; padding:8px 14px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; border:3px solid rgba(255,255,255,0.12); box-shadow:0 4px 0 rgba(0,0,0,0.28); }
+  .chip small { display:block; font-family:'Nunito',sans-serif; font-size:10px; font-weight:800; opacity:.7; letter-spacing:.09em; text-transform:uppercase; line-height:1; }
+  .chip button, button.chip { pointer-events:auto; cursor:pointer; font-family:'Lilita One',sans-serif; font-size:14px; letter-spacing:0.5px; border:3px solid rgba(255,255,255,0.18); }
+  #hudCombo { color:var(--yellow); min-width:0; font-family:'Lilita One',sans-serif; font-size:18px; }
+  #hudCombo:empty{ display:none; }
+  #hudPhase { background:linear-gradient(180deg, var(--yellow), var(--gold)); color:var(--ink); border-color:rgba(255,255,255,0.5); box-shadow:0 3px 0 #b07f12; font-family:'Lilita One',sans-serif; letter-spacing:0.5px; }
+  #hudPhase:empty{ display:none; }
+  .spacer{ flex:1; }
+  #hudMsg { position:fixed; left:0; right:0; top:34%; text-align:center; font-family:'Lilita One',sans-serif; font-size:34px; font-weight:400; color:#fff; text-shadow:0 3px 0 rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.35); opacity:0; transition:opacity .25s; pointer-events:none; }
+  #hudMsg[style*="opacity: 1"]{ text-shadow:0 3px 0 rgba(0,0,0,0.35), 0 0 18px rgba(255,210,58,0.6); }
+  #hint { position:fixed; left:0; right:0; bottom:16px; text-align:center; color:rgba(255,255,255,0.9); font-family:'Nunito',sans-serif; font-weight:800; font-size:13px; text-shadow:0 2px 0 rgba(0,0,0,0.35); pointer-events:none; opacity:.92; }
+  #overPanel{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.66); backdrop-filter:blur(4px); }
+  .card{ background:var(--panel); border:3px solid #2e2940; border-radius:26px; padding:26px 28px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(255,255,255,0.06); }
+  .card h2{ margin:0 0 6px; font-family:'Lilita One',sans-serif; font-size:26px; color:#fff; letter-spacing:0.5px; }
+  .card .big{ font-family:'Lilita One',sans-serif; font-size:54px; color:var(--yellow); text-shadow:0 4px 0 #b07f12; line-height:1; margin:6px 0 14px; }
+  .card button{ font-family:'Lilita One',sans-serif; font-size:18px; letter-spacing:0.5px; border:0; cursor:pointer; background:#e85f5f; color:#fff; border-radius:999px; padding:12px 28px; box-shadow:0 4px 0 #b54040; text-shadow:0 2px 0 rgba(0,0,0,0.25); }
+  .card a{ display:block; margin-top:12px; font-size:13px; font-weight:800; color:rgba(255,255,255,0.6); text-decoration:none; }
+  #pausePanel{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.62); backdrop-filter:blur(4px); z-index:20; }
+  #pausePanel .card{ border-color:rgba(255,210,58,0.25); }
+  .chip[style*="255,60,40"]{ background:linear-gradient(180deg,#ff8a3a,#e23b3b)!important; border-color:#ffe27a; box-shadow:0 3px 0 #9a2a1a; }
 </style>
 </head>
 <body>
