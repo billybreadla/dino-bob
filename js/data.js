@@ -48,6 +48,9 @@ var DATA = {
     }
   ],
 
+  // Arrow physics — gravityFactor & speedFactor are MULTIPLIERS:
+  // 2D: gravityFactor × 1500 px/s² (GRAVITY in game.js), speedFactor × (650+power*1450)
+  // 3D: same factors × 9.8 m/s² (ARROW_3D_GRAVITY) and × (26+power*26 m/s) — Penny tunes once, both worlds feel it.
   arrows: [
     {
       id: 'wooden', name: 'Wooden Arrow', price: 0,

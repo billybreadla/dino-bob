@@ -80,12 +80,12 @@
      model off disk, so the pet falls back to a simple shape. To see the real
      3D model, run this from the repo root:   python3 -m http.server 8769
      then open  http://127.0.0.1:8769/3d.html -->
-<!-- Three r160 ES modules (offline via sw.js cache) — importmap shim for browsers with native support; falls through to UMD if needed -->
+<!-- Three r160 — UMD loads synchronously so classic game3d.js always sees window.THREE.
+     ES modules are cached via sw.js for future tree-shaking, but not required for boot. -->
+<script src="js/vendor/three.min.js"></script>
+<script src="js/vendor/GLTFLoader.js"></script>
 <script type="importmap">{"imports":{"three":"./js/vendor/three.module.js","three/addons/":"./js/vendor/"}}</script>
-<script type="module">import * as THREE_NS from 'three'; import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'; window.THREE = {...THREE_NS, GLTFLoader};</script>
-<!-- UMD r160 fallback for file:// double-click (no importmap/fetch on file:) -->
-<script src="js/vendor/three.min.js" nomodule></script>
-<script src="js/vendor/GLTFLoader.js" nomodule></script>
+<script type="module">import * as THREE_NS from 'three'; import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'; if(!window.THREE.GLTFLoader) window.THREE.GLTFLoader=GLTFLoader;</script>
 <script src="js/tuning.js"></script>
 <script src="js/data.js"></script>
 <script src="js/save.js"></script>

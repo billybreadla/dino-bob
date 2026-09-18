@@ -101,14 +101,19 @@ var SAVE = (function () {
   }
 
   /* ----- daily quests ----- */
+  // YYYY-MM-DD zero-padded so daily seed is identical in 2D and 3D (and matches Save dailyBest).
   function todayStr() {
     var d = new Date();
-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
   }
   function yesterdayStr() {
     var d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
   }
   // Touch the daily streak once per calendar day. Consecutive days increment;
   // a missed day resets to 1. Returns {count, bonus, firstToday} so UI can toast.

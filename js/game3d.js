@@ -138,8 +138,10 @@ function buildBackgroundPlanes(biome){
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function pullDenom() { return Math.min(W.innerWidth, W.innerHeight) * K.PULL_FRACTION; }
   function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable
-  function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
-  function mulberry32(seed){ return function(){ var t=seed+=0x6D2B79F5; t=Math.imul(t ^ t>>>15, t | 1); t^=t + Math.imul(t ^ t>>>7, t | 61); return ((t ^ t>>>14)>>>0)/4294967296; }; }
+  // Zero-padded YYYY-MM-DD so 2D (SAVE.todayStr) and 3D share identical daily seeds.
+  function todayStr(){ var d=new Date(); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; }
+  // Identical to GAME mulberry32 in js/game.js:76 — keep in sync so a seeded daily layout is byte-identical.
+  function mulberry32(seed){ var t=seed>>>0; return function(){ t=(t+0x6D2B79F5)|0; var z=t; z=Math.imul(z ^ z>>>15, z|1); z^=z + Math.imul(z ^ z>>>7, z|61); return ((z ^ z>>>14)>>>0)/4294967296; }; }
   function seededTargets(seedStr){
     var seed=0; for(var i=0;i<seedStr.length;i++) seed=(seed*31+seedStr.charCodeAt(i))>>>0;
     var rnd=mulberry32(seed);
@@ -224,14 +226,9 @@ scene.add(camera);
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
-
-    // A faint grid is the cheapest depth ruler there is: it tells your eye
-    // how far away everything is before you have thrown a single arrow.
-    var grid = new THREE.GridHelper(240, 120, 0x5c9444, 0x5c9444);
-    grid.material.opacity = 0.28;
-    grid.material.transparent = true;
-    grid.position.y = 0.01;
-    scene.add(grid);
+    // Depth ruler is now the distance posts every 10m (plus fog + horizon haze)
+    // — grid removed: 120 divisions = 240 line segments per frame, heavy on mobile
+    // and reads as debug graph paper, not toy-box meadow.
 
     // horizon haze — soft wash where ground meets sky, strongest depth cue after fog
     var hazeGeo = new THREE.PlaneGeometry(240, 18);

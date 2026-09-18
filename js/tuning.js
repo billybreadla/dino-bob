@@ -49,7 +49,9 @@ var TUNING = {
   // ---------- WIND ----------
   // Sometimes the round gets a breeze! Wind pushes arrows sideways while
   // they fly. Watch the little flag at the top of the screen.
-  WIND_MAX: 55,            // strongest push (px/s^2) ≈ 10-15% of arrow speed over a flight
+  // UNITS: 2D world is pixels (1600×900), 3D world is metres (1 unit = 1 m).
+  // These two numbers are the SAME wind, just in different ruler units.
+  WIND_MAX: 55,            // 2D wind: strongest push (px/s²) ≈ 10-15% of arrow speed
   WIND_CHANCE: 0.6,        // chance a round is windy (0.6 = 60% of rounds). Rest are calm.
   WIND_MIN_SHOW: 4,        // a whisper of wind smaller than this shows no flag
 
@@ -175,9 +177,10 @@ var TUNING = {
   // ---------- 3D PROTOTYPE (graduating) ----------
   // These tune the 3D prototype in 3d.html. Same idea as the rest of this file:
   // change a number, save, refresh.
+  // UNITS: 3D world is metres — 1 unit = 1 m.  Gravity 9.8 m/s² = Earth, so arrows arc like real life.
   ARROW_3D_SPEED_MIN: 26,
   ARROW_3D_SPEED_MAX: 52,
-  ARROW_3D_GRAVITY: 9.8,
+  ARROW_3D_GRAVITY: 9.8,        // 3D gravity (m/s²) — keep 9.8 so floaty/ice arrows feel right
   ARROW_3D_MAX_YAW: 0.55,      // radians left/right you can aim (0.55 ≈ 31° — was tunnel-vision 17°)
   ARROW_3D_MAX_PITCH: 0.52,    // radians up you can aim (0.52 ≈ 30°)
   ARROWS_3D: 20,
@@ -196,9 +199,10 @@ var TUNING = {
   ARROW_3D_CAM_SHAKE: 0.18,        // camera kick on fire
   ARROW_3D_BOW_ENABLED: true,      // show bow mesh
   // World feel — wind pushes arrows, ground shows depth
+  // 3D wind uses metres per second (m/s) — same feel as WIND_MAX above, just a different ruler.
   ARROW_3D_WIND_ENABLED: true,
-  ARROW_3D_WIND_MAX: 3.5,        // max sideways push (m/s drift over flight)
-  ARROW_3D_WIND_CHANCE: 0.6,     // 60% of rounds are windy
+  ARROW_3D_WIND_MAX: 3.5,        // 3D wind: max sideways drift (m/s) — matches WIND_MAX in feel
+  ARROW_3D_WIND_CHANCE: 0.6,     // 60% of rounds are windy (keep same as WIND_CHANCE)
   ARROW_3D_SHADOW_ENABLED: true,
   ARROW_3D_PARALLAX: 0.35,        // extra shake on foreground vs background
   ARROW_3D_PARTICLES: true,     // hit sparkles + dust puffs
