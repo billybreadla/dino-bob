@@ -740,15 +740,31 @@ scene.add(camera);
       // tell three the textures are sRGB, or every bought/generated model
       // will look like a burnt lump. This is the 3D version of the lighting
       // contract the 2D art already has to obey.
+      // Matte clay: Rough 0.78 Metal 0 Spec 0.12 — not shiny plastic. Same as 2D storybook.
       m.traverse(function (o) {
         if (!o.isMesh || !o.material) return;
         var mats = Array.isArray(o.material) ? o.material : [o.material];
         mats.forEach(function (mat) {
-          if (mat.metalness !== undefined) mat.metalness = Math.min(mat.metalness, 0.05);
-          if (mat.roughness !== undefined) mat.roughness = 0.85;
+          if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+            mat.metalness = 0.0;
+            mat.roughness = 0.78;
+            if (mat.clearcoat !== undefined) mat.clearcoat = 0.04;
+            if (mat.clearcoatRoughness !== undefined) mat.clearcoatRoughness = 0.35;
+            if (mat.specularIntensity !== undefined) mat.specularIntensity = 0.12;
+          } else {
+            if (mat.metalness !== undefined) mat.metalness = Math.min(mat.metalness, 0.05);
+            if (mat.roughness !== undefined) mat.roughness = 0.85;
+          }
+          // Vertex colors already carry painted palette — keep them, don't tint.
+          if (mat.vertexColors === false && o.geometry && o.geometry.attributes.color) mat.vertexColors = true;
           if (mat.map) { if (THREE.SRGBColorSpace) mat.map.colorSpace = THREE.SRGBColorSpace; else mat.map.encoding = THREE.sRGBEncoding; }
           mat.needsUpdate = true;
         });
+        // Bevel feel: smooth normals (retopo already shade_smooth) + no flat shading.
+        if (o.geometry) {
+          if (o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+          o.geometry.computeBoundingSphere();
+        }
       });
       fitAndPlace(m);
       holder.add(m);
