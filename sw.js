@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v78-3d-coins-float';
+var CACHE = 'dinobob-v79-3d-audio';
 var FILES = [
   '.',
   'index.html',

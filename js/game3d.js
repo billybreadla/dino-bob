@@ -59,6 +59,7 @@ var pickups = [], obstacles = [];
 var bowMesh = null, bowString = null;
 var camShake = 0; var baseFov = 46;
 var windX = 0; var windFlag = null; var windFlagMesh = null;
+var windOsc=null, windGain=null;
 var sceneryGroup = null;
 var groundShadows = [];
 var rainSystem = null;
@@ -75,6 +76,7 @@ var coinParticles = []; // {obj, vel, life, targetY}
 
   function rollWind(){ if(!K.WIND_ENABLED || Math.random()>K.WIND_CHANCE){ windX=0; return; } var s=Math.random()<0.5?1:-1; var r=Math.pow(Math.random(),3); windX = s * r * K.WIND_MAX; }
   function applyWind(vx, dt){ return vx + windX * dt * 0.9; }
+function ensureWindHum(){ if(!K.WIND_ENABLED || Math.abs(windX)<0.4) { if(windGain) try{windGain.gain.linearRampToValueAtTime(0, (typeof AUDIO!=='undefined'&&AUDIO.ctx)?AUDIO.ctx.currentTime+0.4:0);}catch(e){} return; } try{ if(typeof AUDIO==='undefined' || !AUDIO || !AUDIO.ctx) return; if(!windOsc){ windGain=AUDIO.ctx.createGain(); windGain.gain.value=0; windGain.connect(AUDIO.master||AUDIO.ctx.destination); windOsc=AUDIO.ctx.createOscillator(); windOsc.type='sawtooth'; windOsc.frequency.value=38; windOsc.connect(windGain); windOsc.start(); } var vol=Math.min(0.08, Math.abs(windX)*0.018); windGain.gain.linearRampToValueAtTime(vol, AUDIO.ctx.currentTime+0.6); windOsc.frequency.linearRampToValueAtTime(38+Math.abs(windX)*4, AUDIO.ctx.currentTime+0.6); }catch(e){} }
 var BIOMES = ['meadow','mountain','sunset_beach','starlight','underwater','moon_cave'];
 function pickBiome(){ return BIOMES[Math.floor(Math.random()*BIOMES.length)]; }
 function buildBackgroundPlanes(biome){
@@ -948,6 +950,7 @@ function updateHitParticles(dt){
       if (t.mover) { pts *= (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2; why += ' MOVING x2'; }
       if (-t.z > K.FAR_BONUS_METRES) { pts *= (W.TUNING && TUNING.FAR_TARGET_MULTIPLIER) || 2; why += ' FAR x2'; }
       if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye();
+      if(W.AUDIO && AUDIO.zap && -t.z>34) try{AUDIO.zap();}catch(e){}
       if (pet) pet.cheer = 1.1;
       say('BULLSEYE! +' + pts + why);
       spawnBullseyeParticles(t.obj.position.x, t.obj.position.y, t.z+0.08, t.r);
@@ -1104,7 +1107,7 @@ function updateHitParticles(dt){
         var popMsg = 'POP! +' + balloonPts;
         if (comboMultB > 1) popMsg += ' x' + comboMultB;
         say(popMsg);
-        if (W.AUDIO && AUDIO.pop) AUDIO.pop();
+        if (W.AUDIO && AUDIO.pop) { try{ AUDIO.pop(); if(-pp.z>30 && AUDIO.zap) AUDIO.zap(); }catch(e){} }
         else if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
         st.combo++;
         if (pet) pet.cheer = 0.8;
@@ -1173,6 +1176,7 @@ function updateHitParticles(dt){
         }
       } else windFlag.visible=false;
     }
+    if(Math.random()<0.02) try{ ensureWindHum(); }catch(e){}
     // lightweight weather — rain falls and drifts with wind
     if(rainSystem){
       var rainPos=rainSystem.geometry.attributes.position;
@@ -1323,6 +1327,7 @@ function updateHitParticles(dt){
     coinParticles.forEach(p=>scene.remove(p.obj)); coinParticles=[];
     roundOver = false;
     rollWind();
+    try{ ensureWindHum(); }catch(e){}
     buildTargets();
     buildRain();
     buildBackgroundPlanes(pickBiome());
