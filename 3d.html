@@ -30,10 +30,12 @@
   #pausePanel{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.62); backdrop-filter:blur(4px); z-index:20; }
   #pausePanel .card{ border-color:rgba(255,210,58,0.25); }
   .chip[style*="255,60,40"]{ background:linear-gradient(180deg,#ff8a3a,#e23b3b)!important; border-color:#ffe27a; box-shadow:0 3px 0 #9a2a1a; }
+#vignette{ position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 68%, rgba(26,24,34,0.38) 100%); }
 </style>
 </head>
 <body>
 <canvas id="c3d"></canvas>
+<div id="vignette"></div>
 
 <div class="hud">
   <div class="chip"><small>Score</small><span id="hudScore">0</span></div>

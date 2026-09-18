@@ -279,6 +279,7 @@ scene.add(camera);
       var p = new THREE.Mesh(postGeo, postMat);
       p.position.set(-3.4, 0.5, -d);
       g.add(p);
+      var canvasD=document.createElement('canvas'); canvasD.width=128; canvasD.height=64; var ctxD=canvasD.getContext('2d'); ctxD.fillStyle='rgba(26,24,34,0.92)'; if(ctxD.roundRect){ ctxD.beginPath(); ctxD.roundRect(6,12,116,40,14); ctxD.fill(); } else ctxD.fillRect(6,12,116,40); ctxD.strokeStyle='rgba(255,255,255,0.18)'; ctxD.lineWidth=3; ctxD.stroke(); ctxD.fillStyle='#ffd23a'; ctxD.font='900 24px Lilita One, Nunito, sans-serif'; ctxD.textAlign='center'; ctxD.textBaseline='middle'; ctxD.fillText(d+'m',64,34); var tex=new THREE.CanvasTexture(canvasD); if(THREE.SRGBColorSpace) tex.colorSpace=THREE.SRGBColorSpace; else tex.encoding=THREE.sRGBEncoding; var label=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.45), new THREE.MeshBasicMaterial({map:tex, transparent:true, fog:false})); label.position.set(-3.4,1.55,-d); label.lookAt(0,1.55,0); g.add(label);
     }
     scene.add(g);
     sceneryGroup = g;
@@ -826,11 +827,14 @@ function updateHitParticles(dt){
     var mesh = makeArrowMesh();
     mesh.position.set(0, K.EYE_HEIGHT, 0.6);
     scene.add(mesh);
-    arrows.push({ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0 });
+    var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0 };
+    arrows.push(ar);
+    var trailGeo=new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12*3),3)); var trail=new THREE.Points(trailGeo, new THREE.PointsMaterial({color:0xffffff, size:0.12, transparent:true, opacity:0.65, sizeAttenuation:true})); scene.add(trail); ar.trail=trail; ar.trailPos=[];
     if (W.AUDIO && AUDIO.shoot) AUDIO.shoot();
     camShake = K.CAM_SHAKE;
     if (navigator.vibrate) navigator.vibrate(10);
     if (bowMesh) bowMesh.userData.punch = 1;
+    var flash=new THREE.Mesh(new THREE.CircleGeometry(0.22,12), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.85, side:THREE.DoubleSide})); flash.position.set(0, K.EYE_HEIGHT, 0.35+0.22); flash.lookAt(camera.position); scene.add(flash); setTimeout(function(){ scene.remove(flash); }, 90);
     refreshHud();
   }
 
@@ -932,13 +936,15 @@ function updateHitParticles(dt){
       var ar = arrows[i];
       ar.life += dt;
       if (ar.stuck) {
-        if (ar.life > 6) { scene.remove(ar.obj); arrows.splice(i--, 1); }
+        if (ar.life > 6) { scene.remove(ar.obj); if(ar.trail) scene.remove(ar.trail); arrows.splice(i--, 1); }
+        else if(ar.trail) ar.trail.material.opacity=0;
         continue;
       }
       var px = ar.x, py = ar.y, pz = ar.z;
       ar.vy -= K.GRAVITY * dt;
       ar.vx += windX * dt * 0.65;
       ar.x += ar.vx * dt; ar.y += ar.vy * dt; ar.z += ar.vz * dt;
+      if(ar.trail && ar.trailPos){ ar.trailPos.unshift({x:ar.x,y:ar.y,z:ar.z}); if(ar.trailPos.length>12) ar.trailPos.pop(); var pos=ar.trail.geometry.attributes.position; for(var ti=0;ti<12;ti++){ if(ti<ar.trailPos.length) pos.setXYZ(ti, ar.trailPos[ti].x, ar.trailPos[ti].y, ar.trailPos[ti].z); else pos.setXYZ(ti, ar.x,ar.y,ar.z); } pos.needsUpdate=true; ar.trail.material.opacity = ar.stuck?0:0.65; }
 
       var _blocked = false;
       for (var k = 0; k < obstacles.length; k++) {
@@ -950,7 +956,7 @@ function updateHitParticles(dt){
         var hxO = px + (ar.x - px) * uo - ob.obj.position.x;
         var hyO = py + (ar.y - py) * uo - ob.obj.position.y;
         if (Math.sqrt(hxO * hxO + hyO * hyO) > 0.52) continue;
-        ar.stuck = true; ar.life = 0;
+        ar.stuck = true; ar.life = 0; if(ar.trail) ar.trail.material.opacity=0;
         ar.obj.position.set(ob.obj.position.x + hxO, ob.obj.position.y + hyO, oz + 0.08);
         pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
         ob.obj.add(ar.obj);
@@ -975,7 +981,7 @@ function updateHitParticles(dt){
         var hx = px + (ar.x - px) * u - t.obj.position.x;
         var hy = py + (ar.y - py) * u - t.obj.position.y;
         if (Math.sqrt(hx * hx + hy * hy) > t.r) continue;     // missed the disc
-        ar.stuck = true; ar.life = 0;
+        ar.stuck = true; ar.life = 0; if(ar.trail) ar.trail.material.opacity=0;
         ar.obj.position.set(t.obj.position.x + hx, t.obj.position.y + hy, t.z + 0.08);
         pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
         t.obj.add(ar.obj);                                    // ride along if it moves
@@ -1018,12 +1024,13 @@ function updateHitParticles(dt){
 
       if (ar.y <= 0.05) {                                     // stuck in the dirt
         ar.y = 0.05; ar.stuck = true; ar.life = 0;
+        if(ar.trail) ar.trail.material.opacity=0;
         st.combo = 0;
         if (W.AUDIO && AUDIO.snap) AUDIO.snap();
         say('MISS at ' + Math.round(-ar.z) + 'm');
         spawnDustPuff(ar.x, ar.z);
       }
-      if (ar.z < -120) { scene.remove(ar.obj); arrows.splice(i--, 1); continue; }
+      if (ar.z < -120) { scene.remove(ar.obj); if(ar.trail) scene.remove(ar.trail); arrows.splice(i--, 1); continue; }
 
       ar.obj.position.set(ar.x, ar.y, ar.z);
       pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
@@ -1218,7 +1225,7 @@ function updateHitParticles(dt){
   }
 
   function reset() {
-    arrows.forEach(function (a) { if (a.obj.parent) a.obj.parent.remove(a.obj); });
+    arrows.forEach(function (a) { if (a.obj.parent) a.obj.parent.remove(a.obj); if(a.trail) scene.remove(a.trail); });
     arrows = [];
     hitParticles.forEach(p=>scene.remove(p.obj)); hitParticles=[];
     roundOver = false;
