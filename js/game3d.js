@@ -382,7 +382,54 @@ scene.add(camera);
     var sh = new THREE.Mesh(new THREE.CircleGeometry(0.52, 12), new THREE.MeshLambertMaterial({ color: 0x8b5a2b, side: THREE.DoubleSide }));
     sh.position.set(target.obj.position.x + 0.9, target.obj.position.y, target.obj.position.z + 0.35);
     scene.add(sh);
-    return { obj: sh, host: target, angle: rng() * 6.28, orbitR: 0.95 };
+    return { obj: sh, kind: 'shield', host: target, angle: rng() * 6.28, orbitR: 0.95, dead: false };
+  }
+  function makeWall3D(){
+    var h = (W.TUNING && TUNING.WALL_HEIGHT ? TUNING.WALL_HEIGHT * 0.01 : 2.1);
+    var w = (W.TUNING && TUNING.WALL_WIDTH ? TUNING.WALL_WIDTH * 0.01 + 0.02 : 0.42);
+    if(h < 1.8) h = 1.8; if(h > 2.4) h = 2.4;
+    if(w < 0.30) w = 0.30; if(w > 0.60) w = 0.60;
+    var len = 6 + rng() * 4;
+    var x = (rng() - 0.5) * 3;
+    var z = -18 - rng() * 28;
+    var y = h / 2 + 0.02;
+    var geo = new THREE.BoxGeometry(len, h, w);
+    var mat = new THREE.MeshLambertMaterial({ color: 0x8a7a65 });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    try{
+      var edgeGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-len/2, h/2+0.01, 0), new THREE.Vector3(len/2, h/2+0.01, 0)]);
+      var edgeMat = new THREE.LineBasicMaterial({ color: 0xf0e2c0, transparent: true, opacity: 0.55 });
+      var edge = new THREE.Line(edgeGeo, edgeMat);
+      mesh.add(edge);
+    }catch(e){}
+    return { obj: mesh, kind: 'wall', x: x, y: y, z: z, w: len, h: h, d: w, dead: false };
+  }
+  function segBox(x1, y1, z1, x2, y2, z2, box){
+    var hw = box.w / 2, hh = box.h / 2, hd = box.d / 2;
+    var minX = box.x - hw, maxX = box.x + hw;
+    var minY = box.y - hh, maxY = box.y + hh;
+    var minZ = box.z - hd, maxZ = box.z + hd;
+    for(var i=0;i<=10;i++){
+      var u = i/10;
+      var px = x1 + (x2 - x1) * u;
+      var py = y1 + (y2 - y1) * u;
+      var pz = z1 + (z2 - z1) * u;
+      if(px >= minX && px <= maxX && py >= minY && py <= maxY && pz >= minZ && pz <= maxZ) return { x: px, y: py, z: pz, u: u };
+    }
+    return null;
+  }
+  function hitObstacle3D(ox, oy, oz, nx, ny, nz, ob){
+    if(ob.kind === 'wall') return segBox(ox, oy, oz, nx, ny, nz, ob);
+    var ozPos = ob.obj.position.z;
+    if((oz > ozPos) === (nz > ozPos)) return null;
+    var u = (ozPos - oz) / (nz - oz || 1e-6);
+    var hx = ox + (nx - ox) * u - ob.obj.position.x;
+    var hy = oy + (ny - oy) * u - ob.obj.position.y;
+    var r = 0.52;
+    try{ var sz = (W.TUNING && TUNING.OBSTACLE_SHIELD_SIZE); if(sz) r = sz * 0.015; if(r < 0.48) r = 0.52; }catch(e){}
+    if(Math.sqrt(hx*hx + hy*hy) > r) return null;
+    return { x: ob.obj.position.x + hx, y: ob.obj.position.y + hy, z: ozPos + 0.08, hx: hx, hy: hy, u: u };
   }
   function makeFruit3D(){
     var kinds = (W.TUNING && TUNING.FRUIT_VALUES) ? Object.keys(TUNING.FRUIT_VALUES) : ['cherry'];
@@ -608,11 +655,17 @@ scene.add(camera);
       if(balloons<1 && roll<0.4){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=2.5; }
       else st.spawnCooldown=1;
     } else if(ph===2){
-      if(balloons<2 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.6; }
+      var walls = obstacles.filter(function(o){ return o.kind==='wall' && !o.dead; }).length;
+      var wallChance = (W.TUNING && TUNING.WALL_CHANCE) || 0.22;
+      if(walls<1 && roll < wallChance){ obstacles.push(makeWall3D()); st.spawnCooldown=2.8; }
+      else if(balloons<2 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.6; }
       else if(roll<0.55){ pickups.push(makeFruit3D()); st.spawnCooldown=2.2; }
       else st.spawnCooldown=0.9;
     } else {
-      if(balloons<3 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.0; }
+      var walls3 = obstacles.filter(function(o){ return o.kind==='wall' && !o.dead; }).length;
+      var wallChance3 = (W.TUNING && TUNING.WALL_CHANCE) || 0.22;
+      if(walls3<2 && roll < wallChance3*1.2){ obstacles.push(makeWall3D()); st.spawnCooldown=2.0; }
+      else if(balloons<3 && roll<0.35){ pickups.push(makeBalloon((rng()-0.5)*6, -18 - rng()*30)); st.spawnCooldown=1.0; }
       else if(roll<0.65){ pickups.push(makeFruit3D()); st.spawnCooldown=1.2; }
       else st.spawnCooldown=0.6;
     }
@@ -774,10 +827,10 @@ scene.add(camera);
     var denom2 = pullDenom();
     var lean = (drag && drag.active) ? -(drag.dx / denom2) * 0.12 : 0;
     bowMesh.position.x += (lean - bowMesh.position.x) * Math.min(1, dt * 8);
-    // auto-fade when aiming so you can see the target — fades early so you don't need to over-pull
+    // auto-fade when aiming so you can see the target — fades very early so you don't need to over-pull
     var targetFade = 0;
     if (K.BOW_FADE && drag && drag.active) {
-      targetFade = Math.max(0, Math.min(1, (power - 0.04) / 0.22)) * 0.92;
+      targetFade = Math.max(0, Math.min(1, (power - 0.02) / 0.16)) * 0.96;
     }
     bowMesh.userData.fade += (targetFade - bowMesh.userData.fade) * Math.min(1, dt * 7);
     var fade = bowMesh.userData.fade;
@@ -788,7 +841,7 @@ scene.add(camera);
         mats[mi].depthWrite = fade < 0.5;
       }
     }
-    var fadeScale = 1 - fade * 0.28;
+    var fadeScale = 1 - fade * 0.38;
     // scale punch decay (recoil snap) combined with fade shrink
     if (bowMesh.userData.punch) {
       bowMesh.userData.punch *= Math.max(0, 1 - dt * 10);
@@ -1043,7 +1096,7 @@ function updateHitParticles(dt){
     var denom = Math.max(80, pullDenom()); // clamp min 80px so tiny phones still work
     var len = Math.min(Math.sqrt(drag.dx*drag.dx + drag.dy*drag.dy), denom);
     var raw = len / denom;
-    var power = Math.pow(raw, 0.72); // 25% pull → 40% power, so you don't need to over-pull to reach far targets
+    var power = Math.pow(raw, 0.64); // 25% pull → 45% power, so you don't need to over-pull to reach far targets
     var yaw = -(drag.dx / denom) * K.MAX_YAW;
     var pitch = (drag.dy / denom) * K.MAX_PITCH;
     yaw = clamp(yaw, -K.MAX_YAW, K.MAX_YAW);
@@ -1277,6 +1330,8 @@ function updateHitParticles(dt){
     }
     for (i = 0; i < obstacles.length; i++) {
       var o = obstacles[i];
+      if (o.dead) continue;
+      if (o.kind === 'wall') continue;
       if (!o.host || o.host.dead) continue;
       o.angle += dt * ((W.TUNING && TUNING.OBSTACLE_SHIELD_SPEED) || 1.05);
       o.obj.position.x = o.host.obj.position.x + Math.cos(o.angle) * o.orbitR;
@@ -1312,26 +1367,53 @@ function updateHitParticles(dt){
       var _blocked = false;
       for (var k = 0; k < obstacles.length; k++) {
         var ob = obstacles[k];
-        if (!ob.host || ob.host.dead) continue;
-        var oz = ob.obj.position.z;
-        if ((pz > oz) === (ar.z > oz)) continue;
-        var uo = (oz - pz) / (ar.z - pz || 1e-6);
-        var hxO = px + (ar.x - px) * uo - ob.obj.position.x;
-        var hyO = py + (ar.y - py) * uo - ob.obj.position.y;
-        if (Math.sqrt(hxO * hxO + hyO * hyO) > 0.52) continue;
-        ar.stuck = true; ar.life = 0; if(ar.trail) ar.trail.material.opacity=0;
-        ar.obj.position.set(ob.obj.position.x + hxO, ob.obj.position.y + hyO, oz + 0.08);
-        pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
-        ob.obj.add(ar.obj);
-        ar.obj.position.set(hxO, hyO, 0.08);
-        say('BLOCKED!');
-        if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
-        spawnDustPuff(ob.obj.position.x, ob.obj.position.z);
-        if(navigator.vibrate) navigator.vibrate([25,30,25]);
-        st.combo = 0;
-        refreshHud();
-        _blocked = true;
-        break;
+        if (ob.dead) continue;
+        if (ob.kind === 'wall') {
+          var hit = segBox(px, py, pz, ar.x, ar.y, ar.z, ob);
+          if (!hit) continue;
+          ar.stuck = true; ar.life = 0; if(ar.trail) ar.trail.material.opacity=0;
+          // world hit then reparent to wall mesh so arrow travels with wall if it ever moves
+          ar.obj.position.set(hit.x, hit.y, hit.z);
+          pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
+          var lx = hit.x - ob.obj.position.x;
+          var ly = hit.y - ob.obj.position.y;
+          var lz = hit.z - ob.obj.position.z;
+          // nudge slightly out so head is visible
+          if (ar.vz < 0) lz += 0.08; else lz -= 0.08;
+          ob.obj.add(ar.obj);
+          ar.obj.position.set(lx, ly, lz);
+          say('ARC OVER!');
+          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+          spawnDustPuff(hit.x, hit.z);
+          if(navigator.vibrate) navigator.vibrate([25,30,25]);
+          st.combo = 0;
+          refreshHud();
+          _blocked = true;
+          break;
+        } else {
+          if (!ob.host || ob.host.dead) continue;
+          var oz = ob.obj.position.z;
+          if ((pz > oz) === (ar.z > oz)) continue;
+          var uo = (oz - pz) / (ar.z - pz || 1e-6);
+          var hxO = px + (ar.x - px) * uo - ob.obj.position.x;
+          var hyO = py + (ar.y - py) * uo - ob.obj.position.y;
+          var r = 0.52;
+          try{ var sz = (W.TUNING && TUNING.OBSTACLE_SHIELD_SIZE); if(sz) r = sz * 0.015; if(r < 0.48) r = 0.52; }catch(e){}
+          if (Math.sqrt(hxO * hxO + hyO * hyO) > r) continue;
+          ar.stuck = true; ar.life = 0; if(ar.trail) ar.trail.material.opacity=0;
+          ar.obj.position.set(ob.obj.position.x + hxO, ob.obj.position.y + hyO, oz + 0.08);
+          pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
+          ob.obj.add(ar.obj);
+          ar.obj.position.set(hxO, hyO, 0.08);
+          say('BLOCKED!');
+          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+          spawnDustPuff(ob.obj.position.x, ob.obj.position.z);
+          if(navigator.vibrate) navigator.vibrate([25,30,25]);
+          st.combo = 0;
+          refreshHud();
+          _blocked = true;
+          break;
+        }
       }
       if (_blocked) continue;
       if (ar.stuck) continue;
@@ -1481,14 +1563,23 @@ function updateHitParticles(dt){
       if(bgFar) { bgFar.rotation.y = idleX*0.02; }
     }
     // shake decays quickly — additive kick on fire, with differential parallax
+    // Contract mirrors 2D: far bg 0.85, action 1.15, nearest fg 1.4. ReducedMotion pins all.
+    var shakeDisabled = false; try{ shakeDisabled = (typeof SAVE!=='undefined' && SAVE.settings && SAVE.settings().reducedMotion); }catch(e){}
+    if(shakeDisabled) camShake = 0;
     camShake *= Math.max(0, 1 - dt * 7);
     if (camShake > 0.001) {
       var shakeX = (Math.random()-0.5)*camShake;
       var shakeY = (Math.random()-0.5)*camShake*0.6;
+      var farK = (typeof TUNING!=='undefined' && TUNING.PARALLAX_FAR!=null) ? TUNING.PARALLAX_FAR : 0.15;
+      var fg2K = (typeof TUNING!=='undefined' && TUNING.PARALLAX_FG2!=null) ? TUNING.PARALLAX_FG2 : 0.4;
       camera.position.x += shakeX * (1 + K.PARALLAX*0.15);
       camera.position.y += shakeY * (1 + K.PARALLAX*0.15);
-      if(bowMesh) bowMesh.position.x += shakeX * (1 + K.PARALLAX*0.4) *0.3;
+      if(bowMesh) bowMesh.position.x += shakeX * (1 + fg2K) *0.3;
       if(sceneryGroup) sceneryGroup.position.x = -shakeX * K.PARALLAX *0.15;
+      // Parallax layers: far/mid counter-move so bg feels distant, haze even more.
+      if(bgFar) { bgFar.position.x += -shakeX * farK; bgFar.position.y += -shakeY * farK; }
+      if(bgMid) { bgMid.position.x += -shakeX * farK * 0.6; bgMid.position.y += -shakeY * farK * 0.6; }
+      if(horizonHaze) { horizonHaze.position.x += -shakeX * farK * 0.5; horizonHaze.position.y += -shakeY * farK * 0.5; }
     }
     camera.lookAt(camera.position.x * 0.4, K.EYE_HEIGHT - 0.2, -24);
     // roll with horizontal drag

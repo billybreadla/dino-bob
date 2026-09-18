@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v83-slingshot-spawner-rings';
+var CACHE = 'dinobob-v85-bow-more';
 var FILES = [
   '.',
   'index.html',
