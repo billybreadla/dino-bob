@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v88-juice';
+var CACHE = 'dinobob-v89-3d-1324';
 var FILES = [
   '.',
   'index.html',
@@ -289,7 +289,9 @@ var FILES = [
   'js/vendor/GLTFLoader.module.js',
   'js/vendor/loaders/GLTFLoader.js',
   'js/vendor/utils/BufferGeometryUtils.js',
-  'assets/models/pet_ptero.glb'
+  'assets/models/pet_ptero.glb',
+  'assets/models/pet_turtle.glb',
+  'assets/models/pet_firefly.glb'
 ];
 
 self.addEventListener('install', function (e) {

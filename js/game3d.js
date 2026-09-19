@@ -154,7 +154,7 @@ function buildBackgroundPlanes(biome){
   function isReduced(){ try{ return !!(typeof SAVE!=='undefined' && SAVE.settings && SAVE.settings().reducedMotion); }catch(e){ return false; } }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function pullDenom() { return Math.min(W.innerWidth, W.innerHeight) * K.PULL_FRACTION; }
-  function currentArrow3D(){ var id=K.ARROW_TYPE; var list=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var a=list.find(function(x){return x.id===id;}); return a||{id:'wooden', speedFactor:1, gravityFactor:1, scoreBonus:0}; }
+  function currentArrow3D(){ var id=K.ARROW_TYPE; var list=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var a=list.find(x=>x.id===id); return a||{id:'wooden', speedFactor:1, gravityFactor:1, scoreBonus:0}; }
   function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable — MUST match live arrow step in update()
   // Zero-padded YYYY-MM-DD so 2D (SAVE.todayStr) and 3D share identical daily seeds.
   function todayStr(){ var d=new Date(); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; }
@@ -1335,7 +1335,7 @@ function updateHitParticles(dt){
     var moveMult = (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2;
     var comboMult = 1;
     var aForBonus = null;
-    if(arrow && arrow.arrowType){ try{ var lst=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var f=lst.find(function(x){return x.id===arrow.arrowType;}); if(f) aForBonus=f; else aForBonus={id:arrow.arrowType, scoreBonus:arrow.scoreBonus||0}; }catch(e){ aForBonus=currentArrow3D(); }}
+    if(arrow && arrow.arrowType){ try{ var lst=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var f=lst.find(x=>x.id===arrow.arrowType); if(f) aForBonus=f; else aForBonus={id:arrow.arrowType, scoreBonus:arrow.scoreBonus||0}; }catch(e){ aForBonus=currentArrow3D(); }}
     else if(arrow && arrow.id) aForBonus=arrow;
     else aForBonus=currentArrow3D();
     if (ring === 0) {
@@ -1346,7 +1346,7 @@ function updateHitParticles(dt){
       if (comboMult > 1) { pts *= comboMult; why += ' x' + comboMult; }
       if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
-      if(aForBonus && aForBonus.scoreBonus){ var _b=aForBonus.scoreBonus||0; pts = Math.round(pts * (1+_b)); why+=' '+aForBonus.id.toUpperCase(); }
+      if(aForBonus && aForBonus.scoreBonus){ pts *= 1 + (aForBonus.scoreBonus||0); pts=Math.round(pts); if(aForBonus.id==='fire') why+=' FIRE'; else if(aForBonus.id==='ice') why+=' ICE'; else if(aForBonus.id==='lightning') why+=' LIGHTNING'; else if(aForBonus.id==='obsidian') why+=' OBSIDIAN'; else why+=' '+aForBonus.id.toUpperCase(); }
       if(st.marathon){ var add=(W.TUNING&&TUNING.MARATHON_BULLSEYE_ARROWS)||1; st.arrowsLeft+=add; why+=' +'+add+'\u2191'; }
       if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye();
       if(W.AUDIO && AUDIO.zap && isFar) try{AUDIO.zap();}catch(e){}
@@ -1365,7 +1365,7 @@ function updateHitParticles(dt){
     } else {
       if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
-      if(aForBonus && aForBonus.scoreBonus && aForBonus.id!=='wooden'){ var _b2=aForBonus.scoreBonus||0; pts = Math.round(pts * (1+_b2)); why+=' '+aForBonus.id.toUpperCase(); }
+      if(aForBonus && aForBonus.scoreBonus && aForBonus.id!=='wooden'){ pts *= 1 + (aForBonus.scoreBonus||0); pts=Math.round(pts); if(aForBonus.id==='fire') why+=' FIRE'; else if(aForBonus.id==='ice') why+=' ICE'; else if(aForBonus.id==='lightning') why+=' LIGHTNING'; else if(aForBonus.id==='obsidian') why+=' OBSIDIAN'; else why+=' '+aForBonus.id.toUpperCase(); }
       st.combo = 0;
       if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
       say('+' + pts + ' at ' + Math.round(-t.z) + 'm' + why);
@@ -1470,11 +1470,9 @@ function updateHitParticles(dt){
       }
       var px = ar.x, py = ar.y, pz = ar.z;
       // Preview = truth: live arrows use same gravity/wind as preview (via effectiveGravity).
-      var gravLive;
-      if(ar.gravityFactor!==undefined) gravLive = K.GRAVITY * (ar.gravityFactor||1) * (1 - (currentPerk().gravityCut||0));
-      else gravLive = (ar.grav !== undefined) ? ar.grav : effectiveGravity();
       // Spec: ar.vy -= K.GRAVITY * dt * (a.gravityFactor||1);
-      ar.vy -= gravLive * worldDt;
+      if(ar.gravityFactor!==undefined) ar.vy -= K.GRAVITY * worldDt * (ar.gravityFactor||1) * (1 - (currentPerk().gravityCut||0));
+      else { var gravLive = (ar.grav !== undefined) ? ar.grav : effectiveGravity(); ar.vy -= gravLive * worldDt; }
       ar.vx += windX * worldDt * 0.65;
       ar.x += ar.vx * worldDt; ar.y += ar.vy * worldDt; ar.z += ar.vz * worldDt;
       if(ar.trail && ar.trailPos){ ar.trailPos.unshift({x:ar.x,y:ar.y,z:ar.z}); if(ar.trailPos.length>12) ar.trailPos.pop(); var pos=ar.trail.geometry.attributes.position; for(var ti=0;ti<12;ti++){ if(ti<ar.trailPos.length) pos.setXYZ(ti, ar.trailPos[ti].x, ar.trailPos[ti].y, ar.trailPos[ti].z); else pos.setXYZ(ti, ar.x,ar.y,ar.z); } pos.needsUpdate=true; ar.trail.material.opacity = ar.stuck?0:0.65; }
