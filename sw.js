@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v89-3d-1324';
+var CACHE = 'dinobob-v90-living-skies';
 var FILES = [
   '.',
   'index.html',

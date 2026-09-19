@@ -213,6 +213,9 @@ var TUNING = {
   ARROW_3D_IDLE_SWAY: 0.035,   // tiny camera wobble when you're not aiming — like the world is breathing
   ARROW_3D_FIREWORKS: 7,       // how many fireworks pop when you beat your best!
   ARROW_3D_BOW_FADE: true,     // bow fades when you aim so you can see the target
+  ARROW_3D_SKY_GODRAYS: true,
+  ARROW_3D_SKY_POLLEN: 18,
+  ARROW_3D_SKY_SHADOWS: true,
   ARROW_3D_ADVENTURE: false,
 };
 
