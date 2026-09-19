@@ -219,3 +219,25 @@ var TUNING = {
   ARROW_3D_ADVENTURE: false,
 };
 
+// ---------- Penny guardrail ----------
+// If a number here is set to something wild (like ARROW_3D_MAX_YAW 6 = 343° spin),
+// the game would look broken. This tiny checker keeps numbers in a sane window
+// and whispers a warning in the console instead of crashing.
+(function () {
+  if (typeof TUNING === 'undefined') return;
+  function clampNum(k, lo, hi, dflt) {
+    var v = TUNING[k];
+    if (typeof v !== 'number' || isNaN(v)) { console.warn('[Tuning] ' + k + ' is not a number — using ' + dflt); TUNING[k] = dflt; return; }
+    if (v < lo || v > hi) { console.warn('[Tuning] ' + k + '=' + v + ' out of ' + lo + '..' + hi + ', clamping'); TUNING[k] = Math.max(lo, Math.min(hi, v)); }
+  }
+  clampNum('ROUND_SECONDS', 10, 300, 60);
+  clampNum('ARROWS_PER_ROUND', 1, 99, 24);
+  clampNum('WIND_MAX', 0, 200, 55);
+  clampNum('ARROW_3D_MAX_YAW', 0.1, 1.2, 0.55);
+  clampNum('ARROW_3D_MAX_PITCH', 0.1, 1.2, 0.52);
+  clampNum('ARROW_3D_GRAVITY', 1, 30, 9.8);
+  clampNum('ARROWS_3D', 1, 99, 20);
+  clampNum('PRICE_SHINY', 0, 10000, 400);
+  clampNum('PRICE_OBSIDIAN_ARROW', 0, 20000, 3500);
+})();
+

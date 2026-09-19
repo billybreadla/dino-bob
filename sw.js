@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v92-hud-chest-palette';
+var CACHE = 'dinobob-v93-unboxing-validator';
 var FILES = [
   '.',
   'index.html',
