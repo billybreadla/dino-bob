@@ -178,6 +178,8 @@ var TUNING = {
   // These tune the 3D prototype in 3d.html. Same idea as the rest of this file:
   // change a number, save, refresh.
   // UNITS: 3D world is metres — 1 unit = 1 m.  Gravity 9.8 m/s² = Earth, so arrows arc like real life.
+  ARROW_3D_TYPE: 'wooden',
+  MARATHON_3D_ENABLED: true,
   ARROW_3D_SPEED_MIN: 26,
   ARROW_3D_SPEED_MAX: 52,
   ARROW_3D_GRAVITY: 9.8,        // 3D gravity (m/s²) — keep 9.8 so floaty/ice arrows feel right
@@ -203,12 +205,14 @@ var TUNING = {
   ARROW_3D_WIND_ENABLED: true,
   ARROW_3D_WIND_MAX: 3.5,        // 3D wind: max sideways drift (m/s) — matches WIND_MAX in feel
   ARROW_3D_WIND_CHANCE: 0.6,     // 60% of rounds are windy (keep same as WIND_CHANCE)
-  ARROW_3D_SHADOW_ENABLED: true,
+  // Fake blobs, not shadowMap — cheap and reads as toy. Keep shadowMap off.
+  ARROW_3D_SHADOW_ENABLED: true, // CONTACT shadows: CircleGeometry r*0.55 opacity 0.18 at y 0.02
   ARROW_3D_PARALLAX: 0.35,        // extra shake on foreground vs background
   ARROW_3D_PARTICLES: true,     // hit sparkles + dust puffs
   ARROW_3D_PARTICLE_COUNT: 12,  // sparks per bullseye
   ARROW_3D_IDLE_SWAY: 0.035,   // tiny camera wobble when you're not aiming — like the world is breathing
   ARROW_3D_FIREWORKS: 7,       // how many fireworks pop when you beat your best!
   ARROW_3D_BOW_FADE: true,     // bow fades when you aim so you can see the target
+  ARROW_3D_ADVENTURE: false,
 };
 

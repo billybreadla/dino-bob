@@ -21,6 +21,7 @@ var GAME3D = (function () {
   var K = (function () {
     var t = (typeof TUNING !== 'undefined' ? TUNING : {});
     return {
+      ARROW_TYPE: t.ARROW_3D_TYPE||'wooden',
       ARROW_SPEED_MIN: t.ARROW_3D_SPEED_MIN || 26,
       ARROW_SPEED_MAX: t.ARROW_3D_SPEED_MAX || 52,
       GRAVITY: t.ARROW_3D_GRAVITY || 9.8,
@@ -47,9 +48,10 @@ var GAME3D = (function () {
       SHADOW_ENABLED: (t.ARROW_3D_SHADOW_ENABLED !== false),
       PARALLAX: t.ARROW_3D_PARALLAX || 0.35,
        PARTICLES: (t.ARROW_3D_PARTICLES!==false), PARTICLE_COUNT: t.ARROW_3D_PARTICLE_COUNT||12,
-       IDLE_SWAY: t.ARROW_3D_IDLE_SWAY || 0.035,
-       FIREWORKS: t.ARROW_3D_FIREWORKS || 7,
-       FOV_BASE: 46
+        IDLE_SWAY: t.ARROW_3D_IDLE_SWAY || 0.035,
+        FIREWORKS: t.ARROW_3D_FIREWORKS || 7,
+        FOV_BASE: 46,
+        ADVENTURE_ENABLED: !!t.ARROW_3D_ADVENTURE
     };
   })();
 
@@ -59,6 +61,7 @@ var targets = [], arrows = [], previewDots = null, previewRibbon = null, pet = n
 var pickups = [], obstacles = [];
 var bowMesh = null, bowString = null;
 var camShake = 0; var baseFov = 46;
+var _sphereSmall = null, _sphereDust = null; // shared particle geos (19-20: reuse, not alloc per spark)
 var windX = 0; var windFlag = null; var windFlagMesh = null;
 var windOsc=null, windGain=null;
 var sceneryGroup = null;
@@ -69,6 +72,7 @@ var roundOver = false;
 var paused=false;
 var hud = {};
 var bgFar=null, bgMid=null; var horizonHaze=null; var currentBiome='meadow';
+var adventureStage=0; var adventureActive=false;
 
 function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
 function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
@@ -147,8 +151,10 @@ function buildBackgroundPlanes(biome){
 }
 
   // ---------- little helpers ----------
+  function isReduced(){ try{ return !!(typeof SAVE!=='undefined' && SAVE.settings && SAVE.settings().reducedMotion); }catch(e){ return false; } }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function pullDenom() { return Math.min(W.innerWidth, W.innerHeight) * K.PULL_FRACTION; }
+  function currentArrow3D(){ var id=K.ARROW_TYPE; var list=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var a=list.find(function(x){return x.id===id;}); return a||{id:'wooden', speedFactor:1, gravityFactor:1, scoreBonus:0}; }
   function physicsDt() { return 0.033; } // shared dt for preview + live, ~30Hz stable — MUST match live arrow step in update()
   // Zero-padded YYYY-MM-DD so 2D (SAVE.todayStr) and 3D share identical daily seeds.
   function todayStr(){ var d=new Date(); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; }
@@ -217,9 +223,10 @@ function onRoundEnd(){
     if(isDaily) { setTimeout(function(){ say('NEW FAMILY BEST!'); }, 900); }
     // also store best in hud for display
     if(hud.best){ hud.best.textContent = p.highScore; hud.bestChip.style.display=''; }
-    SAVE.persist();
-  } catch(e){ console.warn('save fail', e); }
-}
+     SAVE.persist();
+   } catch(e){ console.warn('save fail', e); }
+  try{ if(adventureActive && typeof SAVE!=='undefined' && SAVE.completeAdventureStage){ var stars = st.hits>6?3: st.hits>3?2:1; SAVE.completeAdventureStage(adventureStage, stars); say('Adventure Stage '+(adventureStage+1)+' \u2014 '+stars+'\u2605'); } }catch(e){}
+ }
 
   // ============================================================
   // BUILD THE WORLD
@@ -344,7 +351,9 @@ scene.add(camera);
     sceneryGroup = g;
   }
 
-  function makeGroundShadow(target){ var g=new THREE.CircleGeometry(target.r*0.55,16); var m=new THREE.MeshBasicMaterial({color:0x1a1822, transparent:true, opacity:0.18}); var mesh=new THREE.Mesh(g,m); mesh.rotation.x=-Math.PI/2; mesh.position.set(target.obj.position.x,0.02,target.obj.position.z); mesh.userData.target=target; scene.add(mesh); return mesh; }
+  function getSphereSmall(){ if(_sphereSmall) return _sphereSmall; try{ _sphereSmall = new THREE.SphereGeometry(0.055,6,6); }catch(e){ _sphereSmall = new THREE.SphereGeometry(0.055,6,6); } return _sphereSmall; }
+function getSphereDust(){ if(_sphereDust) return _sphereDust; try{ _sphereDust = new THREE.SphereGeometry(0.09,5,5); }catch(e){ _sphereDust = new THREE.SphereGeometry(0.09,5,5); } return _sphereDust; }
+function makeGroundShadow(target){ var g=new THREE.CircleGeometry(target.r*0.55,16); var m=new THREE.MeshBasicMaterial({color:0x1a1822, transparent:true, opacity:0.18, fog:false}); var mesh=new THREE.Mesh(g,m); mesh.rotation.x=-Math.PI/2; mesh.position.set(target.obj.position.x,0.02,target.obj.position.z); mesh.userData.target=target; scene.add(mesh); return mesh; }
 
   // ---- a target: four scoring rings on a post, facing the player ----
   function makeTarget(x, z, radius, mover) {
@@ -722,6 +731,7 @@ scene.add(camera);
   // ============================================================
   // THE PET (the real-model test)
   // ============================================================
+  function currentPet3D(){ try{ var p=SAVE.current&&SAVE.current(); return p&&p.equipped&&p.equipped.pet; }catch(e){ return null; } }
   // House rule 6 applies here exactly as it does to sprites: something sane
   // must render even when the model does not load. It will not load from a
   // double-clicked file:// page, because Chrome blocks reading the .glb off
@@ -750,6 +760,7 @@ scene.add(camera);
   }
 
   function buildPet() {
+    try{ if(pet && pet.holder){ if(pet.holder.parent) pet.holder.parent.remove(pet.holder); else scene.remove(pet.holder); } }catch(e){}
     var holder = new THREE.Group();
     holder.position.set(1.9, 0, -4.1);        // just inside the fence, in frame
     holder.rotation.y = -0.5;                 // half-turned toward the shooter
@@ -760,7 +771,8 @@ scene.add(camera);
     pet = { holder: holder, model: stand, real: false, bob: Math.random() * 6.28, cheer: 0 };
 
     if (typeof THREE.GLTFLoader !== 'function') return;
-    new THREE.GLTFLoader().load(K.PET_URL, function (gltf) {
+    var petId=currentPet3D()||'ptero'; var url='assets/models/pet_'+petId+'.glb';
+    new THREE.GLTFLoader().load(url, function (gltf) {
       holder.remove(stand);
       var m = gltf.scene;
       // Meshy/Tripo exports come out shiny-metal, which reads as BLACK in a
@@ -803,6 +815,9 @@ scene.add(camera);
       // stays procedural, and that is a fine answer
     });
   }
+  function refreshPetName(){ try{ var pid=currentPet3D(); if(!hud.petName) return; if(!pid) hud.petName.textContent='None'; else { var k='NAME_PET_'+pid.toUpperCase(); hud.petName.textContent=(typeof TUNING!=='undefined'&&TUNING[k])||pid; } }catch(e){} }
+  function openPetShop(){ var pets=['ptero','turtle','firefly','bunbun']; var price=(typeof TUNING!=='undefined'&&TUNING.PRICE_PET)||2500; var list=pets.map(function(id,i){ return (i+1)+'. '+id+' ('+price+'c)'; }).join('\n'); var choice=prompt('Choose pet:\n'+list+'\nEnter name (ptero/turtle/firefly/bunbun):','ptero'); if(!choice) return; choice=choice.trim().toLowerCase(); if(pets.indexOf(choice)===-1){ say('Unknown pet'); return; } try{ var owns=false; try{ owns=SAVE.owns&&SAVE.owns('pets', choice); }catch(e2){} if(owns){ SAVE.equip('pet', choice); refreshPetName(); buildPet(); say('Equipped '+choice); return; } }catch(e){} if(SAVE.spend(2500)){ try{ SAVE.unlock('pets', choice); SAVE.equip('pet', choice); }catch(e){} refreshPetName(); buildPet(); say('Unlocked '+choice+'!'); } else { say('Need 2500 coins'); } }
+  function startAdventure(stageIdx){ var list=(typeof STAGES!=='undefined'&&STAGES.LIST)||[]; var s=list[stageIdx||0]; if(!s) return reset(); currentBiome=s.background.replace('bg_','')||'meadow'; buildBackgroundPlanes(currentBiome); adventureStage=stageIdx||0; adventureActive=true; reset(); try{ var seedStr='adv'+stageIdx; var layout=seededTargets(seedStr); try{ targets.forEach(function(t){ if(t.obj) scene.remove(t.obj); }); }catch(e){} try{ groundShadows.forEach(function(sh){ scene.remove(sh); }); }catch(e){} targets=[]; groundShadows=[]; for(var li=0; li<layout.length&&li<4; li++){ var ld=layout[li]; var t=makeTarget(ld.x, ld.z, ld.r, !!ld.mover); targets.push(t); } while(targets.length<4){ var fb=seededTargets(seedStr+'_'+targets.length)[0]; targets.push(makeTarget(fb.x, fb.z, fb.r, !!fb.mover)); } if(st){ st.moversAt=s.round.moversAt; st.chaosAt=s.round.chaosAt; st.adventure=s; st.adventureStage=stageIdx; } buildBackgroundPlanes(currentBiome); }catch(e){} say('Adventure Stage '+(stageIdx+1)); }
 
   // ---- bow: sells the fantasy even before the first arrow ----
   function buildBow() {
@@ -900,11 +915,11 @@ scene.add(camera);
 function spawnBullseyeParticles(x,y,z, r){
   if(!K.PARTICLES) return;
   var n = K.PARTICLE_COUNT || 12;
+  var geo = getSphereSmall();
   for(var i=0;i<n;i++){
     var ang = (i/n)*Math.PI*2 + Math.random()*0.3;
     var sp = 1.8 + Math.random()*2.2;
     var vel = new THREE.Vector3(Math.cos(ang)*sp*0.6, Math.sin(ang)*sp*0.6 + 1.2, (Math.random()-0.5)*sp*0.5);
-    var geo = new THREE.SphereGeometry(0.055,6,6);
     var mat = new THREE.MeshBasicMaterial({color: i%2?0xffcf3d:0xffffff, transparent:true, opacity:0.95});
     var m = new THREE.Mesh(geo, mat);
     m.position.set(x,y,z+0.22);
@@ -924,10 +939,11 @@ function spawnBullseyeParticles(x,y,z, r){
 
 function spawnDustPuff(x,z){
   if(!K.PARTICLES) return;
+  var geo = getSphereDust();
   for(var i=0;i<6;i++){
     var vel = new THREE.Vector3((Math.random()-0.5)*1.6, 0.8+Math.random()*1.1, (Math.random()-0.5)*1.6);
     var mat = new THREE.MeshBasicMaterial({color:0xc8a06a, transparent:true, opacity:0.42});
-    var m = new THREE.Mesh(new THREE.SphereGeometry(0.09,5,5), mat);
+    var m = new THREE.Mesh(geo, mat);
     m.position.set(x,0.12,z);
     m.scale.setScalar(0.7+Math.random()*0.5);
     scene.add(m);
@@ -1147,8 +1163,8 @@ function updateHitParticles(dt){
     pitch = clamp(pitch, -K.MAX_PITCH*0.35, K.MAX_PITCH);
     var mag = applyMagnetism(yaw, pitch);
     yaw = mag.yaw; pitch = mag.pitch;
-    var speed = effectiveSpeed(power);
-    return { power:power, yaw:yaw, pitch:pitch, denom:denom, vx:Math.sin(yaw)*Math.cos(pitch)*speed, vy:Math.sin(pitch)*speed, vz:-Math.cos(yaw)*Math.cos(pitch)*speed };
+    var a=currentArrow3D(); var speed = effectiveSpeed(power * (a.speedFactor||1));
+    return { power:power, yaw:yaw, pitch:pitch, denom:denom, vx:Math.sin(yaw)*Math.cos(pitch)*speed, vy:Math.sin(pitch)*speed, vz:-Math.cos(yaw)*Math.cos(pitch)*speed, arrow:a, a:a };
   }
 
   // gentle aim help — pulls yaw/pitch a little toward the nearest target when close
@@ -1192,7 +1208,7 @@ function updateHitParticles(dt){
     var pos = previewDots.geometry.attributes.position;
     var x = 0, y = K.EYE_HEIGHT, z = 0.6;
     var vx = a.vx, vy = a.vy, vz = a.vz, dt = physicsDt();
-    var grav = effectiveGravity();
+    var grav = K.GRAVITY * ((a.arrow&&a.arrow.gravityFactor)||1) * (1 - (currentPerk().gravityCut||0));
     for (var i = 0; i < K.PREVIEW_DOTS; i++) {
       vy -= grav * dt;
       vx += windX * dt * 0.65;
@@ -1226,45 +1242,71 @@ function updateHitParticles(dt){
     }
   }
 
-  function makeArrowMesh() {
+  function makeArrowMesh(arrow) {
+    var a = arrow || currentArrow3D();
+    var shaftColor = 0xd9b98c, headColor = 0x9aa4ad, fletchColor = 0xe86a4a;
+    var emberColor = null, sparkColor = null;
+    if(a.id==='fire'){ shaftColor=0x7a3010; headColor=0xff6a3d; fletchColor=0xff7a1a; emberColor=0xff6a3d; }
+    else if(a.id==='ice'){ shaftColor=0x1d5e8f; headColor=0x7dd8ff; fletchColor=0x8fdcff; emberColor=0x7dd8ff; }
+    else if(a.id==='lightning'){ shaftColor=0x7a6a10; headColor=0xffe566; fletchColor=0xffe33a; sparkColor=0xffffff; }
+    else if(a.id==='obsidian'){ shaftColor=0x2a1a3a; headColor=0x3fe0ff; fletchColor=0x7a3cff; sparkColor=0x9b5fe8; }
     var g = new THREE.Group();
     var shaft = new THREE.Mesh(
       new THREE.CylinderGeometry(0.035, 0.035, 1.0, 6),
-      new THREE.MeshLambertMaterial({ color: 0xd9b98c })
+      new THREE.MeshLambertMaterial({ color: shaftColor })
     );
     shaft.rotation.x = Math.PI / 2;          // lie the arrow down its own -Z
     var head = new THREE.Mesh(
       new THREE.ConeGeometry(0.075, 0.26, 7),
-      new THREE.MeshLambertMaterial({ color: 0x9aa4ad })
+      new THREE.MeshLambertMaterial({ color: headColor })
     );
     head.rotation.x = -Math.PI / 2;
     head.position.z = -0.6;
     var fletch = new THREE.Mesh(
       new THREE.ConeGeometry(0.13, 0.3, 4),
-      new THREE.MeshLambertMaterial({ color: 0xe86a4a })
+      new THREE.MeshLambertMaterial({ color: fletchColor })
     );
     fletch.rotation.x = Math.PI / 2;
     fletch.position.z = 0.5;
     g.add(shaft); g.add(head); g.add(fletch);
+    if(emberColor!==null){
+      var ember = new THREE.Mesh(new THREE.SphereGeometry(0.09,8,8), new THREE.MeshBasicMaterial({color:emberColor, transparent:true, opacity:0.92}));
+      ember.position.set(0,0,-0.58);
+      g.add(ember);
+    }
+    if(sparkColor!==null){
+      var spark = new THREE.Mesh(new THREE.SphereGeometry(0.055,6,6), new THREE.MeshBasicMaterial({color:sparkColor, transparent:true, opacity:0.88}));
+      spark.position.set(0,0.08,-0.45);
+      g.add(spark);
+    }
     g.userData.isArrow = true;
+    g.userData.arrowType = a.id;
     return g;
   }
 
   function shoot() {
     if (roundOver) return;
-    if (st.arrowsLeft <= 0 || st.timeLeft <= 0) return;
+    if (st.arrowsLeft <= 0 || (st.timeLeft <= 0 && !st.marathon)) return;
     var a = aimFromDrag();
     if (a.power < K.DEAD_ZONE) { say('Pull harder!'); if (navigator.vibrate) navigator.vibrate(20); return; }
     st.arrowsLeft--;
-    var mesh = makeArrowMesh();
+    var arrowData = a.arrow||a.a||a;
+    var mesh = makeArrowMesh(arrowData);
     mesh.position.set(0, K.EYE_HEIGHT, 0.6);
     scene.add(mesh);
     // Lock gravity at shoot so preview vs live never diverge even if arrow type switches mid-flight.
-    var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0, grav: effectiveGravity() };
+    var gravLock = K.GRAVITY * (arrowData.gravityFactor||1) * (1 - (currentPerk().gravityCut||0));
+    var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0, grav: gravLock, gravityFactor: arrowData.gravityFactor||1, arrowType: arrowData.id, scoreBonus: arrowData.scoreBonus||0 };
     arrows.push(ar);
     var trailGeo=new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12*3),3)); var trail=new THREE.Points(trailGeo, new THREE.PointsMaterial({color:0xffffff, size:0.12, transparent:true, opacity:0.65, sizeAttenuation:true})); scene.add(trail); ar.trail=trail; ar.trailPos=[];
     if (W.AUDIO && AUDIO.shoot) AUDIO.shoot();
     camShake = K.CAM_SHAKE;
+    // Last arrow slow-send + extra kick (mirrors 2D st.cinematicUntil 0.16 on last arrow)
+    if(!isReduced() && st.arrowsLeft===0){
+      st.cinematicUntil = Math.max(st.cinematicUntil||0, st.elapsed + 0.16);
+      st.camKick = (st.camKick||0) + 0.05;
+      camShake += 0.05;
+    }
     if (navigator.vibrate) navigator.vibrate(10);
     if (bowMesh) bowMesh.userData.punch = 1;
     var flash=new THREE.Mesh(new THREE.CircleGeometry(0.22,12), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.85, side:THREE.DoubleSide})); flash.position.set(0, K.EYE_HEIGHT, 0.35+0.22); flash.lookAt(camera.position); scene.add(flash); setTimeout(function(){ scene.remove(flash); }, 90);
@@ -1281,7 +1323,7 @@ function updateHitParticles(dt){
   // ============================================================
   // Ray-disc: hx/hy are already in target local space (plane z=t.z, normal +Z towards camera).
   // If a future boss tilts the disc, switch to ray-plane with dot(normal) instead of z-test.
-  function scoreHit(t, hx, hy) {
+  function scoreHit(t, hx, hy, arrow) {
     var rings = (W.TUNING && TUNING.SCORE_BULLSEYE_RINGS) || [100, 50, 25, 10];
     var d = Math.sqrt(hx*hx + hy*hy) / (t.r || 1);
     // Exact 2D parity: 0.25/0.5/0.75 thresholds from js/game.js:1129 (not floor*4 rounding).
@@ -1292,6 +1334,10 @@ function updateHitParticles(dt){
     var farMult = (W.TUNING && TUNING.FAR_TARGET_MULTIPLIER) || 2;
     var moveMult = (W.TUNING && TUNING.MOVING_TARGET_MULTIPLIER) || 2;
     var comboMult = 1;
+    var aForBonus = null;
+    if(arrow && arrow.arrowType){ try{ var lst=(typeof DATA!=='undefined'&&DATA.arrows)||[]; var f=lst.find(function(x){return x.id===arrow.arrowType;}); if(f) aForBonus=f; else aForBonus={id:arrow.arrowType, scoreBonus:arrow.scoreBonus||0}; }catch(e){ aForBonus=currentArrow3D(); }}
+    else if(arrow && arrow.id) aForBonus=arrow;
+    else aForBonus=currentArrow3D();
     if (ring === 0) {
       st.combo++;
       var step = (W.TUNING && TUNING.COMBO_STEP) || 2;
@@ -1300,9 +1346,17 @@ function updateHitParticles(dt){
       if (comboMult > 1) { pts *= comboMult; why += ' x' + comboMult; }
       if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
+      if(aForBonus && aForBonus.scoreBonus){ var _b=aForBonus.scoreBonus||0; pts = Math.round(pts * (1+_b)); why+=' '+aForBonus.id.toUpperCase(); }
+      if(st.marathon){ var add=(W.TUNING&&TUNING.MARATHON_BULLSEYE_ARROWS)||1; st.arrowsLeft+=add; why+=' +'+add+'\u2191'; }
       if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye();
       if(W.AUDIO && AUDIO.zap && isFar) try{AUDIO.zap();}catch(e){}
       if (pet) pet.cheer = 1.1;
+      // Cinematic: bullseye slow-mo + zoom punch (mirrors 2D st.cinematicUntil 0.34)
+      if(!isReduced()){
+        st.cinematicUntil = Math.max(st.cinematicUntil||0, st.elapsed + 0.34);
+        st.camKick = (st.camKick||0) + 0.05;
+        camShake = Math.max(camShake, K.CAM_SHAKE*1.4);
+      }
       say('BULLSEYE! +' + pts + why);
       spawnBullseyeParticles(t.obj.position.x, t.obj.position.y, t.z+0.08, t.r);
       spawnCoinBurst(t.obj.position.x, t.obj.position.y, t.z+0.08, pts);
@@ -1311,15 +1365,13 @@ function updateHitParticles(dt){
     } else {
       if (t.mover) { pts *= moveMult; why += ' MOVING x2'; }
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
+      if(aForBonus && aForBonus.scoreBonus && aForBonus.id!=='wooden'){ var _b2=aForBonus.scoreBonus||0; pts = Math.round(pts * (1+_b2)); why+=' '+aForBonus.id.toUpperCase(); }
       st.combo = 0;
       if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
       say('+' + pts + ' at ' + Math.round(-t.z) + 'm' + why);
       spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, '');
       if(navigator.vibrate) navigator.vibrate(10);
     }
-    // Include arrow scoreBonus like 2D award() does (DATA.arrows[].scoreBonus)
-    var ab = currentArrow().scoreBonus || 0;
-    if(ab) { var extra = Math.round(pts * ab); pts += extra; }
     st.score += pts;
     st.hits++;
     refreshHud();
@@ -1332,20 +1384,36 @@ function updateHitParticles(dt){
     if(paused || roundOver) return;
     if (!st) return;
     st.elapsed += dt;
-    st.timeLeft = Math.max(0, ((W.TUNING && TUNING.ROUND_SECONDS) || 60) - st.elapsed);
-    var moversAt = (W.TUNING && TUNING.MOVERS_START_AT) || 15;
-    var chaosAt = (W.TUNING && TUNING.CHAOS_START_AT) || 40;
-    if (st.elapsed < moversAt) st.phase = 'warmup';
-    else if (st.elapsed < chaosAt) st.phase = 'movers';
-    else st.phase = 'chaos';
-    if(st.timeLeft<=0 || st.arrowsLeft<=0){
+    if(st.marathon){
+      st.timeLeft = Infinity;
+      // marathon uses its own wave timing but keep phase as movers/chaos after start
+      var mMoversAt = (W.TUNING && TUNING.MARATHON_MOVERS_AT) || 30;
+      var mChaosAt = (W.TUNING && TUNING.MARATHON_CHAOS_AT) || 60;
+      if (st.elapsed < mMoversAt) st.phase = 'warmup';
+      else if (st.elapsed < mChaosAt) st.phase = 'movers';
+      else st.phase = 'chaos';
+    } else {
+      st.timeLeft = Math.max(0, ((W.TUNING && TUNING.ROUND_SECONDS) || 60) - st.elapsed);
+      var moversAt = (W.TUNING && TUNING.MOVERS_START_AT) || 15;
+      var chaosAt = (W.TUNING && TUNING.CHAOS_START_AT) || 40;
+      if (st.elapsed < moversAt) st.phase = 'warmup';
+      else if (st.elapsed < chaosAt) st.phase = 'movers';
+      else st.phase = 'chaos';
+    }
+    if((!st.marathon && st.timeLeft<=0) || st.arrowsLeft<=0){
       roundOver=true;
       onRoundEnd();
       refreshHud();
       return;
     }
+    // Cinematic slow-mo: bullseye 0.34s + last arrow 0.16s — world slows to 18% but clock stays real.
+    var worldDt = (st.cinematicUntil && st.elapsed < st.cinematicUntil && !isReduced()) ? dt * 0.18 : dt;
+    // Camera zoom punch on cinematic (extra FOV narrow)
+    if(worldDt !== dt){
+      st.camKick = (st.camKick||0) + (0.34 - (st.cinematicUntil - st.elapsed))*0.02;
+    }
     // phased respawning — mirrors game.js spawner but scaled to 3D counts
-    try{ spawner(dt); }catch(e){}
+    try{ spawner(worldDt); }catch(e){}
     var i, t;
     for (i = 0; i < targets.length; i++) {
       t = targets[i];
@@ -1353,7 +1421,7 @@ function updateHitParticles(dt){
       if (!t.mover) continue;
       if (st.phase === 'warmup') continue;
       var speedMul = st.phase === 'chaos' ? 1.7 : 1.0;
-      t.phase += dt * t.speed * speedMul;
+      t.phase += worldDt * t.speed * speedMul;
       t.obj.position.x = t.baseX + Math.sin(t.phase) * t.amp;
     }
     // ground contact shadows — follow targets, fade when high, breathe a little
@@ -1368,16 +1436,16 @@ function updateHitParticles(dt){
     }
     for (i = 0; i < pickups.length; i++) {
       var p = pickups[i];
-      p.bobPhase += dt * 1.8;
+      p.bobPhase += worldDt * 1.8;
       p.obj.position.y = p.baseY + Math.sin(p.bobPhase) * 0.35;
-      p.obj.position.x += Math.sin(p.bobPhase * 0.7) * dt * 0.5;
+      p.obj.position.x += Math.sin(p.bobPhase * 0.7) * worldDt * 0.5;
     }
     for (i = 0; i < obstacles.length; i++) {
       var o = obstacles[i];
       if (o.dead) continue;
       if (o.kind === 'wall') continue;
       if (!o.host || o.host.dead) continue;
-      o.angle += dt * ((W.TUNING && TUNING.OBSTACLE_SHIELD_SPEED) || 1.05);
+      o.angle += worldDt * ((W.TUNING && TUNING.OBSTACLE_SHIELD_SPEED) || 1.05);
       o.obj.position.x = o.host.obj.position.x + Math.cos(o.angle) * o.orbitR;
       o.obj.position.y = o.host.obj.position.y + Math.sin(o.angle) * o.orbitR * 0.7;
       o.obj.position.z = o.host.obj.position.z + 0.35;
@@ -1386,7 +1454,7 @@ function updateHitParticles(dt){
 
     for (i = 0; i < arrows.length; i++) {
       var ar = arrows[i];
-      ar.life += dt;
+      ar.life += worldDt;
       if (ar.stuck) {
         if (ar.life > 6) {
           if(ar.obj.parent) ar.obj.parent.remove(ar.obj); else scene.remove(ar.obj);
@@ -1402,10 +1470,13 @@ function updateHitParticles(dt){
       }
       var px = ar.x, py = ar.y, pz = ar.z;
       // Preview = truth: live arrows use same gravity/wind as preview (via effectiveGravity).
-      var gravLive = (ar.grav !== undefined) ? ar.grav : effectiveGravity();
-      ar.vy -= gravLive * dt;
-      ar.vx += windX * dt * 0.65;
-      ar.x += ar.vx * dt; ar.y += ar.vy * dt; ar.z += ar.vz * dt;
+      var gravLive;
+      if(ar.gravityFactor!==undefined) gravLive = K.GRAVITY * (ar.gravityFactor||1) * (1 - (currentPerk().gravityCut||0));
+      else gravLive = (ar.grav !== undefined) ? ar.grav : effectiveGravity();
+      // Spec: ar.vy -= K.GRAVITY * dt * (a.gravityFactor||1);
+      ar.vy -= gravLive * worldDt;
+      ar.vx += windX * worldDt * 0.65;
+      ar.x += ar.vx * worldDt; ar.y += ar.vy * worldDt; ar.z += ar.vz * worldDt;
       if(ar.trail && ar.trailPos){ ar.trailPos.unshift({x:ar.x,y:ar.y,z:ar.z}); if(ar.trailPos.length>12) ar.trailPos.pop(); var pos=ar.trail.geometry.attributes.position; for(var ti=0;ti<12;ti++){ if(ti<ar.trailPos.length) pos.setXYZ(ti, ar.trailPos[ti].x, ar.trailPos[ti].y, ar.trailPos[ti].z); else pos.setXYZ(ti, ar.x,ar.y,ar.z); } pos.needsUpdate=true; ar.trail.material.opacity = ar.stuck?0:0.65; }
 
       var _blocked = false;
@@ -1476,7 +1547,7 @@ function updateHitParticles(dt){
         pointAlong(ar.obj, ar.vx, ar.vy, ar.vz);
         t.obj.add(ar.obj);                                    // ride along if it moves
         ar.obj.position.set(hx, hy, 0.08);
-        scoreHit(t, hx, hy);
+        scoreHit(t, hx, hy, ar);
         t.dead = true;
         break;
       }
@@ -1517,6 +1588,7 @@ function updateHitParticles(dt){
           pts = Math.round(pts * comboMultB);
           label='GOLDEN! +'+pts;
           audioKind='chest';
+          if(st.marathon){ var gAdd=(W.TUNING&&W.TUNING.MARATHON_GOLDEN_ARROWS)||3; st.arrowsLeft+=gAdd; label+=' +'+gAdd+'\u2191'; }
           spawnCoinBurst(_px, _py, _pz, pts);
           spawnFloatScore(_px, _py, _pz, '+'+pts, 'golden');
           spawnBalloonShreds(_px, _py, _pz);
@@ -1542,6 +1614,7 @@ function updateHitParticles(dt){
           pts = (W.TUNING && TUNING.SCORE_BALLOON) || 25;
           pts = Math.round(pts * comboMultB);
           label='POP! +'+pts;
+          if(st.marathon){ st.arrowsLeft+=3; label+=' +3\u2191'; }
           spawnCoinBurst(_px, _py, _pz, pts);
           spawnFloatScore(_px, _py, _pz, 'POP! +'+pts, 'pop');
           spawnBalloonShreds(_px, _py, _pz);
@@ -1668,8 +1741,9 @@ function updateHitParticles(dt){
       hud.phase.textContent = st.phase === 'warmup' ? 'Warm-up' : st.phase === 'movers' ? 'Moving!' : 'CHAOS!';
     }
 
-    updateHitParticles(dt);
-    updateCoinParticles(dt);
+    // Particles ride the world slow-mo, UI (preview/pet/bow) stays real-time.
+    updateHitParticles(isReduced() ? dt : worldDt);
+    updateCoinParticles(isReduced() ? dt : worldDt);
     updatePreview();
     updatePet(dt);
     updateBow(dt);
@@ -1765,16 +1839,18 @@ function updateHitParticles(dt){
     if (hud.score) hud.score.textContent = st.score;
     if (hud.arrows) hud.arrows.textContent = st.arrowsLeft;
     if (hud.combo) hud.combo.textContent = st.combo > 1 ? ('x' + st.combo) : '';
-    if (hud.time) hud.time.textContent = Math.ceil(st.timeLeft);
-    if (hud.phase) hud.phase.textContent = st.phase === 'warmup' ? 'Warm-up' : st.phase === 'movers' ? 'Moving!' : 'CHAOS!';
-    if(hud.overTitle) hud.overTitle.textContent = st.timeLeft<=0 ? 'Time!' : (st.arrowsLeft<=0?'Out of arrows!':'Round Over!');
+    if (hud.arrow) { try{ var a=currentArrow3D(); hud.arrow.textContent = (a.name|| (a.id.charAt(0).toUpperCase()+a.id.slice(1))); }catch(e){} }
+    if (hud.time) hud.time.textContent = st.marathon ? '\u221E' : Math.ceil(st.timeLeft);
+    if (hud.phase) hud.phase.textContent = st.marathon ? 'MARATHON' : (st.phase === 'warmup' ? 'Warm-up' : st.phase === 'movers' ? 'Moving!' : 'CHAOS!');
+    if(hud.overTitle) hud.overTitle.textContent = (!st.marathon && st.timeLeft<=0) ? 'Time!' : (st.arrowsLeft<=0?'Out of arrows!':'Round Over!');
     if(hud.overCoins) hud.overCoins.textContent = st._coinsEarned||0;
     if(hud.overHigh) hud.overHigh.style.display = st._isHigh?'':'none';
     if(hud.overBest) try{ var p=SAVE.current&&SAVE.current(); hud.overBest.textContent=p?p.highScore:st.score; }catch(e){}
     if(hud.overStreak) try{ var s=SAVE.streakInfo&&SAVE.streakInfo(); hud.overStreak.textContent=s.count?'🔥 Day '+s.count:''; }catch(e){}
-    if (hud.over) hud.over.style.display = (st.arrowsLeft <= 0 || st.timeLeft <= 0 || roundOver) ? 'flex' : 'none';
+    if (hud.over) hud.over.style.display = (st.arrowsLeft <= 0 || (!st.marathon && st.timeLeft <= 0) || roundOver) ? 'flex' : 'none';
     if (hud.final) hud.final.textContent = st.score;
   }
+  function startMarathon(){ reset(); st.marathon=true; st.timeLeft=Infinity; if(hud.phase) hud.phase.textContent='MARATHON'; refreshHud(); say('MARATHON!'); }
 
   function resize() {
     var w = W.innerWidth, h = W.innerHeight;
@@ -1822,7 +1898,7 @@ function updateHitParticles(dt){
     // st must exist before buildTargets if we want deterministic initial balloons/shields, but minimal fix is to keep order and pin rand after.
     // Create st with spawner fields before buildTargets would be ideal, so we create a temp st, build, then keep it.
     // Simplified: create st first, then buildTargets can use rng().
-    st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup', spawnCooldown: 0, bossSpawned: false, bossRage: false, rand: null };
+    st = { score: 0, arrowsLeft: K.ARROWS, combo: 0, hits: 0, elapsed: 0, timeLeft: (typeof TUNING !== 'undefined' ? TUNING.ROUND_SECONDS : 60), phase: 'warmup', spawnCooldown: 0, bossSpawned: false, bossRage: false, rand: null, cinematicUntil: 0, camKick: 0 };
     try{
       // if a previous buildTargets (before st existed) stashed a pending seed, apply it
       if(W._pending3DSeed && !st.rand){
@@ -1922,7 +1998,55 @@ function updateHitParticles(dt){
       buildBackgroundPlanes(pickBiome());
       say('Daily: '+todayStr());
     });
+    // Arrow fantasy chip
+    hud.arrow = el('hudArrow');
+    var arrowChip = null;
+    if(!hud.arrow){
+      arrowChip = D.createElement('div');
+      arrowChip.className='chip';
+      arrowChip.style.pointerEvents='auto';
+      arrowChip.style.cursor='pointer';
+      arrowChip.innerHTML='<small>Arrow</small><span id="hudArrow">Wooden</span>';
+      var hudRootA = D.querySelector('.hud');
+      if(hudRootA) hudRootA.insertBefore(arrowChip, hudRootA.querySelector('#hudPhase')||hudRootA.firstChild);
+      hud.arrow = el('hudArrow');
+    }
+    arrowChip = hud.arrow ? (hud.arrow.closest ? hud.arrow.closest('.chip') : hud.arrow.parentElement) : arrowChip;
+    hud.arrowChip = arrowChip;
+    if(hud.arrowChip){ hud.arrowChip.style.pointerEvents='auto'; hud.arrowChip.style.cursor='pointer'; hud.arrowChip.addEventListener('click', function(){
+      try{
+        var list=(typeof DATA!=='undefined'&&DATA.arrows)||[];
+        if(!list.length) return;
+        var idx=list.findIndex(function(x){return x.id===K.ARROW_TYPE;});
+        if(idx<0) idx=0;
+        var next=list[(idx+1)%list.length];
+        K.ARROW_TYPE=next.id;
+        refreshHud();
+        say(next.name);
+      }catch(e){}
+    }); }
+    // Marathon button
+    hud.marathonBtn = el('marathonBtn');
+    if(!hud.marathonBtn){
+      var mBtn=D.createElement('button');
+      mBtn.id='marathonBtn';
+      mBtn.className='chip';
+      mBtn.style.pointerEvents='auto';
+      mBtn.style.cursor='pointer';
+      mBtn.style.background='rgba(108,194,74,0.92)';
+      mBtn.style.color='#1a1822';
+      mBtn.textContent='Marathon';
+      var hudRootM=D.querySelector('.hud');
+      if(hudRootM) hudRootM.appendChild(mBtn);
+      hud.marathonBtn=mBtn;
+    }
+    if(hud.marathonBtn) hud.marathonBtn.addEventListener('click', startMarathon);
+    hud.pet=el('hudPet'); hud.petName=el('hudPetName'); hud.advBtn=el('adv3dBtn');
+    if(hud.pet) hud.pet.addEventListener('click', openPetShop);
+    try{ refreshPetName(); }catch(e){}
+    if(hud.advBtn) hud.advBtn.addEventListener('click', function(){ adventureStage=(adventureStage+1)%((typeof STAGES!=='undefined'&&STAGES.LIST&&STAGES.LIST.length)||7); startAdventure(adventureStage); });
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.shadowMap.enabled = false; // fake contact blobs only (CircleGeometry 0.18), no shadowMap cost
     if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace; else renderer.outputEncoding = THREE.sRGBEncoding;   // textured models need this or they look muddy (r152+ uses outputColorSpace)
     clock = new THREE.Clock();
     buildScene();
