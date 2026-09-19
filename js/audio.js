@@ -39,6 +39,40 @@ var AUDIO = (function () {
     return true;
   }
 
+  // spatial helpers — tiny Panner per sfx when a 3D position is given
+  function spatialPanner(pos) {
+    if (!pos || typeof pos.x !== 'number') return null;
+    try {
+      var p = ctx.createPanner();
+      p.panningModel = 'HRTF';
+      p.distanceModel = 'inverse';
+      p.refDistance = 5;
+      p.maxDistance = 80;
+      p.rolloffFactor = 1;
+      // place sound relative to listener (camera). Listener is at 0,0,0 after setListenerPos.
+      if (p.positionX) {
+        p.positionX.setValueAtTime(pos.x, ctx.currentTime);
+        p.positionY.setValueAtTime(pos.y, ctx.currentTime);
+        p.positionZ.setValueAtTime(pos.z, ctx.currentTime);
+      } else {
+        p.setPosition(pos.x, pos.y, pos.z);
+      }
+      p.connect(sfxGain);
+      return p;
+    } catch (e) { return null; }
+  }
+  function setListenerPos(pos) {
+    if (!ctx || !ctx.listener || !pos) return;
+    try {
+      if (ctx.listener.positionX) {
+        ctx.listener.positionX.setValueAtTime(pos.x, ctx.currentTime);
+        ctx.listener.positionY.setValueAtTime(pos.y, ctx.currentTime);
+        ctx.listener.positionZ.setValueAtTime(pos.z, ctx.currentTime);
+      } else if (ctx.listener.setPosition) {
+        ctx.listener.setPosition(pos.x, pos.y, pos.z);
+      }
+    } catch (e) {}
+  }
   function tone(opts) {
     if (!ensure()) return;
     var t = ctx.currentTime + (opts.delay || 0);
@@ -51,7 +85,9 @@ var AUDIO = (function () {
     g.gain.linearRampToValueAtTime(opts.vol || 0.3, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + (opts.dur || 0.2));
     o.connect(g);
-    g.connect(opts.music ? musicGain : sfxGain);
+    var panner = opts.pos ? spatialPanner(opts.pos) : null;
+    if (panner) g.connect(panner);
+    else g.connect(opts.music ? musicGain : sfxGain);
     o.start(t);
     o.stop(t + (opts.dur || 0.2) + 0.05);
   }
@@ -72,7 +108,10 @@ var AUDIO = (function () {
     var g = ctx.createGain();
     g.gain.setValueAtTime(opts.vol || 0.3, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(sfxGain);
+    src.connect(f); f.connect(g);
+    var panner = opts.pos ? spatialPanner(opts.pos) : null;
+    if (panner) g.connect(panner);
+    else g.connect(sfxGain);
     src.start(t);
   }
 
@@ -469,45 +508,47 @@ var AUDIO = (function () {
       if (p && p.catch) p.catch(function () { /* autoplay rules: drop it */ });
     },
 
-    /* ----- game sfx ----- */
-    shoot: function () { noise({ freq: 2400, slide: 300, dur: 0.18, vol: 0.35 }); },
-    stretch: function (power) { tone({ freq: 120 + power * 160, type: 'triangle', dur: 0.06, vol: 0.08 }); },
-    thunk: function () {
-      noise({ freq: 500, dur: 0.08, vol: 0.5 });
-      tone({ freq: 130, slide: 70, type: 'square', dur: 0.12, vol: 0.25 });
+    // helper to forward optional 3D pos to tone/noise
+    setListenerPos: setListenerPos,
+    /* ----- game sfx (optional pos {x,y,z} for spatial) ----- */
+    shoot: function (pos) { noise({ freq: 2400, slide: 300, dur: 0.18, vol: 0.35, pos: pos }); },
+    stretch: function (power, pos) { tone({ freq: 120 + power * 160, type: 'triangle', dur: 0.06, vol: 0.08, pos: pos }); },
+    thunk: function (pos) {
+      noise({ freq: 500, dur: 0.08, vol: 0.5, pos: pos });
+      tone({ freq: 130, slide: 70, type: 'square', dur: 0.12, vol: 0.25, pos: pos });
     },
-    snap: function () {
-      noise({ freq: 1800, filter: 'highpass', slide: 650, dur: 0.09, vol: 0.42 });
-      tone({ freq: 360, slide: 110, type: 'square', dur: 0.08, vol: 0.16 });
-      tone({ freq: 190, slide: 80, type: 'triangle', dur: 0.11, vol: 0.12, delay: 0.045 });
+    snap: function (pos) {
+      noise({ freq: 1800, filter: 'highpass', slide: 650, dur: 0.09, vol: 0.42, pos: pos });
+      tone({ freq: 360, slide: 110, type: 'square', dur: 0.08, vol: 0.16, pos: pos });
+      tone({ freq: 190, slide: 80, type: 'triangle', dur: 0.11, vol: 0.12, delay: 0.045, pos: pos });
     },
-    bullseye: function () {
-      tone({ freq: 660, type: 'square', dur: 0.1, vol: 0.25 });
-      tone({ freq: 880, type: 'square', dur: 0.12, vol: 0.25, delay: 0.08 });
-      tone({ freq: 1320, type: 'square', dur: 0.2, vol: 0.25, delay: 0.16 });
+    bullseye: function (pos) {
+      tone({ freq: 660, type: 'square', dur: 0.1, vol: 0.25, pos: pos });
+      tone({ freq: 880, type: 'square', dur: 0.12, vol: 0.25, delay: 0.08, pos: pos });
+      tone({ freq: 1320, type: 'square', dur: 0.2, vol: 0.25, delay: 0.16, pos: pos });
     },
-    pop: function () { noise({ freq: 3000, filter: 'highpass', dur: 0.1, vol: 0.45 }); tone({ freq: 500, slide: 900, dur: 0.07, vol: 0.2 }); },
-    splat: function () { noise({ freq: 700, slide: 150, dur: 0.18, vol: 0.4 }); },
-    coin: function () {
-      tone({ freq: 988, type: 'square', dur: 0.07, vol: 0.18 });
-      tone({ freq: 1319, type: 'square', dur: 0.18, vol: 0.18, delay: 0.07 });
+    pop: function (pos) { noise({ freq: 3000, filter: 'highpass', dur: 0.1, vol: 0.45, pos: pos }); tone({ freq: 500, slide: 900, dur: 0.07, vol: 0.2, pos: pos }); },
+    splat: function (pos) { noise({ freq: 700, slide: 150, dur: 0.18, vol: 0.4, pos: pos }); },
+    coin: function (pos) {
+      tone({ freq: 988, type: 'square', dur: 0.07, vol: 0.18, pos: pos });
+      tone({ freq: 1319, type: 'square', dur: 0.18, vol: 0.18, delay: 0.07, pos: pos });
     },
-    chest: function () {
+    chest: function (pos) {
       [523, 659, 784, 1047].forEach(function (f, i) {
-        tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.3, delay: i * 0.09 });
+        tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.3, delay: i * 0.09, pos: pos });
       });
     },
-    chestCrack: function () {
-      noise({ freq: 900, filter: 'bandpass', slide: 240, dur: 0.13, vol: 0.38 });
-      tone({ freq: 260, slide: 120, type: 'square', dur: 0.11, vol: 0.13, delay: 0.02 });
+    chestCrack: function (pos) {
+      noise({ freq: 900, filter: 'bandpass', slide: 240, dur: 0.13, vol: 0.38, pos: pos });
+      tone({ freq: 260, slide: 120, type: 'square', dur: 0.11, vol: 0.13, delay: 0.02, pos: pos });
     },
-    bossHit: function () {
-      noise({ freq: 560, slide: 95, dur: 0.20, vol: 0.46 });
-      tone({ freq: 120, slide: 62, type: 'sawtooth', dur: 0.18, vol: 0.18 });
-      tone({ freq: 420, slide: 260, type: 'triangle', dur: 0.12, vol: 0.12, delay: 0.04 });
+    bossHit: function (pos) {
+      noise({ freq: 560, slide: 95, dur: 0.20, vol: 0.46, pos: pos });
+      tone({ freq: 120, slide: 62, type: 'sawtooth', dur: 0.18, vol: 0.18, pos: pos });
+      tone({ freq: 420, slide: 260, type: 'triangle', dur: 0.12, vol: 0.12, delay: 0.04, pos: pos });
     },
-    freeze: function () { tone({ freq: 1800, slide: 600, type: 'sine', dur: 0.4, vol: 0.25 }); },
-    zap: function () { tone({ freq: 1400, slide: 120, type: 'sawtooth', dur: 0.18, vol: 0.25 }); },
+    freeze: function (pos) { tone({ freq: 1800, slide: 600, type: 'sine', dur: 0.4, vol: 0.25, pos: pos }); },
+    zap: function (pos) { tone({ freq: 1400, slide: 120, type: 'sawtooth', dur: 0.18, vol: 0.25, pos: pos }); },
     tick: function () { tone({ freq: 880, type: 'square', dur: 0.05, vol: 0.15 }); },
     roundEnd: function () {
       [392, 523, 659, 784].forEach(function (f, i) {

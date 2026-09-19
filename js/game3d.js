@@ -75,6 +75,7 @@ var hud = {};
 var bgFar=null, bgMid=null; var horizonHaze=null; var currentBiome='meadow';
 var godRays=null, pollenSystem=null, cloudShadows=[];
 var adventureStage=0; var adventureActive=false;
+var atmoGroup=null; var atmoGroups={}; var atmoData=null;
 
 function togglePause(){ if(roundOver) return; paused=!paused; if(paused){ if(hud.pausePanel) hud.pausePanel.style.display='flex'; clock.stop(); } else { if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); } }
 function quitToMenu(){ paused=false; if(hud.pausePanel) hud.pausePanel.style.display='none'; clock.start(); reset(); }
@@ -152,6 +153,7 @@ function buildBackgroundPlanes(biome){
   bgMid.position.set(0, 14, -110);
   bgMid.lookAt(0, 6, 0);
   scene.add(bgMid);
+  try{ buildAtmo(biome); }catch(e){}
 }
 function buildLivingSkies(){
   if(godRays) scene.remove(godRays); if(pollenSystem) scene.remove(pollenSystem); cloudShadows.forEach(function(c){scene.remove(c);}); cloudShadows=[];
@@ -196,6 +198,344 @@ function buildLivingSkies(){
     }
   }
 }
+
+  // ---------- per-biome living sky (atmoGroups) ----------
+  function atmoHash(n){ var x=Math.sin(n*127.1+311.7)*43758.5453; return x-Math.floor(x); }
+  function clearAtmo(){
+    if(atmoGroup){
+      try{ scene.remove(atmoGroup); }catch(e){}
+      try{
+        atmoGroup.traverse(function(c){
+          if(c.geometry) try{ c.geometry.dispose(); }catch(e){}
+          if(c.material){
+            var mats=Array.isArray(c.material)?c.material:[c.material];
+            mats.forEach(function(m){ if(m.map) try{ m.map.dispose(); }catch(e){} try{ m.dispose(); }catch(e){} });
+          }
+        });
+      }catch(e){}
+      atmoGroup=null;
+    }
+    try{ for(var k in atmoGroups) delete atmoGroups[k]; }catch(e){}
+    atmoData=null;
+  }
+  function buildAtmo(biome){
+    clearAtmo();
+    if(!scene) return;
+    biome = biome || currentBiome || 'meadow';
+    var bIdx = BIOMES.indexOf(biome);
+    if(bIdx<0) bIdx=0;
+    var baseSeed = bIdx*1000;
+    atmoGroup = new THREE.Group();
+    atmoGroup.name = 'atmo_'+biome;
+    atmoData = { biome:biome, t:0, baseSeed:baseSeed };
+    // keep allocation low: create Groups once per biome switch, animate via position/opacity, no per-frame allocation
+    if(biome==='meadow'){
+      atmoData.rays=[];
+      for(var i=0;i<3;i++){
+        var g=new THREE.PlaneGeometry(18, 90);
+        var mat=new THREE.MeshBasicMaterial({ color:0xfff3d0, transparent:true, opacity:0.08, side:THREE.DoubleSide, fog:false, depthWrite:false });
+        var m=new THREE.Mesh(g, mat);
+        m.material.opacity = 0.08;
+        var ph = atmoHash(baseSeed + i*17+3)*6.28;
+        var px = -6 + i*2.2 + (atmoHash(baseSeed+i*7)-0.5)*1.5;
+        var py = 14 + i*1.2;
+        var pz = -72 - i*14;
+        m.position.set(px, py, pz);
+        m.rotation.z = -0.18 - i*0.06;
+        try{ m.lookAt(-6, 12, 4); }catch(e){}
+        m.userData.phase = ph;
+        m.userData.baseY = py;
+        atmoGroup.add(m);
+        atmoData.rays.push(m);
+      }
+      atmoData.pollen=[];
+      for(var j=0;j<10;j++){
+        var geo=new THREE.SphereGeometry(0.07,6,6);
+        var pmat=new THREE.MeshBasicMaterial({ color:0xfff6c8, transparent:true, opacity:0.62, fog:false, depthWrite:false });
+        var p=new THREE.Mesh(geo, pmat);
+        var px2=(atmoHash(baseSeed+j*12+1)-0.5)*48;
+        var py2=atmoHash(baseSeed+j*17+2)*12+2;
+        var pz2=-atmoHash(baseSeed+j*19+3)*70-8;
+        p.position.set(px2, py2, pz2);
+        p.userData.baseX=px2; p.userData.baseY=py2; p.userData.baseZ=pz2;
+        p.userData.phase=atmoHash(baseSeed+j*23+5)*6.28;
+        p.userData.speed=0.16 + (j%4)*0.05;
+        atmoGroup.add(p);
+        atmoData.pollen.push(p);
+      }
+    } else if(biome==='mountain'){
+      atmoData.shadows=[];
+      for(var s=0;s<2;s++){
+        var cg=new THREE.PlaneGeometry(34, 22);
+        var cm=new THREE.MeshBasicMaterial({ color:0x1a1822, transparent:true, opacity:0.10, fog:false, depthWrite:false, side:THREE.DoubleSide });
+        var c=new THREE.Mesh(cg, cm);
+        c.rotation.x=-Math.PI/2;
+        var cx=(atmoHash(baseSeed+s*13+7)-0.5)*44;
+        var cz=-18 - atmoHash(baseSeed+s*19+11)*42;
+        c.position.set(cx, 0.04, cz);
+        c.userData.speed=0.55+atmoHash(baseSeed+s*7+3)*0.45;
+        c.userData.dir=(atmoHash(baseSeed+s*11+5)<0.5?1:-1);
+        c.userData.baseY=0.04;
+        atmoGroup.add(c);
+        atmoData.shadows.push(c);
+      }
+      atmoData.streaks=[];
+      for(var k=0;k<4;k++){
+        var sg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(18,0,0)]);
+        var lm=new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:0.13, fog:false, depthWrite:false });
+        var line=new THREE.Line(sg, lm);
+        var lx=(atmoHash(baseSeed+k*17+41)-0.5)*60;
+        var ly=9+ atmoHash(baseSeed+k*19+7)*6;
+        var lz=-28 - atmoHash(baseSeed+k*23+9)*32;
+        line.position.set(lx, ly, lz);
+        line.userData.speed=18+atmoHash(baseSeed+k*7+13)*14;
+        line.userData.phase=atmoHash(baseSeed+k*11+3)*6.28;
+        line.rotation.z = -0.06 - (k%2)*0.08;
+        line.userData.baseX=lx;
+        atmoGroup.add(line);
+        atmoData.streaks.push(line);
+      }
+    } else if(biome==='sunset_beach'){
+      atmoData.shimmers=[];
+      for(var b=0;b<5;b++){
+        var w=14+atmoHash(baseSeed+b*7+3)*18;
+        var h=1.2+ (b%3)*0.7;
+        var gg=new THREE.PlaneGeometry(w, h);
+        var gm=new THREE.MeshBasicMaterial({ color:0xffecd0, transparent:true, opacity:0.07, fog:false, depthWrite:false, side:THREE.DoubleSide });
+        var mesh=new THREE.Mesh(gg, gm);
+        mesh.rotation.x=-Math.PI/2;
+        var mx=(atmoHash(baseSeed+b*13+5)-0.5)*36;
+        var mz=-8 - atmoHash(baseSeed+b*17+9)*36;
+        mesh.position.set(mx, 0.02, mz);
+        mesh.userData.phase=atmoHash(baseSeed+b*11+7)*6.28;
+        mesh.userData.baseOpacity=0.07;
+        mesh.userData.baseX=mx;
+        atmoGroup.add(mesh);
+        atmoData.shimmers.push(mesh);
+      }
+    } else if(biome==='starlight'){
+      atmoData.stars=[];
+      // 14 star Points twinkling (Points size 0.08) — use small spheres to allow per-star twinkle, but keep Points literal for spec
+      var starGeo=new THREE.BufferGeometry();
+      var starCnt=14;
+      var starPos=new Float32Array(starCnt*3);
+      var starPh=new Float32Array(starCnt);
+      for(var si=0;si<starCnt;si++){
+        starPos[si*3]=(atmoHash(baseSeed+si*3+1)-0.5)*64;
+        starPos[si*3+1]=16+atmoHash(baseSeed+si*7+5)*10;
+        starPos[si*3+2]=-22 - atmoHash(baseSeed+si*11+2)*68;
+        starPh[si]=atmoHash(baseSeed+si*13+9)*6.28;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+      var starMat=new THREE.PointsMaterial({ color:0xfff6be, size:0.08, transparent:true, opacity:0.72, sizeAttenuation:true, fog:false, depthWrite:false });
+      var starPoints=new THREE.Points(starGeo, starMat);
+      starPoints.userData.phases=starPh;
+      starPoints.userData.baseOpacity=0.72;
+      atmoGroup.add(starPoints);
+      atmoData.starPoints=starPoints;
+      atmoData.starPhases=starPh;
+      // also 14 tiny sphere meshes for richer twinkle (keeps <20? 1 Points + 14 would be >20, so keep only Points for starlight)
+      // To allow per-star opacity we animate Points material globally; sphere fallback kept minimal:
+      // we add 4 accent spheres for depth cue
+      atmoData.stars=[];
+      for(var s2=0;s2<4;s2++){
+        var sGeo=new THREE.SphereGeometry(0.08,6,6);
+        var sMat=new THREE.MeshBasicMaterial({ color:0xfff6be, transparent:true, opacity:0.72, fog:false, depthWrite:false });
+        var star=new THREE.Mesh(sGeo, sMat);
+        var sx=(atmoHash(baseSeed+s2*29+11)-0.5)*48;
+        var sy=18+atmoHash(baseSeed+s2*31+13)*9;
+        var sz=-24 - atmoHash(baseSeed+s2*37+17)*60;
+        star.position.set(sx, sy, sz);
+        star.userData.phase=atmoHash(baseSeed+s2*13+9)*6.28;
+        star.userData.baseOpacity=0.62+atmoHash(baseSeed+s2*17+13)*0.3;
+        atmoGroup.add(star);
+        atmoData.stars.push(star);
+      }
+    } else if(biome==='underwater' || biome==='crystal_pool'){
+      var caGeo=new THREE.PlaneGeometry(48,48,6,6);
+      var caColor = biome==='crystal_pool'?0xc8ffff:0xe6fffc;
+      var caMat=new THREE.MeshBasicMaterial({ color:caColor, transparent:true, opacity:0.14, wireframe:true, fog:false, depthWrite:false, side:THREE.DoubleSide });
+      var ca=new THREE.Mesh(caGeo, caMat);
+      ca.rotation.x=-Math.PI/2;
+      ca.position.set(0, 0.03, -22);
+      ca.userData.phase=0;
+      atmoGroup.add(ca);
+      atmoData.caustics=ca;
+      atmoData.bubbles=[];
+      for(var bi=0;bi<8;bi++){
+        var bGeo=new THREE.SphereGeometry(0.18+ (bi%3)*0.07, 8,6);
+        var bMat=new THREE.MeshBasicMaterial({ color:0xd6f4ff, transparent:true, opacity:0.35, fog:false, depthWrite:false });
+        var bub=new THREE.Mesh(bGeo, bMat);
+        var bx=(atmoHash(baseSeed+bi*211+90)-0.5)*52;
+        var by=0.5+atmoHash(baseSeed+bi*137+13)*8;
+        var bz=-6 - atmoHash(baseSeed+bi*191+7)*48;
+        bub.position.set(bx, by, bz);
+        bub.userData.speed=0.9+atmoHash(baseSeed+bi*13+3)*0.9;
+        bub.userData.phase=atmoHash(baseSeed+bi*21+5)*6.28;
+        bub.userData.baseX=bx;
+        bub.userData.baseSeedBase=baseSeed+bi*211+90;
+        atmoGroup.add(bub);
+        atmoData.bubbles.push(bub);
+      }
+    } else if(biome==='moon_cave'){
+      atmoData.gems=[];
+      for(var gi=0;gi<3;gi++){
+        var gGeo=new THREE.SphereGeometry(0.34,10,8);
+        var gMat=new THREE.MeshLambertMaterial({ color:0x9e92ff, emissive:0x7a6cff, emissiveIntensity:0.55, transparent:true, opacity:0.92 });
+        var gem=new THREE.Mesh(gGeo, gMat);
+        var gx=(atmoHash(baseSeed+gi*33+7)-0.5)*18;
+        var gy=0.6+atmoHash(baseSeed+gi*37+11)*1.2;
+        var gz=-12 - atmoHash(baseSeed+gi*41+13)*38;
+        gem.position.set(gx, gy, gz);
+        gem.userData.phase=atmoHash(baseSeed+gi*17+9)*6.28;
+        gem.userData.baseScale=1;
+        atmoGroup.add(gem);
+        atmoData.gems.push(gem);
+      }
+      atmoData.fireflies=[];
+      for(var fi=0;fi<6;fi++){
+        var fGeo=new THREE.SphereGeometry(0.07,6,6);
+        var fMat=new THREE.MeshBasicMaterial({ color:0xffee8c, transparent:true, opacity:0.85, fog:false, depthWrite:false });
+        var fly=new THREE.Mesh(fGeo, fMat);
+        var fx=(atmoHash(baseSeed+fi*31+3)-0.5)*40;
+        var fy=2+atmoHash(baseSeed+fi*37+5)*5;
+        var fz=-10 - atmoHash(baseSeed+fi*41+7)*42;
+        fly.position.set(fx, fy, fz);
+        fly.userData.cx=fx; fly.userData.cy=fy; fly.userData.cz=fz;
+        fly.userData.ax=1.2+atmoHash(baseSeed+fi*7+3)*1.8;
+        fly.userData.ay=0.7+atmoHash(baseSeed+fi*9+5)*1.0;
+        fly.userData.f1=0.23+atmoHash(baseSeed+fi*11+7)*0.2;
+        fly.userData.f2=0.31+atmoHash(baseSeed+fi*13+2)*0.2;
+        fly.userData.phase=atmoHash(baseSeed+fi*17+13)*6.28;
+        atmoGroup.add(fly);
+        atmoData.fireflies.push(fly);
+      }
+    } else {
+      // fallback gentle meadow-lite
+      atmoData.empty=true;
+    }
+    scene.add(atmoGroup);
+    try{ atmoGroups[biome]=atmoGroup; }catch(e){}
+  }
+  function updateAtmo(dt){
+    if(!atmoGroup || !atmoData) return;
+    if(isReduced()) return;
+    var t = (atmoData.t||0) + dt;
+    atmoData.t = t;
+    var biome = atmoData.biome;
+    var baseSeed = atmoData.baseSeed||0;
+    if(biome==='meadow'){
+      if(atmoData.rays){
+        for(var i=0;i<atmoData.rays.length;i++){
+          var m=atmoData.rays[i];
+          m.material.opacity = 0.08 * (0.85 + 0.15*Math.sin(t*0.5 + m.userData.phase));
+          m.position.y = m.userData.baseY + Math.sin(t*0.22 + m.userData.phase)*0.35;
+          m.rotation.z = -0.18 - i*0.06 + Math.sin(t*0.22 + m.userData.phase)*0.035;
+        }
+      }
+      if(atmoData.pollen){
+        for(var j=0;j<atmoData.pollen.length;j++){
+          var p=atmoData.pollen[j];
+          p.position.x = p.userData.baseX + Math.sin(t*0.5 + p.userData.phase)*1.4;
+          p.position.y = p.userData.baseY + Math.cos(t*0.5*0.77 + p.userData.phase)*0.6;
+          p.position.z = p.userData.baseZ + Math.sin(t*0.3 + p.userData.phase)*0.9;
+          p.material.opacity = 0.42 + 0.22*Math.abs(Math.sin(t*0.7 + p.userData.phase));
+        }
+      }
+    } else if(biome==='mountain'){
+      if(atmoData.shadows){
+        for(var s=0;s<atmoData.shadows.length;s++){
+          var ch=atmoData.shadows[s];
+          ch.position.x += ch.userData.dir * ch.userData.speed * dt;
+          if(Math.abs(ch.position.x)>38) ch.userData.dir*=-1;
+          ch.material.opacity = 0.10 * (0.85 + 0.15*Math.sin(t*0.3 + s));
+        }
+      }
+      if(atmoData.streaks){
+        for(var k=0;k<atmoData.streaks.length;k++){
+          var sk=atmoData.streaks[k];
+          sk.position.x += sk.userData.speed * dt * 0.35;
+          if(sk.position.x>32) sk.position.x=-32 - Math.random()*8;
+          var a=Math.max(0, Math.sin(t*0.45 + sk.userData.phase));
+          sk.material.opacity = a*0.13;
+        }
+      }
+    } else if(biome==='sunset_beach'){
+      if(atmoData.shimmers){
+        for(var b=0;b<atmoData.shimmers.length;b++){
+          var sh=atmoData.shimmers[b];
+          var br=Math.sin(t*0.8 + sh.userData.phase);
+          sh.material.opacity = 0.05 + 0.05*(0.5+0.5*br);
+          var sc=1+br*0.12;
+          sh.scale.set(sc,1,1);
+        }
+      }
+    } else if(biome==='starlight'){
+      if(atmoData.starPoints){
+        var twGlobal = 0.55 + 0.28*Math.sin(t*2);
+        atmoData.starPoints.material.opacity = 0.52 + 0.22*Math.abs(Math.sin(t*2));
+        // size pulse for twinkle
+        atmoData.starPoints.material.size = 0.08 * (1 + 0.18*Math.sin(t*2));
+        // slight drift for Points buffer
+        var arr=atmoData.starPoints.geometry.attributes.position.array;
+        var phs=atmoData.starPhases;
+        for(var si=0;si<phs.length;si++){
+          // tiny positional shimmer - no alloc, just subtle y jitter
+          // keep x/z stable, jitter y via sin
+          // we add small offset to y without reallocating base: use base + sin
+          // But Points are static; we can keep them static and just opacity pulse
+        }
+      }
+      if(atmoData.stars){
+        for(var si2=0;si2<atmoData.stars.length;si2++){
+          var star=atmoData.stars[si2];
+          var tw=Math.abs(Math.sin(t*2 + star.userData.phase));
+          star.material.opacity = (0.3 + 0.7*tw)*0.55;
+          star.scale.setScalar(0.9+tw*0.22);
+        }
+      }
+    } else if(biome==='underwater' || biome==='crystal_pool'){
+      if(atmoData.caustics){
+        atmoData.caustics.position.x = Math.sin(t*0.37)*1.2;
+        atmoData.caustics.position.z = -22 + Math.cos(t*0.29)*1.8;
+        atmoData.caustics.material.opacity = 0.14 * (0.85+0.15*Math.sin(t*0.5));
+      }
+      if(atmoData.bubbles){
+        for(var bi=0;bi<atmoData.bubbles.length;bi++){
+          var bub=atmoData.bubbles[bi];
+          bub.position.y += bub.userData.speed * dt;
+          bub.position.x = bub.userData.baseX + Math.sin(t*1.4 + bub.userData.phase)*0.6;
+          if(bub.position.y>14){
+            bub.position.y=0.5;
+            var nx=(atmoHash(baseSeed+bi*211+90 + Math.floor(t)) -0.5)*52;
+            bub.position.x=nx;
+            bub.userData.baseX=nx;
+          }
+          bub.material.opacity = 0.28 + 0.12*Math.sin(t*0.9 + bub.userData.phase);
+        }
+      }
+    } else if(biome==='moon_cave'){
+      if(atmoData.gems){
+        for(var gi=0;gi<atmoData.gems.length;gi++){
+          var gem=atmoData.gems[gi];
+          var br=0.5+0.5*Math.sin(t*0.9 + gem.userData.phase);
+          gem.material.opacity = 0.72 + 0.22*br;
+          var sc=1 + 0.05*Math.sin(t*0.9 + gem.userData.phase);
+          gem.scale.setScalar(sc);
+          if(gem.material.emissiveIntensity!=null) gem.material.emissiveIntensity=0.45+0.25*br;
+        }
+      }
+      if(atmoData.fireflies){
+        for(var fi=0;fi<atmoData.fireflies.length;fi++){
+          var fl=atmoData.fireflies[fi];
+          fl.position.x = fl.userData.cx + fl.userData.ax * Math.sin(t*fl.userData.f1 + fl.userData.phase);
+          fl.position.y = fl.userData.cy + fl.userData.ay * Math.sin(t*fl.userData.f2 + fl.userData.phase*1.7);
+          fl.position.z = fl.userData.cz + Math.sin(t*0.7+fl.userData.phase)*0.5;
+          fl.material.opacity = 0.55 + 0.35*(0.5+0.5*Math.sin(t*2.2+fl.userData.phase));
+        }
+      }
+    }
+  }
 
   // ---------- little helpers ----------
   function isReduced(){ try{ return !!(typeof SAVE!=='undefined' && SAVE.settings && SAVE.settings().reducedMotion); }catch(e){ return false; } }
@@ -353,6 +693,7 @@ scene.add(camera);
     windFlagMesh = flag;
     buildBackgroundPlanes(pickBiome());
     buildLivingSkies();
+    try{ if(!atmoGroup) buildAtmo(currentBiome); }catch(e){}
   }
 
   // Trees and distance posts. They exist so your eye can measure depth.
@@ -1103,7 +1444,7 @@ function handleFreeze(hitX, hitY, hitZ, freezeDur){
       spawnSnow(px,py,pz);
     }
   }
-  try{ if(W.AUDIO && AUDIO.freeze) AUDIO.freeze(); }catch(e){}
+  var _frPos={x:hitX,y:hitY,z:hitZ}; try{ if(W.AUDIO && AUDIO.freeze) AUDIO.freeze(_frPos); }catch(e){}
 }
 function handleChain(hitX, hitY, hitZ, ar){
   // Find nearest live target within 600 Euclidean (spec: 600 3D)
@@ -1681,7 +2022,8 @@ function updateHitParticles(dt){
     var ar={ obj: mesh, x: 0, y: K.EYE_HEIGHT, z: 0.6, vx: a.vx, vy: a.vy, vz: a.vz, stuck: false, life: 0, grav: gravLock, gravityFactor: _powerSrc.gravityFactor||1, arrowType: _powerSrc.id, scoreBonus: _powerSrc.scoreBonus||0, type: _powerSrc.id, pierceLeft: _powerSrc.pierce ? 1 : 0, chain: !!_powerSrc.chain, freeze: _powerSrc.freeze||0, blackhole: !!_powerSrc.blackhole, blackholeSpent: false };
     arrows.push(ar);
     var trailGeo=new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12*3),3)); var trail=new THREE.Points(trailGeo, new THREE.PointsMaterial({color:0xffffff, size:0.12, transparent:true, opacity:0.65, sizeAttenuation:true})); scene.add(trail); ar.trail=trail; ar.trailPos=[];
-    if (W.AUDIO && AUDIO.shoot) AUDIO.shoot();
+    var _shootPos = {x:0, y:K.EYE_HEIGHT, z:0.6};
+    if (W.AUDIO && AUDIO.shoot) AUDIO.shoot(_shootPos);
     camShake = K.CAM_SHAKE;
     // Last arrow slow-send + extra kick (mirrors 2D st.cinematicUntil 0.16 on last arrow)
     if(!isReduced() && st.arrowsLeft===0){
@@ -1730,8 +2072,9 @@ function updateHitParticles(dt){
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
       if(aForBonus && aForBonus.scoreBonus){ pts *= 1 + (aForBonus.scoreBonus||0); pts=Math.round(pts); if(aForBonus.id==='fire') why+=' FIRE'; else if(aForBonus.id==='ice') why+=' ICE'; else if(aForBonus.id==='lightning') why+=' LIGHTNING'; else if(aForBonus.id==='obsidian') why+=' OBSIDIAN'; else why+=' '+aForBonus.id.toUpperCase(); }
       if(st.marathon){ var add=(W.TUNING&&TUNING.MARATHON_BULLSEYE_ARROWS)||1; st.arrowsLeft+=add; why+=' +'+add+'\u2191'; }
-      if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye();
-      if(W.AUDIO && AUDIO.zap && isFar) try{AUDIO.zap();}catch(e){}
+      var _hitPos = {x:t.obj.position.x, y:t.obj.position.y, z:t.z};
+      if (W.AUDIO && AUDIO.bullseye) AUDIO.bullseye(_hitPos);
+      if(W.AUDIO && AUDIO.zap && isFar) try{AUDIO.zap(_hitPos);}catch(e){}
       if (pet) pet.cheer = 1.1;
       // Cinematic: bullseye slow-mo + zoom punch (mirrors 2D st.cinematicUntil 0.34)
       if(!isReduced()){
@@ -1749,7 +2092,8 @@ function updateHitParticles(dt){
       if (isFar) { pts *= farMult; why += ' FAR x2'; }
       if(aForBonus && aForBonus.scoreBonus && aForBonus.id!=='wooden'){ pts *= 1 + (aForBonus.scoreBonus||0); pts=Math.round(pts); if(aForBonus.id==='fire') why+=' FIRE'; else if(aForBonus.id==='ice') why+=' ICE'; else if(aForBonus.id==='lightning') why+=' LIGHTNING'; else if(aForBonus.id==='obsidian') why+=' OBSIDIAN'; else why+=' '+aForBonus.id.toUpperCase(); }
       st.combo = 0;
-      if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+      var _hitPos2 = {x:t.obj.position.x, y:t.obj.position.y, z:t.z};
+      if (W.AUDIO && AUDIO.thunk) AUDIO.thunk(_hitPos2);
       say('+' + pts + ' at ' + Math.round(-t.z) + 'm' + why);
       spawnFloatScore(t.obj.position.x, t.obj.position.y, t.z+0.08, '+'+pts, '');
       if(navigator.vibrate) navigator.vibrate(10);
@@ -1880,7 +2224,8 @@ function updateHitParticles(dt){
           ob.obj.add(ar.obj);
           ar.obj.position.set(lx, ly, lz);
           say('ARC OVER!');
-          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+          var _wallPos = {x:hit.x, y:hit.y, z:hit.z};
+          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk(_wallPos);
           spawnDustPuff(hit.x, hit.z);
           if(navigator.vibrate) navigator.vibrate([25,30,25]);
           st.combo = 0;
@@ -1903,7 +2248,8 @@ function updateHitParticles(dt){
           ob.obj.add(ar.obj);
           ar.obj.position.set(hxO, hyO, 0.08);
           say('BLOCKED!');
-          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk();
+          var _blkPos = {x:ob.obj.position.x, y:ob.obj.position.y, z:ob.obj.position.z};
+          if (W.AUDIO && AUDIO.thunk) AUDIO.thunk(_blkPos);
           spawnDustPuff(ob.obj.position.x, ob.obj.position.z);
           if(navigator.vibrate) navigator.vibrate([25,30,25]);
           st.combo = 0;
@@ -2042,7 +2388,7 @@ function updateHitParticles(dt){
         try{
           if(audioKind==='chest' && W.AUDIO && AUDIO.chest) AUDIO.chest();
           else if(audioKind==='coin' && W.AUDIO && AUDIO.coin) AUDIO.coin();
-          else if(W.AUDIO && AUDIO.pop){ AUDIO.pop(); if(-_pz>30 && AUDIO.zap) AUDIO.zap(); }
+          else if(W.AUDIO && AUDIO.pop){ var _popPos={x:_px,y:_py,z:_pz}; AUDIO.pop(_popPos); if(-_pz>30 && AUDIO.zap) AUDIO.zap(_popPos); }
           else if(W.AUDIO && AUDIO.thunk) AUDIO.thunk();
         }catch(e){}
         if(ar.freeze) handleFreeze(_px,_py,_pz, ar.freeze);
@@ -2118,6 +2464,8 @@ function updateHitParticles(dt){
       if(horizonHaze) { horizonHaze.position.x += -shakeX * farK * 0.5; horizonHaze.position.y += -shakeY * farK * 0.5; }
     }
     camera.lookAt(camera.position.x * 0.4, K.EYE_HEIGHT - 0.2, -24);
+    // spatial audio: listener follows camera (head)
+    try{ if(W.AUDIO && AUDIO.setListenerPos) AUDIO.setListenerPos({x:camera.position.x, y:camera.position.y, z:camera.position.z}); }catch(e){}
     // roll with horizontal drag
     var targetRoll = (drag && drag.active) ? clamp(-(drag.dx / denom) * 0.04, -0.04, 0.04) : 0;
     camera.rotation.z += (targetRoll - camera.rotation.z) * Math.min(1, dt * 8);
@@ -2133,6 +2481,7 @@ function updateHitParticles(dt){
       } else windFlag.visible=false;
     }
     if(Math.random()<0.02) try{ ensureWindHum(); }catch(e){}
+    try{ updateAtmo(dt); }catch(e){}
     // lightweight weather — rain falls and drifts with wind
     if(rainSystem){
       var rainPos=rainSystem.geometry.attributes.position;
