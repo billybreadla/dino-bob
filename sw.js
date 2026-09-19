@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v86-retopo-clay';
+var CACHE = 'dinobob-v87-sky-ground';
 var FILES = [
   '.',
   'index.html',

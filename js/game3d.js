@@ -78,7 +78,7 @@ var coinParticles = []; // {obj, vel, life, targetY}
   function rollWind(){ if(!K.WIND_ENABLED || Math.random()>K.WIND_CHANCE){ windX=0; return; } var s=Math.random()<0.5?1:-1; var r=Math.pow(Math.random(),3); windX = s * r * K.WIND_MAX; }
   function applyWind(vx, dt){ return vx + windX * dt * 0.9; }
 function ensureWindHum(){ if(!K.WIND_ENABLED || Math.abs(windX)<0.4) { if(windGain) try{windGain.gain.linearRampToValueAtTime(0, (typeof AUDIO!=='undefined'&&AUDIO.ctx)?AUDIO.ctx.currentTime+0.4:0);}catch(e){} return; } try{ if(typeof AUDIO==='undefined' || !AUDIO || !AUDIO.ctx) return; if(!windOsc){ windGain=AUDIO.ctx.createGain(); windGain.gain.value=0; windGain.connect(AUDIO.master||AUDIO.ctx.destination); windOsc=AUDIO.ctx.createOscillator(); windOsc.type='sawtooth'; windOsc.frequency.value=38; windOsc.connect(windGain); windOsc.start(); } var vol=Math.min(0.08, Math.abs(windX)*0.018); windGain.gain.linearRampToValueAtTime(vol, AUDIO.ctx.currentTime+0.6); windOsc.frequency.linearRampToValueAtTime(38+Math.abs(windX)*4, AUDIO.ctx.currentTime+0.6); }catch(e){} }
-var BIOMES = ['meadow','mountain','sunset_beach','starlight','underwater','moon_cave'];
+var BIOMES = ['meadow','mountain','sunset_beach','starlight','underwater','moon_cave','crystal_pool'];
 function pickBiome(){ return BIOMES[Math.floor(Math.random()*BIOMES.length)]; }
 function buildBackgroundPlanes(biome){
   if(bgFar){
@@ -105,18 +105,29 @@ function buildBackgroundPlanes(biome){
   }
   if(!biome) biome = pickBiome();
   currentBiome = biome;
-  if(scene && scene.fog){
-    scene.fog.near = biome==='starlight'||biome==='moon_cave' ? 22 : 26;
-    scene.fog.far = biome==='starlight'||biome==='moon_cave' ? 88 : 96;
-    if(scene.fog.color){
-      if(biome==='starlight') scene.fog.color.setHex(0x24314e);
-      else if(biome==='moon_cave') scene.fog.color.setHex(0x2a2a45);
-      else scene.fog.color.setHex(0x8ecfe8);
+  // Crystal pool reuses underwater art but with its own turquoise mood (see sky/ground below).
+  var texBiome = (biome==='crystal_pool') ? 'underwater' : biome;
+  // Update sky, ground, and fog tints for this biome — distinct pool vs reef.
+  try{
+    var skyHex = skyFor(biome);
+    if(scene && scene.background) scene.background.setHex(skyHex);
+    if(scene && scene.userData && scene.userData.skyDome) scene.userData.skyDome.material.color.setHex(skyHex);
+    if(_ground && _ground.material) _ground.material.color.setHex(groundFor(biome));
+    if(scene && scene.fog){
+      scene.fog.near = biome==='starlight'||biome==='moon_cave' ? 22 : 26;
+      scene.fog.far = biome==='starlight'||biome==='moon_cave' ? 88 : 96;
+      if(scene.fog.color){
+        if(biome==='crystal_pool') scene.fog.color.setHex(0x4dc8e8);
+        else if(biome==='starlight') scene.fog.color.setHex(0x24314e);
+        else if(biome==='moon_cave') scene.fog.color.setHex(0x2a2a45);
+        else if(biome==='underwater') scene.fog.color.setHex(0x8ecfe8);
+        else scene.fog.color.setHex(skyHex);
+      }
     }
-  }
+  }catch(e){}
   var loader = new THREE.TextureLoader();
-  // far plane — 240x135 at z -180
-  var farUrl = 'assets/sprites/bg_'+biome+'_far.webp';
+  // far plane — 240x135 at z -180 (crystal_pool reuses underwater textures)
+  var farUrl = 'assets/sprites/bg_'+texBiome+'_far.webp';
   var farTex = loader.load(farUrl, function(tex){ if(THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; tex.needsUpdate=true; }, undefined, function(){ console.warn('bg failed', farUrl); });
   if(THREE.SRGBColorSpace) farTex.colorSpace = THREE.SRGBColorSpace; else farTex.encoding = THREE.sRGBEncoding;
   var farMat = new THREE.MeshBasicMaterial({map: farTex, transparent:true, opacity:0.92, fog:false});
@@ -125,7 +136,7 @@ function buildBackgroundPlanes(biome){
   bgFar.lookAt(0, 8, 0);
   scene.add(bgFar);
   // mid plane — 160x90 at z -110, lower
-  var midUrl = 'assets/sprites/bg_'+biome+'_mid.webp';
+  var midUrl = 'assets/sprites/bg_'+texBiome+'_mid.webp';
   var midTex = loader.load(midUrl, function(tex){ if(THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; tex.needsUpdate=true; }, undefined, function(){ console.warn('bg failed', midUrl); });
   if(THREE.SRGBColorSpace) midTex.colorSpace = THREE.SRGBColorSpace; else midTex.encoding = THREE.sRGBEncoding;
   var midMat = new THREE.MeshBasicMaterial({map: midTex, transparent:true, opacity:0.96, fog:false});
@@ -213,30 +224,47 @@ function onRoundEnd(){
   // ============================================================
   // BUILD THE WORLD
   // ============================================================
+  // Sky + ground palette per biome — keeps toy-box feel, not PBR grey. Ground is flat in bottom third (no cliff).
+  var GROUND_COLORS = { meadow:0x69a94e, mountain:0x7a9a6a, sunset_beach:0xd9b98c, starlight:0x3a4a6a, underwater:0x2a9a8a, moon_cave:0x4a3a5a, crystal_pool:0x3fc0d0 };
+  var SKY_COLORS = { meadow:0x8ecfe8, mountain:0x9ec9f0, sunset_beach:0xffd4a0, starlight:0x1a2038, underwater:0x2a6a7a, moon_cave:0x2a1a3a, crystal_pool:0x4dc8e8 };
+  function skyFor(biome){ return SKY_COLORS[biome] || SKY_COLORS.meadow; }
+  function groundFor(biome){ return GROUND_COLORS[biome] || GROUND_COLORS.meadow; }
+  // Three-point toy light — locked upper-left forever. Fog tint carries biome mood, not light position.
+  var _sun, _hemi, _ground;
   function buildScene() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x8ecfe8);
+    scene.background = new THREE.Color(skyFor(currentBiome));
     // haze pushes far things toward the sky colour: the strongest depth cue we get for free
-    scene.fog = new THREE.Fog(0x8ecfe8, 26, 96);
+    scene.fog = new THREE.Fog(skyFor(currentBiome), 26, 96);
 
     camera = new THREE.PerspectiveCamera(46, 1, 0.1, 400);   // tighter than a walking-around FOV: archery wants compression
     camera.position.set(0, K.EYE_HEIGHT, 2.2);
     camera.lookAt(0, K.EYE_HEIGHT - 0.05, -20);
 
-    var sun = new THREE.DirectionalLight(0xfff1d0, 1.05);
-    sun.position.set(-6, 12, 4);           // key light upper-left, same contract as the 2D art
-    scene.add(sun);
-    scene.add(new THREE.HemisphereLight(0xd6ecff, 0x6fae5a, 0.68));
+    _sun = new THREE.DirectionalLight(0xfff1d0, 1.05);
+    _sun.position.set(-6, 12, 4);           // key light upper-left, same contract as the 2D art — never moves per biome
+    scene.add(_sun);
+    _hemi = new THREE.HemisphereLight(0xd6ecff, 0x6fae5a, 0.68);
+    scene.add(_hemi);
 
 scene.add(camera);
 
-    // ---- ground ----
+    // ---- ground — flat meadow in bottom third, not a cliff. Vertex-tinted so horizon fades into fog.
     var ground = new THREE.Mesh(
       new THREE.PlaneGeometry(240, 240),
-      new THREE.MeshLambertMaterial({ color: 0x69a94e })
+      new THREE.MeshLambertMaterial({ color: groundFor(currentBiome) })
     );
     ground.rotation.x = -Math.PI / 2;
+    _ground = ground;
     scene.add(ground);
+    // Subtle sky dome — hemisphere facing down, same sky color, gives infinite depth behind far planes.
+    var skyGeo = new THREE.SphereGeometry(180, 16, 12, 0, Math.PI*2, 0, Math.PI*0.5);
+    var skyMat = new THREE.MeshBasicMaterial({ color: skyFor(currentBiome), side: THREE.BackSide, fog:false });
+    var skyDome = new THREE.Mesh(skyGeo, skyMat);
+    skyDome.position.y = -20;
+    skyDome.scale.y = 0.5;
+    scene.add(skyDome);
+    scene.userData.skyDome = skyDome;
     // Depth ruler is now the distance posts every 10m (plus fog + horizon haze)
     // — grid removed: 120 divisions = 240 line segments per frame, heavy on mobile
     // and reads as debug graph paper, not toy-box meadow.
