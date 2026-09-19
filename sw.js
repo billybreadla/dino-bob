@@ -1,6 +1,6 @@
 /* Cache-first service worker so Dino Bob plays offline once installed. */
 
-var CACHE = 'dinobob-v91-arrows-spatial';
+var CACHE = 'dinobob-v92-hud-chest-palette';
 var FILES = [
   '.',
   'index.html',
@@ -78,14 +78,14 @@ var FILES = [
   'assets/sprites/chest_closed.png',
   'assets/sprites/chest_semi.png',
   'assets/sprites/chest_open.png',
-  'assets/sprites/chest_3d_0.png',
-  'assets/sprites/chest_3d_1.png',
-  'assets/sprites/chest_3d_2.png',
-  'assets/sprites/chest_3d_3.png',
-  'assets/sprites/chest_3d_4.png',
-  'assets/sprites/chest_3d_5.png',
-  'assets/sprites/chest_3d_6.png',
-  'assets/sprites/chest_3d_7.png',
+  'assets/sprites/chest_3d_0.webp',
+  'assets/sprites/chest_3d_1.webp',
+  'assets/sprites/chest_3d_2.webp',
+  'assets/sprites/chest_3d_3.webp',
+  'assets/sprites/chest_3d_4.webp',
+  'assets/sprites/chest_3d_5.webp',
+  'assets/sprites/chest_3d_6.webp',
+  'assets/sprites/chest_3d_7.webp',
   'assets/sprites/fruit_apple.png',
   'assets/sprites/fruit_banana.png',
   'assets/sprites/fruit_pineapple.png',

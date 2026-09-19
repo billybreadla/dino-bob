@@ -28,7 +28,8 @@ var ART = (function () {
     ninja:     { body: '#2c2f38', belly: '#444a58', skin: '#e8b07a', dark: '#16181f' },
     astronaut: { body: '#e9edf2', belly: '#c4ccd6', skin: '#caa06a', dark: '#9aa3b0' },
     robot:     { body: '#8d97a5', belly: '#5b6470', skin: '#39404a', dark: '#4c545f' },
-    bear:      { body: '#9c6b3a', belly: '#d8b27e', skin: '#f3c08c', dark: '#6f4b27' }
+    bear:      { body: '#9c6b3a', belly: '#d8b27e', skin: '#f3c08c', dark: '#6f4b27' },
+    trixie:    { body: '#e65a6b', belly: '#f7c9a6', skin: '#f3c08c', dark: '#7a2b38' }
   };
 
   var archerSpriteCache = {};
@@ -60,13 +61,6 @@ var ART = (function () {
       return;
     }
     switch (id) {
-      case 'party':
-        ctx.beginPath();
-        ctx.moveTo(x, y - 34 * s); ctx.lineTo(x - 13 * s, y - 2 * s); ctx.lineTo(x + 13 * s, y - 2 * s);
-        ctx.closePath(); ctx.fillStyle = '#ff5fa2'; ctx.fill();
-        rr(ctx, x - 13 * s, y - 14 * s, 26 * s, 5 * s, 2 * s, '#ffd23a');
-        circle(ctx, x, y - 34 * s, 5 * s, '#ffd23a');
-        break;
       case 'crown':
         ctx.beginPath();
         ctx.moveTo(x - 16 * s, y); ctx.lineTo(x - 16 * s, y - 18 * s);
@@ -76,11 +70,6 @@ var ART = (function () {
         ctx.closePath(); ctx.fillStyle = '#ffc83a'; ctx.fill();
         circle(ctx, x, y - 4 * s, 3.5 * s, '#e23b3b');
         break;
-      case 'cowboy':
-        ellipse(ctx, x, y - 2 * s, 26 * s, 7 * s, '#8a5a2b');
-        rr(ctx, x - 12 * s, y - 20 * s, 24 * s, 19 * s, 8 * s, '#a06a35');
-        rr(ctx, x - 12 * s, y - 8 * s, 24 * s, 5 * s, 2 * s, '#6f4b27');
-        break;
       case 'wizard':
         ctx.beginPath();
         ctx.moveTo(x + 2 * s, y - 38 * s); ctx.lineTo(x - 18 * s, y - 2 * s); ctx.lineTo(x + 18 * s, y - 2 * s);
@@ -88,19 +77,6 @@ var ART = (function () {
         ellipse(ctx, x, y - 2 * s, 24 * s, 6 * s, '#5b3fd0');
         circle(ctx, x - 4 * s, y - 18 * s, 2.5 * s, '#ffd23a');
         circle(ctx, x + 6 * s, y - 26 * s, 2 * s, '#ffd23a');
-        break;
-      case 'propeller':
-        rr(ctx, x - 14 * s, y - 12 * s, 28 * s, 12 * s, 7 * s, '#3aa0e8');
-        ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 2 * s;
-        ctx.beginPath(); ctx.moveTo(x, y - 12 * s); ctx.lineTo(x, y - 18 * s); ctx.stroke();
-        ellipse(ctx, x - 10 * s, y - 19 * s, 9 * s, 3.5 * s, '#e23b3b');
-        ellipse(ctx, x + 10 * s, y - 19 * s, 9 * s, 3.5 * s, '#ffd23a');
-        break;
-      case 'headphones':
-        ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 4 * s;
-        ctx.beginPath(); ctx.arc(x, y + 4 * s, 19 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
-        rr(ctx, x - 24 * s, y - 2 * s, 9 * s, 14 * s, 4 * s, '#e23b3b');
-        rr(ctx, x + 15 * s, y - 2 * s, 9 * s, 14 * s, 4 * s, '#e23b3b');
         break;
     }
   }

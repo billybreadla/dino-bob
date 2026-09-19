@@ -1282,18 +1282,37 @@ var UI = (function () {
           equip: function () { SAVE.equip('hat', h.id); }
         });
       });
+      // Honest outfit merchandising: only Dino Bob has painted recolor sprites
+      // (char_dinobob_ruby etc). Other heroes fall back to hueTintedImage — we
+      // surface that honestly by marking unowned outfits as coming-soon teasers
+      // for non-Bob mains instead of selling vapor.
+      var hasPaintedOutfits = (function () {
+        if (p.equipped.character === 'dinobob') return true;
+        if (typeof SPRITES !== 'undefined' && SPRITES.get) {
+          for (var _oi = 0; _oi < DATA.outfits.length; _oi++) {
+            var _o = DATA.outfits[_oi];
+            if (!_o.swap) continue;
+            if (SPRITES.get('char_' + p.equipped.character + '_' + _o.id)) return true;
+          }
+        }
+        return false;
+      })();
       DATA.outfits.forEach(function (o) {
         if (!o.swap) return; // classic is default, not sold
+        var isPainted = hasPaintedOutfits;
+        var owned = SAVE.owns('outfits', o.id);
+        var teaser = !isPainted && !owned;
         addItem({
           id: 'outfit_' + o.id,
-          name: o.name,
-          perk: 'A fresh new color!',
+          name: o.name + (teaser ? ' · Bob only' : ''),
+          perk: teaser ? '🎨 Painted recolors are Dino Bob exclusive — other heroes preview with a hue tint (coming soon!)' : 'A fresh new color!',
           price: o.price,
-          owned: SAVE.owns('outfits', o.id),
+          owned: owned,
           equipped: p.equipped.outfit === o.id,
+          comingSoon: teaser,
           draw: function (cv) { portrait(cv, p.equipped.character, { outfitColor: o.swap, outfitId: o.id }); },
           previewDraw: function (cv, t) { previewCharacter(cv, p.equipped.character, { hat: p.equipped.hat, outfitColor: o.swap, outfitId: o.id, shiny: p.equipped.shiny, t: t }, t); },
-          buy: function () { SAVE.unlock('outfits', o.id); SAVE.equip('outfit', o.id); },
+          buy: function () { if (teaser) return; SAVE.unlock('outfits', o.id); SAVE.equip('outfit', o.id); },
           equip: function () { SAVE.equip('outfit', o.id); }
         });
       });

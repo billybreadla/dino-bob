@@ -9,7 +9,10 @@
   :root { --ink:#1a1822; --yellow:#ffd23a; --gold:#e8a91d; --green:#6cc24a; --panel:#242031; }
   html, body { margin:0; height:100%; overflow:hidden; background:var(--ink); font-family:'Nunito',sans-serif; -webkit-user-select:none; user-select:none; }
   #c3d { display:block; width:100vw; height:100vh; touch-action:none; }
-  .hud { position:fixed; top:0; left:0; right:0; display:flex; gap:10px; padding:12px 14px; pointer-events:none; align-items:flex-start; flex-wrap:wrap; }
+  .hud-top { position:fixed; top:0; left:0; right:0; display:flex; gap:10px; padding:12px 14px; padding-top:max(12px, env(safe-area-inset-top)); padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); pointer-events:none; align-items:flex-start; flex-wrap:wrap; justify-content:space-between; z-index:10; }
+  .hud-top .chip { pointer-events:none; }
+  .hud-bottom { position:fixed; bottom:0; left:0; right:0; display:flex; gap:10px; padding:12px 14px; padding-bottom:max(12px, env(safe-area-inset-bottom)); padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); pointer-events:none; align-items:center; justify-content:center; flex-wrap:wrap; z-index:10; }
+  .hud-bottom .chip, .hud-bottom button.chip { pointer-events:auto; min-height:44px; min-width:44px; justify-content:center; }
   .chip { background:rgba(26,24,34,0.88); color:#fff; font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; padding:8px 14px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; border:3px solid rgba(255,255,255,0.12); box-shadow:0 4px 0 rgba(0,0,0,0.28); }
   .chip small { display:block; font-family:'Nunito',sans-serif; font-size:10px; font-weight:800; opacity:.7; letter-spacing:.09em; text-transform:uppercase; line-height:1; }
   .chip button, button.chip { pointer-events:auto; cursor:pointer; font-family:'Lilita One',sans-serif; font-size:14px; letter-spacing:0.5px; border:3px solid rgba(255,255,255,0.18); }
@@ -18,9 +21,14 @@
   #hudPhase { background:linear-gradient(180deg, var(--yellow), var(--gold)); color:var(--ink); border-color:rgba(255,255,255,0.5); box-shadow:0 3px 0 #b07f12; font-family:'Lilita One',sans-serif; letter-spacing:0.5px; }
   #hudPhase:empty{ display:none; }
   .spacer{ flex:1; }
+  /* collapsed: combo/phase become world-space floaters, hide persistent chips */
+  #hudCombo, #hudPhase { display:none !important; }
+  .hud-top .chip--small, .hud-top .hud-chip--meta { font-size:12px; padding:5px 10px; opacity:0.92; }
+  .chip--prototype { position:fixed; top:6px; right:8px; font-size:10px; padding:4px 8px; opacity:0.38; pointer-events:none; z-index:11; }
+  @media (max-width:600px) { .hud-top { gap:8px; padding:10px 10px; } .hud-top .chip { font-size:13px; padding:6px 10px; } .hud-bottom { gap:8px; padding:10px 10px; } .hud-bottom .chip, .hud-bottom button.chip { font-size:13px; padding:8px 12px; min-height:44px; } }
   #hudMsg { position:fixed; left:0; right:0; top:34%; text-align:center; font-family:'Lilita One',sans-serif; font-size:34px; font-weight:400; color:#fff; text-shadow:0 3px 0 rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.35); opacity:0; transition:opacity .25s; pointer-events:none; }
   #hudMsg[style*="opacity: 1"]{ text-shadow:0 3px 0 rgba(0,0,0,0.35), 0 0 18px rgba(255,210,58,0.6); }
-  #hint { position:fixed; left:0; right:0; bottom:16px; text-align:center; color:rgba(255,255,255,0.9); font-family:'Nunito',sans-serif; font-weight:800; font-size:13px; text-shadow:0 2px 0 rgba(0,0,0,0.35); pointer-events:none; opacity:.92; }
+  #hint { position:fixed; left:0; right:0; bottom:74px; bottom:calc(68px + env(safe-area-inset-bottom, 0px)); text-align:center; color:rgba(255,255,255,0.9); font-family:'Nunito',sans-serif; font-weight:800; font-size:13px; text-shadow:0 2px 0 rgba(0,0,0,0.35); pointer-events:none; opacity:.92; z-index:9; }
   #overPanel{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(12,22,32,.66); backdrop-filter:blur(4px); }
   .card{ background:var(--panel); border:3px solid #2e2940; border-radius:26px; padding:26px 28px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(255,255,255,0.06); }
   .card h2{ margin:0 0 6px; font-family:'Lilita One',sans-serif; font-size:26px; color:#fff; letter-spacing:0.5px; }
@@ -40,23 +48,24 @@
 <canvas id="c3d"></canvas>
 <div id="vignette"></div>
 
-<div class="hud">
+<div class="hud-top">
   <div class="chip"><small>Score</small><span id="hudScore">0</span></div>
   <div class="chip"><small>Arrows</small><span id="hudArrows">20</span></div>
+  <div class="chip"><small>Time</small><span id="hudTime">60</span>s</div>
+  <div class="chip" id="hudCombo" style="display:none"></div>
+  <div class="chip" id="hudPhase" style="display:none">Warm-up</div>
+</div>
+
+<div class="hud-bottom">
+  <div class="chip" id="arrowChip" style="pointer-events:auto; cursor:pointer"><small>Arrow</small><span id="hudArrow">Wooden</span></div>
   <div class="chip" id="hudPet" style="pointer-events:auto; cursor:pointer"><small>Pet</small><span id="hudPetName">None</span></div>
   <button id="adv3dBtn" class="chip" style="pointer-events:auto">Adventure</button>
-  <div class="chip"><small>Time</small><span id="hudTime">60</span>s</div>
-  <div class="chip" id="hudCombo"></div>
-  <div class="chip" id="hudPhase" style="opacity:0.85">Warm-up</div>
-  <div class="chip" id="arrowChip" style="pointer-events:auto; cursor:pointer"><small>Arrow</small><span id="hudArrow">Wooden</span></div>
   <button id="marathonBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(108,194,74,0.92); color:#1a1822">Marathon</button>
-<div class="spacer" style="display:none"></div>
-<button id="share3dBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(100,80,180,0.82)">Share</button>
-<button id="daily3dBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(255,180,0,0.9); color:#1a1822">Daily</button>
+  <button id="share3dBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(100,80,180,0.82)">Share</button>
+  <button id="daily3dBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(255,180,0,0.9); color:#1a1822">Daily</button>
   <button id="pauseBtn" class="chip" style="pointer-events:auto; cursor:pointer; background:rgba(20,32,44,0.82)">⏸︎</button>
-  <div class="spacer"></div>
-  <div class="chip"><small>Prototype</small>3D</div>
 </div>
+<div class="chip chip--prototype" aria-hidden="true"><small>Prototype</small>3D</div>
 
 <div id="hudMsg"></div>
 <div id="hint">Drag back like a slingshot and let go. Pull down to shoot higher, sideways to steer.</div>

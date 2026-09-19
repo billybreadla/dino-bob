@@ -110,7 +110,8 @@ var SPRITES = (function () {
   // Big scenes + the heavy 3D boss frames ship as WebP (~85% smaller); the rest stay PNG.
   var WEBP = { bg_meadow: 1, bg_mountain: 1, bg_moon_cave: 1, bg_starlight: 1, bg_sunset_beach: 1, bg_underwater: 1, adventure_map: 1,
     boss_moonstone: 1, boss_moonstone_cracked: 1, boss_moonstone_broken: 1,
-    boss_moonstone_3d_0: 1, boss_moonstone_3d_1: 1, boss_moonstone_3d_2: 1, boss_moonstone_3d_3: 1, boss_moonstone_3d_4: 1, boss_moonstone_3d_5: 1 };
+    boss_moonstone_3d_0: 1, boss_moonstone_3d_1: 1, boss_moonstone_3d_2: 1, boss_moonstone_3d_3: 1, boss_moonstone_3d_4: 1, boss_moonstone_3d_5: 1,
+    chest_3d_0: 1, chest_3d_1: 1, chest_3d_2: 1, chest_3d_3: 1, chest_3d_4: 1, chest_3d_5: 1, chest_3d_6: 1, chest_3d_7: 1 };
   // every V6 asset shipped as WebP from day one
   NAMES.slice(NAMES.indexOf('target_stand')).forEach(function (n) { WEBP[n] = 1; });
   var imgs = {};
